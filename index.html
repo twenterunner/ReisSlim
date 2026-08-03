@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#174f46">
+  <title>ReisSlim – AI-roadtripplanner</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Proof of principle</p>
+      <h1>ReisSlim</h1>
+      <p>Van reisidee naar een realistische roadtrip, inclusief route, budget en GPX.</p>
+    </div>
+    <button id="newTripBtn" class="secondary">Nieuwe reis</button>
+  </header>
+
+  <main>
+    <section class="panel hero-grid">
+      <div>
+        <h2>Vertel ons wat voor reis je zoekt</h2>
+        <p class="muted">Deze versie gebruikt een transparant scoremodel en indicatieve gegevens. Live prijzen en beschikbaarheid volgen later.</p>
+      </div>
+      <div class="status-card">
+        <span>Opslag</span>
+        <strong>Lokaal op dit apparaat</strong>
+        <small>Geen account nodig</small>
+      </div>
+    </section>
+
+    <section class="panel" id="intakeSection">
+      <form id="tripForm">
+        <div class="form-grid">
+          <label>Vertrekplaats<input id="origin" value="Saasveld" required></label>
+          <label>Startdatum<input id="startDate" type="date" required></label>
+          <label>Aantal dagen<input id="days" type="number" min="3" max="30" value="10" required></label>
+          <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
+          <label>Volwassenen<input id="adults" type="number" min="1" max="8" value="2" required></label>
+          <label>Kinderen<input id="children" type="number" min="0" max="8" value="2" required></label>
+          <label>Vervoer
+            <select id="transport">
+              <option value="car">Auto</option>
+              <option value="motorcycle">Motor</option>
+              <option value="camper">Camper</option>
+            </select>
+          </label>
+          <label>Max. rijden per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required></label>
+          <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="3" required></label>
+          <label>Accommodatieniveau
+            <select id="comfort">
+              <option value="budget">Budget</option>
+              <option value="mid" selected>Middenklasse</option>
+              <option value="comfort">Comfort</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>Wat is belangrijk?</legend>
+          <div id="preferenceGrid" class="preference-grid"></div>
+        </fieldset>
+
+        <label class="full-width">Extra wensen
+          <textarea id="notes" rows="3" placeholder="Bijvoorbeeld: verwarmd zwembad, weinig steden, mooie motorwegen, maximaal twee hotels..."></textarea>
+        </label>
+
+        <div class="actions">
+          <button type="submit">Maak reisvoorstellen</button>
+          <button type="button" id="loadDemoBtn" class="secondary">Laad voorbeeld</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="resultsSection" class="hidden">
+      <section class="panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Stap 1</p><h2>Beste bestemmingen</h2></div>
+          <span id="resultCount" class="badge"></span>
+        </div>
+        <div id="destinationCards" class="card-grid"></div>
+      </section>
+
+      <section class="panel hidden" id="planSection">
+        <div class="section-heading">
+          <div><p class="eyebrow">Stap 2</p><h2 id="planTitle">Reisplan</h2></div>
+          <div class="actions compact">
+            <button id="saveTripBtn" class="secondary">Opslaan</button>
+            <button id="exportJsonBtn" class="secondary">JSON</button>
+            <button id="exportGpxBtn">GPX</button>
+          </div>
+        </div>
+
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div id="map"></div>
+
+        <div class="two-column">
+          <div>
+            <h3>Dagplanning</h3>
+            <div id="itinerary"></div>
+          </div>
+          <div>
+            <h3>Budgetindicatie</h3>
+            <div id="budgetBreakdown"></div>
+            <h3>Controlepunten</h3>
+            <div id="validationList"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <p>ReisSlim v0.1.0 · Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
