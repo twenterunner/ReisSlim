@@ -8,7 +8,7 @@ ReisSlim 0.9 is een GitHub Pages-compatibele PWA met een deterministische, const
 
 1. **Configuratie en data** — `config.js` bevat versie, voertuigprofielen, routering en expliciete aannames; `destinations.js` bevat uitsluitend de gecureerde offline fallback.
 2. **Domein** — `constraint-engine.js` scheidt harde voorwaarden van transparante zachte trade-offs; `proposal-engine.js` selecteert met een deterministische MMR-achtige diversiteitsstap; `itinerary-variants.js` bouwt reisstijlen; `plan-solver.js` verdeelt reisdagen en tijdvensters.
-3. **Provider en infrastructuur** — `destination-provider.js` ontdekt zonder vaste regiolimiet nieuwe bereikbare plaatsen via opeenvolgende Overpass-zoekringen. `routing-provider.js` kiest gateway, lokale OpenRouteService-integratie of beperkte OSRM-fallback. `place-provider.js` verzorgt vertrekgeocoding, route-POI's, Open-Meteo en lokale caches. `api/route-worker.js` beschermt en normaliseert TomTom.
+3. **Provider en infrastructuur** — `destination-provider.js` ontdekt zonder vaste regiolimiet nieuwe bereikbare plaatsen via opeenvolgende Overpass-zoekringen. `routing-provider.js` kiest gateway, lokale OpenRouteService-integratie of beperkte OSRM-fallback. `place-provider.js` verzorgt vertrekgeocoding, route-POI's, Open-Meteo en lokale caches. De vlak geplaatste `route-worker.js` beschermt en normaliseert TomTom.
 4. **Presentatie** — `ui-renderer.js` rendert ge-escapete HTML; `app.js` orkestreert state en events. `index.html` en `styles.css` definiëren de mobiele shell.
 5. **PWA** — `manifest.webmanifest` en `service-worker.js` leveren installatiegegevens, versieverwijdering en offline shellgedrag.
 
