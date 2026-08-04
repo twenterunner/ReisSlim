@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.0 — 2026-08-04
+
+### Added
+
+- zero-catalogue destination resolution by geographic type and boundary;
+- provider-evidence anchors, dynamic region clustering and deterministic constrained route graphs;
+- generic highlight omission with constraint reason and additional-day guidance;
+- selectable per-day map route layers and day-card highlighting;
+- multiple named, vehicle-filtered accommodation candidates where provider data permits;
+- recorded acceptance fixtures for South Africa, Croatia, Bulgaria, Namibia and an unknown geocoded region.
+
+### Fixed
+
+- proposal cards no longer render from the old catalogue before live discovery;
+- failed discovery cannot substitute unrelated destinations;
+- cached discovery identity includes destination resolution, vehicle and material constraints;
+- changing vehicle triggers a complete replan and every recommendation carries a canonical vehicle-profile identity;
+- Wikimedia Commons selection scans all returned candidates for an open licence;
+- Namibia fly-drive planning uses multiple bases and can omit Fish River Canyon under tight limits.
+
+### Changed
+
+- version/build to 1.1.0/1100 and engine/storage schema to 8;
+- `destinations.js` removed from the production import path and PWA cache;
+- hard-coded dashboard destinations replaced with worldwide neutral onboarding.
+
 ## 1.0.0 — 2026-08-04
 
 ### Added

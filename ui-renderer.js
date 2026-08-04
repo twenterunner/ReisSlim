@@ -157,12 +157,22 @@ export function renderPlan(state) {
     ['Reistijd heen', `± ${plan.routeMetrics.oneWayElapsedHours.toFixed(1)} u`],
     ['Budget', `€${budget.total.toLocaleString('nl-NL')}`]
   ].map(([label, value]) => `<div class="summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
-  $('planWarnings').innerHTML = plan.warnings.length ? plan.warnings.map(item => `<div class="inline-warning">${escapeHtml(item)}</div>`).join('') : '<div class="inline-success">Budget, reisduur, daglimiet en accommodatiewissels passen binnen je voorwaarden.</div>';
+  const planImages = [destination.image ? { name: destination.name, image: destination.image } : null, ...(destination.highlights || []).filter(item => item.image).slice(0, 4)].filter(Boolean);
+  $('planImages').innerHTML = planImages.map(item => `<figure class="destination-card"><img class="destination-image" src="${escapeHtml(safeExternalUrl(item.image.url))}" alt="${escapeHtml(item.name)}" loading="lazy"><figcaption><strong>${escapeHtml(item.name)}</strong><br><a class="proposal-attribution" href="${escapeHtml(safeExternalUrl(item.image.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.image.attribution)}</a></figcaption></figure>`).join('');
+  $('planImages').classList.toggle('hidden', !planImages.length);
+  const omissionDetails = (plan.omittedHighlights || []).length
+    ? `<details class="proposal-evidence" open><summary>Bewust weggelaten highlights</summary><ul>${plan.omittedHighlights.map(item => `<li><strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(item.reason)} ${item.minimumTripDays ? `Minimumreis: ${item.minimumTripDays} dagen.` : ''}</li>`).join('')}</ul><p>Indicatie voor de eerstvolgende uitbreiding: ${plan.minimumAdditionalDays || 1} extra dag(en). ReisSlim forceert deze highlights niet in een onrealistische route.</p></details>`
+    : '';
+  $('planWarnings').innerHTML = (plan.warnings.length ? plan.warnings.map(item => `<div class="inline-warning">${escapeHtml(item)}</div>`).join('') : '<div class="inline-success">Budget, reisduur, daglimiet en accommodatiewissels passen binnen je voorwaarden.</div>') + omissionDetails;
   const weatherDays = plan.weather?.days || [];
   $('weatherSummary').innerHTML = weatherDays.length
     ? `<strong>Weer langs de bestemming</strong><div class="weather-days">${weatherDays.slice(0, 7).map(day => { const weather = weatherSuitability(day, trip); return `<div class="weather-day"><span class="weather-icon" aria-hidden="true">${weather.icon}</span><strong>${escapeHtml(day.date.slice(5))}</strong><span>${Math.round(day.minimumC)}–${Math.round(day.maximumC)}°C</span><small>${escapeHtml(weather.label)} · ${weather.score}/100</small></div>`; }).join('')}</div><small>Bron: Open-Meteo · verwachting, geen garantie. Geschiktheid houdt rekening met voertuig, wind en neerslag.</small>`
     : '<strong>Weer</strong><p>Voor deze vertrekdatum is nog geen live verwachting beschikbaar; gebruik de seizoensinschatting en controleer kort voor vertrek.</p>';
   $('itinerary').innerHTML = plan.days.map(renderDay).join('');
+  [...$('itinerary').querySelectorAll('.day-card')].forEach((card, index) => {
+    card.dataset.mapDay = String(plan.days[index]?.day || index + 1);
+    card.title = `Tik om dag ${card.dataset.mapDay} op de kaart te markeren`;
+  });
   $('budgetSummary').innerHTML = [['Lage raming', `€${budget.lowTotal.toLocaleString('nl-NL')}`], ['Centrale raming', `€${budget.total.toLocaleString('nl-NL')}`], ['Hoge raming', `€${budget.conservativeTotal.toLocaleString('nl-NL')}`], [budget.remaining >= 0 ? 'Resterend' : 'Overschrijding', `${budget.remaining >= 0 ? '' : '−'}€${Math.abs(budget.remaining).toLocaleString('nl-NL')}`]].map(([label, value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join('');
   $('budgetBreakdown').innerHTML = budget.rows.map(([label, amount]) => `<div class="budget-row"><span>${escapeHtml(label)}</span><strong>€${amount.toLocaleString('nl-NL')}</strong></div>`).join('') + `<div class="budget-row total"><strong>Totaal</strong><strong>€${budget.total.toLocaleString('nl-NL')}</strong></div>`;
   $('budgetAssumptions').innerHTML = `<summary>Aannames en vertrouwen</summary><p>Ramingvertrouwen: <strong>${escapeHtml(budget.confidence)}</strong>. Brandstof €${budget.assumptions.fuelPricePerLitre.toFixed(2)}/l, verbruik ${budget.assumptions.consumption} l/100 km, onvoorzien ${Math.round(budget.assumptions.contingencyRate * 100)}%. Overnachtingstype: ${escapeHtml(profile.accommodationLabel)}. Prijzen zijn niet-live.</p>`;

@@ -1,12 +1,13 @@
-# ReisSlim 1.0.0 — global intelligent travel assistant
+# ReisSlim 1.1.0 — zero-catalogue travel intelligence
 
 ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips and multi-modal journeys. It supports direct trips by car, motorcycle, camper or caravan, plus fly-drive, fly-ride, fly-camper and train/ferry access. The deterministic planner works without a server; optional public data providers enrich destinations, routes, POIs, weather and open-license images.
 
-## What v1.0 does
+## What v1.1 does
 
 - accepts any typed origin or privacy-aware current location;
-- discovers destinations in staged global batches instead of a finite region list;
-- uses a curated catalog only as an offline fallback and regression fixture;
+- resolves any typed city, region, country, island or bounded destination using provider identity, type and bounds;
+- discovers provider-backed gateways, settlements, highlights and services, then clusters them into feasible trip regions;
+- never uses a finite destination catalogue or unrelated fallback in the production proposal flow;
 - creates 6–12 diverse proposals when enough candidates satisfy the hard constraints;
 - permits at most two clearly labelled, bounded stretch ideas;
 - supports loops with a different return corridor, out-and-back routes and multi-modal open-jaw trips;
@@ -18,9 +19,10 @@ ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints
 - exports daily GPX tracks and waypoints from the same geometry used on the map;
 - includes a Travel Readiness dashboard with official source links and explicit unverified states;
 - learns bounded preferences locally, supports private mode and never silently applies conversational changes;
-- migrates v0.x saved trips to schema 7 and rebuilds stale derived plans.
+- builds a constrained highlight/overnight graph, explains omissions and renders selectable route layers per travel day;
+- migrates older saved trips to schema 8 and rebuilds derived data with the current vehicle profile.
 
-Namibia is an explicit fixture for testing fly-drive/fly-camper, remote readiness, multi-region planning and budget uncertainty. It is not a static template system: arbitrary destinations are still discovered dynamically.
+Namibia, South Africa, Croatia and Bulgaria exist only as recorded provider-shaped acceptance fixtures. They are not imported by production modules and do not control worldwide coverage.
 
 ## Run locally
 
@@ -44,7 +46,7 @@ This runs syntax, unit, integration, migration, GPX, static-server and PWA check
 
 ## Providers, privacy and trust
 
-The offline planner never needs an API key. Optional live data uses Nominatim, Overpass, OSRM/OpenRouteService, Open-Meteo and Wikimedia Commons. A personal OpenRouteService key is stored separately in the browser and is never included in saved-trip JSON or source control. See [API_SOURCES.md](API_SOURCES.md).
+Dynamic proposal generation uses Nominatim and Overpass without a bundled API key. OSRM/OpenRouteService, Open-Meteo and Wikimedia Commons enrich the selected plan. If discovery fails and no exact-request cache exists, ReisSlim shows no unrelated trips. A personal OpenRouteService key is stored separately in the browser and is never included in saved-trip JSON or source control. See [API_SOURCES.md](API_SOURCES.md).
 
 Trips, dismissed/saved proposals and preference evidence stay in browser `localStorage`. Private mode disables new learning. Current-location coordinates are only used after explicit browser permission. See [PERSONALIZATION.md](PERSONALIZATION.md).
 
@@ -52,7 +54,7 @@ ReisSlim is planning and decision support. It does not claim live inventory, con
 
 ## GitHub Pages
 
-Publish the repository root through **Settings → Pages → Deploy from a branch**. All paths are project-site relative, and the v1.0 service worker caches the complete flat runtime shell.
+Publish the repository root through **Settings → Pages → Deploy from a branch**. All paths are project-site relative, and the v1.1 service worker caches the flat runtime shell without `destinations.js`.
 
 ## Architecture
 

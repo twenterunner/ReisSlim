@@ -1,4 +1,4 @@
-# ReisSlim v1.0 architecture
+# ReisSlim v1.1 architecture
 
 ## System boundary
 
@@ -6,24 +6,26 @@ ReisSlim is a flat-file, GitHub Pages-compatible PWA. `app.js` owns the current 
 
 ## Data flow
 
-`TripRequest → origin normalization → staged discovery → hard-constraint gate → suitability scoring → MMR diversity → proposal variants → canonical itinerary → provider enrichment → budget/readiness/quality → map + JSON + GPX`
+`TripRequest → origin geocoding → destination type/boundary resolution → provider anchors → geographic clustering → route graph → hard-constraint gate → evidence scoring/diversity → overnight/night solver → canonical days → provider enrichment → budget/readiness/quality → map + JSON + GPX`
 
 Every selected plan must contain exactly the requested number of days, begin at the entered origin and end there unless a confirmed multi-modal open-jaw topology returns from another destination base. The home origin is never an activity or accommodation destination.
 
 ## Layers
 
-1. **Request and migration** — `trip-model.js`, `storage.js`, `config.js` normalize schema 7 and rebuild stale v0.x derived plans.
+1. **Request and migration** — `trip-model.js`, `storage.js`, `config.js` normalize schema 8 and rebuild stale derived plans and vehicle-specific recommendations.
 2. **Constraint and proposal domain** — `constraint-engine.js`, `destination-engine.js`, `proposal-engine.js`, `preference-engine.js` separate feasibility from ranking and apply bounded local learning.
-3. **Routing and itinerary** — `vehicle-intelligence.js`, `route-engine.js`, `route-topology.js`, `multimodal-engine.js`, `plan-solver.js`, `itinerary-engine.js` create road and access segments, timings, alternate return corridors and day schedules.
+3. **Routing and itinerary** — `vehicle-intelligence.js`, `route-engine.js`, `route-graph-engine.js`, `route-topology.js`, `multimodal-engine.js`, `plan-solver.js`, `itinerary-engine.js` create graph nodes/edges, vehicle timings, omissions, return corridors and day schedules.
 4. **Decision support** — `budget-engine.js`, `travel-readiness.js`, `trip-quality-engine.js`, `trip-optimizer.js`, `assistant-engine.js` produce uncertainty ranges, blockers, quality dimensions and previewable changes.
 5. **Provider platform** — `provider-platform.js` defines envelopes, request budgets, timeouts, health and deduplication. Destination, route, place, weather and image adapters retain source, freshness, confidence and fallback state.
 6. **Presentation/export** — `ui-renderer.js`, `map-view.js`, `gpx-generator.js` render escaped data from the canonical plan. `service-worker.js` provides the offline shell.
 
 ## Global discovery
 
-`destination-provider.js` generates deterministic golden-angle search points. Direct road trips use reach derived from daily travel constraints; multi-modal trips use global rings up to intercontinental scale. A typed destination is geocoded once and turns discovery into local staged searches around that point. Each user action issues one bounded Overpass batch, caches it, deduplicates it and advances the cursor. There is no global candidate cap, although each request has a strict size and timeout.
+`destination-provider.js` treats a typed destination as a provider-resolved geographic object rather than a centre-point string. Country and region bounds drive staged searches; evidence anchors are clustered by distance and constraints into regional concepts. Each provider batch is bounded for reliability, while the discovery cursor has no catalogue or coverage cap.
 
-Curated destinations remain an offline fallback. The Namibia fixture verifies fly-drive/fly-camper, open-jaw, remote readiness and uncertainty behavior; it does not control global coverage.
+Production proposal generation has no catalogue import. Only an unexpired cache for the identical normalized request/provider/schema identity may be reused. Without it, failure is explicit and produces no proposals. Recorded country fixtures live only in tests.
+
+`route-graph-engine.js` selects a feasible highlight subset deterministically. Edge elapsed time, accommodation churn and duration can remove a famous highlight; the canonical plan retains the omission reason and extra-day guidance.
 
 ## Route topology and segments
 

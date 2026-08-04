@@ -9,10 +9,13 @@ function usableLicense(metadata = {}) {
 }
 
 export function normalizeCommonsImage(payload) {
-  const page = Object.values(payload?.query?.pages || {})[0];
+  const page = Object.values(payload?.query?.pages || {}).find(candidate => {
+    const info = candidate?.imageinfo?.[0];
+    return info?.thumburl && /^https:\/\//i.test(info.thumburl) && usableLicense(info.extmetadata || {});
+  });
   const info = page?.imageinfo?.[0];
   const metadata = info?.extmetadata || {};
-  if (!info?.thumburl || !usableLicense(metadata)) return null;
+  if (!page || !info) return null;
   return {
     url: info.thumburl,
     sourceUrl: info.descriptionurl || `https://commons.wikimedia.org/?curid=${page.pageid}`,
@@ -45,11 +48,18 @@ export async function fetchDestinationImage(destination, { fetchImpl = globalThi
 }
 
 export async function enrichDestinationImages(destinations, options = {}) {
-  const maximum = Math.max(0, Math.min(6, options.maximum || 4));
+  const maximum = Math.max(0, Math.min(12, options.maximum || 8));
   const selected = destinations.slice(0, maximum);
   const results = await Promise.all(selected.map(destination => fetchDestinationImage(destination, options)));
   selected.forEach((destination, index) => { if (results[index]) destination.image = results[index]; });
   return destinations;
+}
+
+export async function enrichHighlightImages(destination, options = {}) {
+  const highlights = (destination?.highlights || []).filter(item => !item.gateway).slice(0, options.maximum || 4);
+  const images = await Promise.all(highlights.map(item => fetchDestinationImage({ id: `${destination.id}-${item.id}`, name: item.name }, options)));
+  highlights.forEach((item, index) => { if (images[index]) item.image = images[index]; });
+  return destination;
 }
 
 export const imageProviderAttribution = 'Wikimedia Commons; alleen expliciet open gelicentieerde resultaten met zichtbare attributie.';

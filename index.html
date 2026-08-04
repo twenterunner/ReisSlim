@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1000">
+  <link rel="stylesheet" href="styles.css?v=1100">
 </head>
 <body>
   <header class="topbar">
@@ -47,11 +47,9 @@
       </section>
 
       <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">Inspiratie</p><h2>Populaire richtingen</h2></div></div>
+        <div class="section-heading"><div><p class="eyebrow">Wereldwijd</p><h2>Geen vaste bestemmingslijst</h2></div></div>
         <div class="inspiration-grid">
-          <button class="inspiration-card" data-inspire="slovenia" type="button"><span>🏔️</span><strong>Slovenië</strong><small>Meren, bergen en goede waarde</small></button>
-          <button class="inspiration-card" data-inspire="dolomites" type="button"><span>🏍️</span><strong>Dolomieten</strong><small>Bochten, passen en Italiaans eten</small></button>
-          <button class="inspiration-card" data-inspire="blackforest" type="button"><span>🌲</span><strong>Zwarte Woud</strong><small>Dichtbij en gezinsvriendelijk</small></button>
+          <button class="inspiration-card" data-inspire="" type="button"><span>🌍</span><strong>Voer elke bestemming in</strong><small>Land, regio, stad, eiland of natuurgebied</small></button>
         </div>
       </section>
     </section>
@@ -65,7 +63,7 @@
       <section class="panel" id="intakeSection">
         <form id="tripForm">
           <div class="form-grid">
-            <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie Slovenië"></label>
+            <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie 2027"></label>
             <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Vrije invoer; live geocoding wordt lokaal gecachet.</small><button id="useLocationBtn" class="secondary inline-control" type="button">Gebruik mijn huidige locatie</button></label>
             <datalist id="originOptions"><option>Saasveld</option><option>Amsterdam</option><option>Rotterdam</option><option>Utrecht</option><option>Eindhoven</option><option>Groningen</option><option>Maastricht</option><option>Zwolle</option><option>Enschede</option><option>Hengelo</option><option>Almelo</option><option>Arnhem</option><option>Nijmegen</option></datalist>
             <label>Gewenste bestemming of richting<input id="destinationQuery" placeholder="Leeg = ReisSlim ontdekt wereldwijd"><small>Bijvoorbeeld Namibië, kust, Scandinavië of “verras me”. Geen vaste regiolijst.</small></label>
@@ -95,7 +93,7 @@
               <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong><small>Uit: langere rijdagen mogen alleen als duidelijk compromis worden getoond.</small></span></label>
               <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong><small>Uit: extra wissels tellen als zachte afweging.</small></span></label>
               <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Maximaal twee stretch-ideeën tonen</strong><small>Alleen een kleine budget-, reistijd- of wisselafwijking; nooit voertuigveiligheid, vertrek of terugkeer.</small></span></label>
-              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer proberen</strong><small>Gebruikt OpenStreetMap-, route- en weerdata met automatische offline fallback.</small></span></label>
+              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Dynamische ontdekking en live data</strong><small>Gebruikt actuele providerdata en alleen een exact passende cache; nooit een verborgen bestemmingscatalogus.</small></span></label>
               <label class="check-option"><input id="remoteTravel" type="checkbox"><span><strong>Afgelegen / expeditieroute</strong><small>Voegt strengere controles toe voor brandstof, water, communicatie, permits en evacuatie.</small></span></label>
               <label class="check-option"><input id="privateMode" type="checkbox"><span><strong>Privémodus</strong><small>Leert niet van bewaren, kiezen of afwijzen. Bestaande lokale voorkeuren blijven onaangeroerd.</small></span></label>
             </div>
@@ -118,6 +116,7 @@
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
+        <div id="planImages" class="inspiration-grid"></div>
         <div id="planWarnings" aria-live="polite"></div>
         <div id="weatherSummary" class="weather-summary"></div>
         <section class="readiness-card"><div class="section-heading"><div><p class="eyebrow">Travel Readiness</p><h2>Wat moet nog bevestigd worden?</h2></div><strong id="readinessScore">—</strong></div><p id="readinessDisclaimer" class="muted"></p><div id="readinessList"></div></section>
@@ -163,8 +162,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.0.0 · Build 1000 · Global travel intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.1.0 · Build 1100 · Zero-catalogue travel intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="app.js?v=1000"></script>
+  <script type="module" src="app.js?v=1100"></script>
 </body>
 </html>

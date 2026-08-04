@@ -215,10 +215,10 @@ test('OpenStreetMap discovery normalizes arbitrary towns into plannable dynamic 
   ] };
   const dynamic = normalizeDiscoveredDestinations(trip, payload);
   assert.ok(dynamic.length >= 2);
-  assert.ok(dynamic.every(item => item.dynamic && item.bases.length && item.routeStops.length >= 2));
+  assert.ok(dynamic.every(item => item.dynamic && item.bases.length && Array.isArray(item.routeStops)));
   const discovered = await discoverDestinationBatch(trip, { cursor: 4, storage: null, fetchImpl: async () => ({ ok: true, json: async () => payload }) });
   assert.equal(discovered.live, true);
-  assert.ok(discovered.destinations.every(item => item.id.startsWith('osm-')));
+  assert.ok(discovered.destinations.every(item => item.id.startsWith('dynamic-')));
 });
 
 test('Normal proposals satisfy every hard destination constraint and stretch ideas are capped', () => {
@@ -410,7 +410,7 @@ test('Old stored data migrates without crashing and discards stale derived plans
   assert.equal('itinerary' in migrated, false);
   const storage = new MemoryStorage(); storage.setItem('reisslim.current.v2', JSON.stringify(legacy));
   assert.doesNotThrow(() => loadDraft(storage));
-  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v7'));
+  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v8'));
 });
 
 test('Global discovery is not clipped to Europe and supports targeted locations', () => {

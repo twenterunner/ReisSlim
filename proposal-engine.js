@@ -32,7 +32,7 @@ function primaryStyle(item, trip) {
 function focusBonus(item, focus) {
   if (focus === 'closer') return Math.max(0, 12 - item.distanceKm / 90);
   if (focus === 'cheaper') return Math.max(0, (100 - item.dimensions.budget) * -.04 + 6);
-  if (focus === 'surprising') return (item.crowds || 5) * .45 + (item.id === 'slovenia' || item.id === 'dolomites' ? -3 : 2);
+  if (focus === 'surprising') return (item.crowds || 5) * .45 + (item.evidence?.anchors ? Math.min(4, item.evidence.anchors / 10) : 0);
   if (focus === 'family') return (item.dimensions.family || item.family * 10 || 50) * .06;
   if (focus === 'scenic') return (item.dimensions.scenery || 50) * .05 + (item.dimensions.motorcycle || 50) * .02;
   return 0;
@@ -65,8 +65,14 @@ function proposalFromDestination(item, trip, focus, learnedProfile = null) {
     routeCharacter: trip.travelMode !== 'direct' ? `${trip.travelMode} met lokale ${trip.routeTopology === 'open-jaw' ? 'open-jaw route' : 'rondreis'}` : trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
     tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${item.constraintStatus.travelLegs * 2} reisetappes`,
     keyTradeoff: explainTradeoff(item),
-    evidence: [`Offline regioprofiel met ${item.bases.length} geankerde bases`, `${item.routeStops.length} corridorstops voor routeopbouw`, `Voertuigscore ${item.dimensions.transport}/100`],
-    sourceLabel: item.dynamic ? 'Live ontdekt via OpenStreetMap Overpass; route, plaatsen en weer worden na selectie afzonderlijk gevalideerd' : 'ReisSlim offline regiocatalogus; live route-, plaats- en weerdata wordt na selectie toegevoegd'
+    evidence: [
+      `${item.evidence?.anchors || 0} providerankers en ${item.evidence?.highlights || 0} highlights`,
+      `${item.bases.length} dynamisch afgeleide mogelijke uitvalsbases`,
+      `Voertuigscore ${item.dimensions.transport}/100; neutrale velden: ${(item.evidence?.neutralFields || []).join(', ') || 'geen'}`
+    ],
+    sourceLabel: item.provider?.confidence
+      ? `Dynamisch ontdekt via ${item.discoverySource}; vertrouwen ${item.provider.confidence}, ${item.discoveryCache?.cached ? `exacte cache van ${Math.round(item.discoveryCache.ageMs / 3600000)} uur oud` : `opgehaald ${item.provider.fetchedAt || item.discoveredAt}`}`
+      : 'Opnieuw opgebouwd uit eerder opgeslagen canoniek providerbewijs'
   };
 }
 

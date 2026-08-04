@@ -5,6 +5,8 @@ let map;
 let activeLayers = [];
 let layerControl;
 let activeBounds = [];
+let dayLayers = new Map();
+let selectedDay = null;
 
 const colors = {
   origin: '#176b5c', return: '#123f3a', overnight: '#e6a53b', destination: '#7a5dc7',
@@ -22,6 +24,7 @@ function clearLayers() {
     layerControl.remove();
     layerControl = null;
   }
+  dayLayers = new Map();
 }
 
 function addOverlay(name) {
@@ -46,8 +49,6 @@ export function renderMap(plan, elementId = 'map') {
   clearLayers();
 
   const overlays = {};
-  const [routeName, routeLayer] = addOverlay('Dagroute');
-  overlays[routeName] = routeLayer;
   const [overnightName, overnightLayer] = addOverlay('Dagpunten & overnachtingen');
   overlays[overnightName] = overnightLayer;
   const [breakName, breakLayer] = addOverlay('Pauzes & brandstof');
@@ -61,6 +62,9 @@ export function renderMap(plan, elementId = 'map') {
 
   const bounds = [];
   segments.forEach(segment => {
+    const [dayName, routeLayer] = addOverlay(`Dag ${segment.day} · ${segment.kind}`);
+    overlays[dayName] = routeLayer;
+    dayLayers.set(segment.day, routeLayer);
     const coordinates = segment.points.map(point => [point.lat, point.lon]);
     const liveRoute = ['tomtom', 'openrouteservice', 'osrm'].includes(segment.source);
     bounds.push(...coordinates);
@@ -101,6 +105,7 @@ export function renderMap(plan, elementId = 'map') {
   layerControl = L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(map);
   activeBounds = bounds;
   if (activeBounds.length) map.fitBounds(activeBounds, { padding: [30, 30] });
+  if (selectedDay) setTimeout(() => highlightMapDay(selectedDay), 0);
   setTimeout(() => map.invalidateSize(), 100);
   return {
     rendered: true,
@@ -109,6 +114,25 @@ export function renderMap(plan, elementId = 'map') {
     waypoints: proposals.length,
     source: plan.routing?.source || 'offline-corridor'
   };
+}
+
+export function buildMapModel(plan) {
+  return {
+    segments: collectRouteSegments(plan).map(segment => ({ ...segment, label: `Dag ${segment.day} · ${segment.kind}`, estimated: !['tomtom', 'openrouteservice', 'osrm'].includes(segment.source) })),
+    points: collectRoutePoints(plan),
+    recommendations: collectRecommendationPoints(plan)
+  };
+}
+
+export function highlightMapDay(day) {
+  selectedDay = Number(day) || null;
+  if (!map || !selectedDay) return false;
+  const layer = dayLayers.get(selectedDay);
+  if (!layer) return false;
+  layer.eachLayer(item => item.setStyle?.({ weight: 8, opacity: 1 }));
+  const bounds = layer.getBounds?.();
+  if (bounds?.isValid?.()) map.fitBounds(bounds, { padding: [40, 40] });
+  return true;
 }
 
 export function invalidateMap() {

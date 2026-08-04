@@ -37,7 +37,7 @@ export function scoreDestination(trip, destination) {
     : route;
   const budget = buildBudget(trip, destination);
   const preference = preferenceScore(trip, destination);
-  const season = destination.season?.includes(month) ? 90 : 40;
+  const season = destination.season?.length ? (destination.season.includes(month) ? 90 : 40) : 50;
   const vehicle = transportId(trip.transport);
   const transport = vehicle === 'motorcycle'
     ? destination.motorcycle * 10
@@ -68,8 +68,9 @@ export function scoreDestination(trip, destination) {
   const score = roundScore(preference.score * .36 + budgetFit * .2 + season * .14 + transport * .16 + driving * .14 + intentScore);
   const compromises = [];
   compromises.push(...constraintStatus.violations.map(item => item.detail));
-  if (season < 60) compromises.push('De reis valt buiten de voorkeursmaanden in de offline bestemmingdata.');
-  if (!route.originKnown) compromises.push('De vertrekplaats is niet beschikbaar in de offline coördinatencatalogus.');
+  if (destination.season?.length && season < 60) compromises.push('De reis valt buiten de voorkeursmaanden die uit providerbewijs zijn afgeleid.');
+  if (!destination.season?.length) compromises.push('Seizoensgeschiktheid is onbekend en telt als neutrale prior met lager vertrouwen.');
+  if (!route.originKnown) compromises.push('De vertrekplaats kon niet worden gegeocodeerd; de routebelasting heeft lager vertrouwen.');
   const confidence = route.originKnown ? (destination.routeStops?.length >= route.requiredLegs - 1 ? 'redelijk' : 'beperkt') : 'beperkt';
   const matchLabels = preference.matches.length ? preference.matches.slice(0, 3).join(', ') : 'algemene reiswensen';
   return {

@@ -1,5 +1,4 @@
 import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js';
-import { destinations } from './destinations.js';
 import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js';
 import { discoverDestinationBatch } from './destination-provider.js';
 import { buildItinerary } from './itinerary-engine.js';
@@ -11,14 +10,14 @@ import { validatePlan } from './itinerary-validator.js';
 import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js';
 import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js';
 import { downloadGpx, downloadJson } from './gpx-generator.js';
-import { invalidateMap, renderMap } from './map-view.js';
+import { highlightMapDay, invalidateMap, renderMap } from './map-view.js';
 import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js';
 import { evaluatePlanConstraints } from './constraint-engine.js';
 import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js';
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
-import { enrichDestinationImages } from './image-provider.js';
+import { enrichDestinationImages, enrichHighlightImages } from './image-provider.js';
 
 const defaults = () => normalizeTrip({
   origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500, travelMode: 'direct', routeTopology: 'loop', tripPace: 'balanced', destinationQuery: '',
@@ -30,7 +29,7 @@ const defaults = () => normalizeTrip({
 const state = {
   trip: null, ranked: [], ranking: null, destination: null, plan: null, budget: null,
   validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false,
-  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false,
+  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [], discoveryCursor: 0, discoveryBusy: false,
   preferenceProfile: loadPreferenceProfile(), assistantPreview: null
 };
 
@@ -57,8 +56,15 @@ function learn(kind, destination) {
 
 async function hydrateProposalImages() {
   if (!state.trip?.liveData || !state.ranked.length) return;
-  await enrichDestinationImages(state.ranked, { maximum: 4 });
+  await enrichDestinationImages(state.ranked, { maximum: 8 });
   renderDestinations(state);
+}
+
+async function hydratePlanImages(destinationId) {
+  if (!state.trip?.liveData || !state.destination) return;
+  await enrichDestinationImages([state.destination], { maximum: 1 });
+  await enrichHighlightImages(state.destination, { maximum: 4 });
+  if (state.destination?.id === destinationId && state.plan) renderPlan(state);
 }
 
 function stateForStorage() {
@@ -119,6 +125,7 @@ function applyDestination(destination, optimize = false) {
   persistDraft();
   renderDashboard(state, loadTrips());
   if (state.trip.liveData) void enhanceLiveData(destination.id, state.plan);
+  if (state.trip.liveData) void hydratePlanImages(destination.id);
 }
 
 function chooseProposal(destination) {
@@ -168,9 +175,21 @@ async function discoverLiveOptions({ replace = false, append = false } = {}) {
   });
   state.discoveryCursor += 1;
   state.discoveryBusy = false;
-  if (!result.destinations.length) { setStatus(result.reason || 'Geen nieuwe live regio’s in deze zoekring gevonden'); return 0; }
-  const known = new Set(state.catalog.map(item => item.id));
+  if (!result.destinations.length) {
+    if (replace) {
+      state.catalog = [];
+      state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8 }));
+      state.ranked = [];
+      renderDestinations(state); renderComparison(state);
+    }
+    showError(result.reason || 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.');
+    setStatus(result.reason || 'Dynamische ontdekking niet beschikbaar');
+    return 0;
+  }
+  const known = new Set(replace ? [] : state.catalog.map(item => item.id));
+  if (replace) state.catalog = [];
   state.catalog.push(...result.destinations.filter(item => !known.has(item.id)));
+  showError();
   if (replace) {
     state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
     state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state); void hydrateProposalImages();
@@ -196,6 +215,7 @@ function applyVariant(variantId) {
   persistDraft(`${variant.label} reisplan opgeslagen`);
   renderDashboard(state, loadTrips());
   if (state.trip.liveData) void enhanceLiveData(destination.id, state.plan);
+  if (state.trip.liveData) void hydratePlanImages(destination.id);
 }
 
 async function enhanceLiveData(destinationId, originalPlan) {
@@ -226,7 +246,7 @@ function rebuildFromRecord(record) {
   writeTripForm(state.trip);
   renderVehicleControls();
   syncTravelModeControls();
-  state.catalog = record.destinationProfile?.dynamic ? [...destinations, record.destinationProfile] : [...destinations];
+  state.catalog = record.destinationProfile?.dynamic ? [record.destinationProfile] : [];
   state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, excludedIds: state.dismissedIds }));
   state.ranked = state.ranking.visible;
   state.destination = state.ranking.candidates.find(item => item.id === record.destinationId) || (record.destinationProfile?.id === record.destinationId ? record.destinationProfile : null);
@@ -239,7 +259,7 @@ function rebuildFromRecord(record) {
 }
 
 function resetState(trip = defaults()) {
-  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false });
+  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [], discoveryCursor: 0, discoveryBusy: false });
   writeTripForm(trip);
   renderVehicleControls();
   syncTravelModeControls();
@@ -256,7 +276,7 @@ function initialize() {
   renderPreferenceGrid();
   renderVehicleControls();
   syncTravelModeControls();
-  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Global travel intelligence`;
+  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Zero-catalogue travel intelligence`;
   $('orsApiKey').value = readRoutingSettings().orsApiKey;
   const restored = loadDraft();
   if (restored?.trip) { rebuildFromRecord(restored); setStatus('Concept hersteld en met de actuele planner herberekend'); }
@@ -275,7 +295,12 @@ function initialize() {
       if (select) select.disabled = !event.target.checked;
     }
   });
-  $('transport').addEventListener('change', () => renderVehicleControls({ resetDefaults: true }));
+  $('transport').addEventListener('change', () => {
+    renderVehicleControls({ resetDefaults: true });
+    state.routingRun += 1;
+    state.plan = null; state.destination = null; state.variants = [];
+    if (!$('resultsSection').classList.contains('hidden')) queueMicrotask(() => $('tripForm').requestSubmit());
+  });
   $('travelMode').addEventListener('change', () => {
     const vehicle = { 'fly-drive': 'car', 'fly-ride': 'motorcycle', 'fly-camper': 'motorhome' }[$('travelMode').value];
     if (vehicle) $('transport').value = vehicle;
@@ -283,6 +308,10 @@ function initialize() {
     syncTravelModeControls();
   });
   $('routeStyle').addEventListener('change', () => renderVehicleControls());
+  $('itinerary').addEventListener('click', event => {
+    const card = event.target.closest('[data-map-day]');
+    if (card && highlightMapDay(card.dataset.mapDay)) showView('mapView');
+  });
   $('useLocationBtn').addEventListener('click', () => {
     if (!navigator.geolocation) { showError('Locatiebepaling wordt niet ondersteund op dit apparaat.'); return; }
     setStatus('Huidige locatie opvragen…');
@@ -305,24 +334,24 @@ function initialize() {
       const originPoint = await geocodeOrigin(state.trip.origin);
       if (originPoint) state.trip = normalizeTrip({ ...state.trip, originPoint });
     }
-    if (state.trip.destinationQuery && !state.trip.destinationPoint && state.trip.liveData) {
-      setStatus('Gewenste bestemming lokaliseren…');
-      const destinationPoint = await geocodeOrigin(state.trip.destinationQuery);
-      if (destinationPoint) state.trip = normalizeTrip({ ...state.trip, destinationPoint });
-    }
-    state.dismissedIds = []; state.catalog = [...destinations]; state.discoveryCursor = 0;
+    state.dismissedIds = []; state.catalog = []; state.discoveryCursor = 0;
     state.preferenceProfile.privateMode = state.trip.privateMode;
     savePreferenceProfile(state.preferenceProfile);
-    state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value }));
-    state.ranked = state.ranking.visible;
+    state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8, focus: $('proposalFocus').value }));
+    state.ranked = [];
     state.destination = null; state.plan = null; state.variants = []; state.selectedVariantId = null; state.undoSnapshot = null; state.optimizationSummary = null; state.optimizationProposal = null;
-    renderDestinations(state); renderComparison(state);
-    void hydrateProposalImages();
+    $('destinationCards').innerHTML = '<div class="empty-state"><strong>Bestemming en reisregio’s dynamisch ontdekken…</strong><p>ReisSlim toont pas voorstellen nadat geocodering, ankerontdekking, clustering en de harde-voorwaardentoets klaar zijn.</p></div>';
+    $('resultCount').textContent = 'Dynamische ontdekking actief';
+    renderComparison(state);
     $('resultsSection').classList.remove('hidden');
     $('planSection').classList.add('hidden');
     persistDraft();
     $('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (state.trip.liveData) void discoverLiveOptions({ replace: true });
+    if (state.trip.liveData) await discoverLiveOptions({ replace: true });
+    else {
+      const message = 'Dynamische bestemmingontdekking is uitgeschakeld. Zonder passende opgeslagen providerdata worden geen nieuwe voorstellen gemaakt.';
+      showError(message); setStatus(message);
+    }
   });
 
   let autosaveTimer;
@@ -372,7 +401,7 @@ function initialize() {
   $('moreProposalsBtn').addEventListener('click', async () => {
     const localCount = appendMoreProposals(4);
     if (state.trip.liveData) await discoverLiveOptions({ append: true });
-    else if (!localCount) setStatus('Schakel live data in om buiten de offline fallbackcatalogus te ontdekken');
+    else if (!localCount) setStatus('Schakel live data in om nieuwe bestemmingen dynamisch te ontdekken');
   });
   $('proposalFocus').addEventListener('change', () => {
     state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));

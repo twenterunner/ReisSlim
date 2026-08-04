@@ -1,7 +1,7 @@
-const CACHE = 'reisslim-v1.0.0-build-1000';
+const CACHE = 'reisslim-v1.1.0-build-1100';
 const ASSETS = [
-  './', './index.html', './styles.css?v=1000', './app.js?v=1000', './manifest.webmanifest', './icon.svg',
-  './config.js', './destinations.js', './destination-provider.js', './trip-model.js', './route-engine.js', './route-topology.js', './storage.js',
+  './', './index.html', './styles.css?v=1100', './app.js?v=1100', './manifest.webmanifest', './icon.svg',
+  './config.js', './destination-provider.js', './trip-model.js', './route-engine.js', './route-topology.js', './route-graph-engine.js', './storage.js',
   './destination-engine.js', './proposal-engine.js', './constraint-engine.js', './plan-solver.js', './itinerary-engine.js', './itinerary-variants.js',
   './itinerary-validator.js', './budget-engine.js', './trip-quality-engine.js', './trip-optimizer.js', './multimodal-engine.js', './provider-platform.js',
   './vehicle-intelligence.js', './recommendation-engine.js', './routing-provider.js', './place-provider.js', './travel-readiness.js', './preference-engine.js',
