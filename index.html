@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=300">
+  <link rel="stylesheet" href="styles.css?v=400">
 </head>
 <body>
   <header class="topbar">
@@ -77,7 +77,7 @@
             <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="3" required></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
           </div>
-          <fieldset><legend>Wat is belangrijk?</legend><div id="preferenceGrid" class="preference-grid"></div></fieldset>
+          <fieldset><legend>Wat is belangrijk?</legend><p class="muted priority-help">Selecteer wat belangrijk is en geef per voorkeur aan hoe zwaar deze moet meetellen.</p><div id="preferenceGrid" class="preference-grid priority-grid"></div></fieldset>
           <label class="full-width">Extra wensen<textarea id="notes" rows="3" placeholder="Bijvoorbeeld: verwarmd zwembad, weinig steden, mooie motorwegen, maximaal twee hotels..."></textarea></label>
           <p id="formError" class="form-error hidden" role="alert"></p>
           <div class="actions"><button type="submit">Maak reisvoorstellen</button><button type="button" id="loadDemoBtn" class="secondary">Laad voorbeeld</button></div>
@@ -85,7 +85,7 @@
       </section>
 
       <section id="resultsSection" class="hidden">
-        <section class="panel"><div class="section-heading"><div><p class="eyebrow">Stap 1</p><h2>Beste bestemmingen</h2></div><span id="resultCount" class="badge"></span></div><div id="destinationCards" class="card-grid"></div></section>
+        <section class="panel"><div class="section-heading"><div><p class="eyebrow">Stap 1</p><h2>Beste bestemmingen</h2></div><span id="resultCount" class="badge"></span></div><div id="destinationCards" class="card-grid"></div></section><section id="compareSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Vergelijking</p><h2>Vergelijk geselecteerde bestemmingen</h2></div><button id="clearCompareBtn" class="secondary" type="button">Wis selectie</button></div><div id="comparisonTable" class="comparison-wrap"></div></section>
       </section>
     </section>
 
@@ -115,8 +115,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.3.0 · Build 300 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.4.0 · Build 400 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script defer src="app.js?v=300"></script>
+  <script defer src="app.js?v=400"></script>
 </body>
 </html>

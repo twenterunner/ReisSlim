@@ -1,16 +1,15 @@
-# ReisSlim v0.3.0 Stable (Build 300)
+# ReisSlim v0.4.0 Stable (Build 400)
 
-GitHub Pages-ready Dutch roadtrip planner.
+Destination Intelligence release.
 
-## New in v0.3.0
-- Dashboard with current draft and library summary
-- Multiple saved trips: save, open and delete
-- Bottom navigation for Planner, Itinerary, Map and Budget
-- Trip names
-- Refreshed mobile-first interface
-- Existing autosave, destination ranking, budget, itinerary, map, JSON and GPX retained
+## Nieuw
+- Gewogen voorkeuren: nice to have, belangrijk of essentieel
+- Transparante multidimensionale bestemmingenscores
+- Persoonlijke uitleg waarom een bestemming past
+- Budget-, seizoen-, reisbelasting- en transportscore
+- Dataconfidentie en benodigde tussenstops
+- Vergelijk maximaal drie bestemmingen naast elkaar
+- Bestaande dashboard-, opslag-, kaart-, budget-, JSON- en GPX-functies behouden
 
-## Deploy
-Upload every extracted file to the repository root, replacing the previous version. GitHub Pages should publish from `main` and `/(root)`.
-
-After deployment, close the installed PWA/browser tab and reopen it. Confirm the footer shows **v0.3.0 · Build 300**.
+## GitHub Pages
+Upload alle bestanden naar de repository-root en vervang de bestaande bestanden. Sluit daarna oude tabbladen of de geïnstalleerde PWA volledig en open opnieuw.
