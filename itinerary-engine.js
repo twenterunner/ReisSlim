@@ -2,6 +2,7 @@ import { validCoordinate } from './config.js';
 import { buildBreakWaypoints, buildTravelNodes, haversineKm, segmentMetrics } from './route-engine.js';
 import { buildRecommendations } from './recommendation-engine.js';
 import { estimateLegTiming, transportId, travelGuidance } from './vehicle-intelligence.js';
+import { applyDaySchedules, solveDayAllocation } from './plan-solver.js';
 
 export function addDays(dateString, amount) {
   const date = new Date(`${dateString}T12:00:00`);
@@ -55,10 +56,11 @@ function localTransfer(from, to, trip) {
 }
 
 export function buildItinerary(trip, destination) {
-  const requestedTravelDays = Math.max(1, Math.floor((trip.days - 1) / 2));
   const firstPass = buildTravelNodes(trip, destination, 1);
   const requiredLegs = firstPass.metrics.requiredLegs;
-  const usedLegs = Math.min(requiredLegs, requestedTravelDays);
+  const preferredLegs = destination.constraintStatus?.travelLegs || requiredLegs;
+  const allocation = solveDayAllocation(trip, requiredLegs, preferredLegs);
+  const usedLegs = allocation.usedLegs;
   const { metrics, outbound, inbound } = buildTravelNodes(trip, destination, usedLegs);
   const days = [];
 
@@ -66,7 +68,7 @@ export function buildItinerary(trip, destination) {
     days.push(makeTravelDay('outward', outbound[index], outbound[index + 1], metrics, trip, usedLegs));
   }
 
-  const stayCount = trip.days - usedLegs * 2;
+  const stayCount = allocation.stayDays;
   const activities = chooseActivities(trip, destination);
   const travelChanges = Math.max(0, (usedLegs - 1) * 2);
   const allowSecondBase = stayCount >= 5 && trip.maxChanges > travelChanges + 1 && destination.bases.length > 1;
@@ -115,6 +117,7 @@ export function buildItinerary(trip, destination) {
     day.day = index + 1;
     day.date = addDays(trip.startDate, index);
   });
+  applyDaySchedules(trip, days);
   const recommendations = buildRecommendations(trip, destination, days);
 
   const minimumDays = requiredLegs * 2 + 1;
@@ -125,10 +128,14 @@ export function buildItinerary(trip, destination) {
   if (excessiveDays.length) warnings.push(`${excessiveDays.length} rijdag${excessiveDays.length === 1 ? '' : 'en'} overschrijdt de ingestelde daglimiet.`);
   const accommodationChanges = countAccommodationChanges(days, trip.origin);
   if (accommodationChanges > trip.maxChanges) warnings.push(`De route vraagt circa ${accommodationChanges} accommodatiewissels; jouw voorkeur is maximaal ${trip.maxChanges}.`);
+  if (destination.category === 'stretch' && destination.constraintStatus?.violations?.length) {
+    warnings.unshift(`Stretch-idee: ${destination.constraintStatus.violations[0].detail}`);
+  }
 
   return {
     days, routeMetrics: metrics, requiredLegs, usedLegs, minimumDays,
-    feasible: minimumDays <= trip.days && excessiveDays.length === 0,
+    feasible: minimumDays <= trip.days && excessiveDays.length === 0 && accommodationChanges <= trip.maxChanges,
+    proposalCategory: destination.category || 'exact',
     warnings, accommodationChanges, recommendations,
     routing: { source: 'offline-corridor', label: 'Offline corridorraming', live: false },
     origin: { name: trip.origin, ...(metrics.origin || {}) }

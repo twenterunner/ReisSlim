@@ -36,8 +36,13 @@ export function buildBudget(trip, destination, itinerary = null) {
   const total = rows.reduce((sum, [, amount]) => sum + amount, 0);
   const remaining = roundMoney(trip.budget - total);
   const confidence = route.originKnown && destination.nightMid && destination.activityDaily ? 'redelijk' : 'beperkt';
+  const uncertaintyRate = confidence === 'redelijk' ? 0.08 : 0.15;
+  const conservativeTotal = roundMoney(total * (1 + uncertaintyRate));
   return {
     rows, total, subtotal, remaining, nights, rooms, equivalents,
+    conservativeTotal,
+    conservativeRemaining: roundMoney(trip.budget - conservativeTotal),
+    uncertaintyRate,
     totalDistanceKm: roundMoney(totalDistanceKm),
     perDay: roundMoney(total / trip.days),
     perTravellerEquivalent: roundMoney(total / Math.max(1, equivalents)),

@@ -2,9 +2,9 @@ import { ENGINE_VERSION, STORAGE_SCHEMA_VERSION } from './config.js';
 import { normalizeTrip } from './trip-model.js';
 
 export const STORAGE_KEYS = {
-  current: 'reisslim.current.v4', trips: 'reisslim.trips.v4',
-  legacyCurrent: ['reisslim.current.v3', 'reisslim.current.v2', 'reisslim.current'],
-  legacyTrips: ['reisslim.trips.v3', 'reisslim.trips.v2']
+  current: 'reisslim.current.v5', trips: 'reisslim.trips.v5',
+  legacyCurrent: ['reisslim.current.v4', 'reisslim.current.v3', 'reisslim.current.v2', 'reisslim.current'],
+  legacyTrips: ['reisslim.trips.v4', 'reisslim.trips.v3', 'reisslim.trips.v2']
 };
 
 function safeParse(value, fallback) {

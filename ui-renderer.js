@@ -4,6 +4,15 @@ import { vehicleProfile } from './vehicle-intelligence.js';
 export const $ = id => document.getElementById(id);
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
 export function showView(viewId) {
   document.querySelectorAll('.app-view').forEach(view => view.classList.toggle('active', view.id === viewId));
   document.querySelectorAll('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === viewId));
@@ -66,8 +75,16 @@ function scorePill(label, value) {
 }
 
 export function renderDestinations(state) {
-  $('resultCount').textContent = `${state.ranked.length} opties`;
-  $('destinationCards').innerHTML = state.ranked.map((destination, index) => `<article class="destination-card intelligence-card ${destination.feasible ? '' : 'not-feasible'}"><div class="destination-rank">#${index + 1}</div><div class="card-body"><div class="score">${destination.score}/100</div><p class="eyebrow">${escapeHtml(destination.country)}</p><h3>${escapeHtml(destination.name)}</h3><p class="muted">${escapeHtml(destination.summary)}</p><p class="ai-explanation"><strong>Waarom deze?</strong> ${escapeHtml(destination.explanation)}</p><div class="confidence-row"><span>Ramingvertrouwen</span><strong>${escapeHtml(destination.confidence)}</strong></div><div class="dimension-grid">${scorePill('Budget', destination.dimensions.budget)}${scorePill('Reisbelasting', destination.dimensions.driving)}${scorePill('Seizoen', destination.dimensions.season)}${scorePill('Voertuigmatch', destination.dimensions.transport)}</div><div class="chips">${destination.matches.map(match => `<span class="chip">${escapeHtml(match)}</span>`).join('')}<span class="chip">± €${destination.estimate.toLocaleString('nl-NL')}</span><span class="chip">min. ${destination.minimumDays} dagen</span></div>${destination.compromises.length ? `<div class="compromise"><strong>Compromissen</strong><ul>${destination.compromises.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>` : ''}<div class="pros-cons"><div><strong>Sterk</strong><ul>${destination.pros.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div><div><strong>Let op</strong><ul>${destination.cons.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div></div><div class="card-actions"><button data-select="${destination.id}" type="button">Kies deze reis</button><label class="compare-toggle"><input type="checkbox" data-compare="${destination.id}" ${state.compareIds.includes(destination.id) ? 'checked' : ''}> Vergelijk</label></div></div></article>`).join('');
+  const ranking = state.ranking || { exact: state.ranked.filter(item => item.category === 'exact'), stretched: state.ranked.filter(item => item.category === 'stretch'), closestAdjustments: [] };
+  $('resultCount').textContent = `${ranking.exact.length} passend · ${ranking.stretched.length} stretch`;
+  const card = (destination, index) => `<article class="destination-card intelligence-card ${destination.category === 'stretch' ? 'stretch-card' : 'exact-card'}"><div class="destination-rank">#${index + 1}</div><div class="card-body"><div class="score">${destination.score}/100</div><p class="eyebrow">${escapeHtml(destination.country)}</p><span class="fit-badge ${destination.category}">${destination.category === 'stretch' ? 'Stretch-idee' : 'Past binnen je voorwaarden'}</span><h3>${escapeHtml(destination.name)}</h3><p class="muted">${escapeHtml(destination.summary)}</p><p class="ai-explanation"><strong>Waarom deze?</strong> ${escapeHtml(destination.explanation)}</p><div class="constraint-summary ${destination.category}">${escapeHtml(destination.constraintStatus.summary)}</div><div class="confidence-row"><span>Ramingvertrouwen</span><strong>${escapeHtml(destination.confidence)}</strong></div><div class="dimension-grid">${scorePill('Budget', destination.dimensions.budget)}${scorePill('Reisbelasting', destination.dimensions.driving)}${scorePill('Seizoen', destination.dimensions.season)}${scorePill('Voertuigmatch', destination.dimensions.transport)}</div><div class="chips">${destination.matches.map(match => `<span class="chip">${escapeHtml(match)}</span>`).join('')}<span class="chip">± €${destination.estimate.toLocaleString('nl-NL')}</span><span class="chip">min. ${destination.minimumDays} dagen</span></div>${destination.compromises.length ? `<div class="compromise"><strong>${destination.category === 'stretch' ? 'Afwijking' : 'Aandachtspunten'}</strong><ul>${destination.compromises.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>` : ''}<div class="pros-cons"><div><strong>Sterk</strong><ul>${destination.pros.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div><div><strong>Let op</strong><ul>${destination.cons.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div></div><div class="card-actions"><button data-select="${destination.id}" type="button">${destination.category === 'stretch' ? 'Bekijk stretch-idee' : 'Kies deze reis'}</button><label class="compare-toggle"><input type="checkbox" data-compare="${destination.id}" ${state.compareIds.includes(destination.id) ? 'checked' : ''}> Vergelijk</label></div></div></article>`;
+  const exactHtml = ranking.exact.length
+    ? `<div class="proposal-group-heading"><div><p class="eyebrow">Eerst haalbaarheid</p><h3>Past binnen je voorwaarden</h3></div><span>${ranking.exact.length}</span></div>${ranking.exact.map(card).join('')}`
+    : `<div class="no-exact-results"><h3>Geen exacte match gevonden</h3><p>ReisSlim toont geen onhaalbare reis als normale aanbeveling.</p>${ranking.closestAdjustments?.length ? `<ul>${ranking.closestAdjustments.map(item => `<li><strong>${escapeHtml(item.destination)}:</strong> ${escapeHtml(item.adjustments[0])}</li>`).join('')}</ul>` : ''}</div>`;
+  const stretchHtml = ranking.stretched.length
+    ? `<div class="proposal-group-heading stretch-heading"><div><p class="eyebrow">Optioneel, maximaal twee</p><h3>Stretch-ideeën</h3></div><span>${ranking.stretched.length}</span></div>${ranking.stretched.map((item, index) => card(item, ranking.exact.length + index)).join('')}`
+    : '';
+  $('destinationCards').innerHTML = exactHtml + stretchHtml;
 }
 
 export function renderComparison(state) {
@@ -85,7 +102,10 @@ const recommendationLabels = {
 
 function renderDayRecommendations(day) {
   if (!day.recommendations?.length) return '';
-  return `<div class="day-recommendations"><h5>Voertuiggerichte voorstellen</h5><div class="recommendation-grid">${day.recommendations.map(item => `<article class="place-proposal ${escapeHtml(item.type)}"><span>${escapeHtml(recommendationLabels[item.type] || item.type)}</span><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.reason)}</p><small>${escapeHtml(item.confidence)} · nog live verifiëren</small></article>`).join('')}</div></div>`;
+  return `<div class="day-recommendations"><h5>Waar stoppen, slapen, eten en wat te zien</h5><div class="recommendation-grid">${day.recommendations.map(item => {
+    const sourceUrl = safeExternalUrl(item.url);
+    return `<article class="place-proposal ${escapeHtml(item.type)}"><span>${escapeHtml(recommendationLabels[item.type] || item.type)}</span><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.reason)}</p>${item.openingHours ? `<small>Openingstijden: ${escapeHtml(item.openingHours)}</small>` : ''}${Number.isFinite(item.detourKm) ? `<small>Afstand tot planpunt: ± ${item.detourKm.toFixed(1)} km</small>` : ''}<small>${escapeHtml(item.source)} · ${item.live ? 'live locatie, beschikbaarheid controleren' : 'categorievoorstel'}</small>${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Bekijk bron</a>` : ''}</article>`;
+  }).join('')}</div></div>`;
 }
 
 function renderDay(day) {
@@ -94,7 +114,9 @@ function renderDay(day) {
   const moving = Number(day.roadHours ?? day.driveHours ?? 0);
   const elapsed = Number(day.elapsedHours ?? day.driveHours ?? 0);
   const nonDriving = Number(day.breakHours || 0);
-  return `<article class="day-card ${day.kind} ${day.exceedsDailyLimit ? 'excessive' : ''}"><div class="day-card-inner"><div class="day-heading"><div><p class="eyebrow">Dag ${day.day} · ${escapeHtml(day.typeLabel)}</p><h4>${date}</h4></div><span class="day-drive">${elapsed.toFixed(1)} u totaal · ± ${day.distanceKm} km</span></div><strong>${escapeHtml(routeTitle)}</strong><dl class="day-details"><div><dt>Rijtijd</dt><dd>${moving.toFixed(1)} uur rijdend + ${nonDriving.toFixed(1)} uur pauze/aankomst</dd></div><div><dt>Waypoints</dt><dd>${day.stopCount || 0} geplande stop${day.stopCount === 1 ? '' : 's'} · ${escapeHtml(day.routeSource === 'tomtom' ? 'live routegeometrie' : 'offline corridorraming')}</dd></div><div><dt>Overnachting</dt><dd>${escapeHtml(day.overnight)}</dd></div><div><dt>Hoofdplan</dt><dd>${escapeHtml(day.primaryPlan)}</dd></div><div><dt>Regenalternatief</dt><dd>${escapeHtml(day.rainAlternative)}</dd></div></dl>${renderDayRecommendations(day)}${day.exceedsDailyLimit ? '<p class="limit-warning">Deze totale reisdag overschrijdt je ingestelde limiet.</p>' : ''}</div></article>`;
+  const schedule = day.schedule || {};
+  const scheduleText = schedule.departure ? `${escapeHtml(schedule.departure)} vertrek · ${escapeHtml(schedule.arrival)} aankomst` : escapeHtml(schedule.activityWindow || 'Flexibel');
+  return `<article class="day-card ${day.kind} ${day.exceedsDailyLimit ? 'excessive' : ''}"><div class="day-card-inner"><div class="day-heading"><div><p class="eyebrow">Dag ${day.day} · ${escapeHtml(day.typeLabel)}</p><h4>${date}</h4></div><span class="day-drive">${elapsed.toFixed(1)} u totaal · ± ${day.distanceKm} km</span></div><strong>${escapeHtml(routeTitle)}</strong><dl class="day-details"><div><dt>Tijdschema</dt><dd>${scheduleText}</dd></div><div><dt>Rijtijd</dt><dd>${moving.toFixed(1)} uur rijdend + ${nonDriving.toFixed(1)} uur pauze/aankomst</dd></div><div><dt>Waypoints</dt><dd>${day.stopCount || 0} geplande stop${day.stopCount === 1 ? '' : 's'} · ${escapeHtml(['tomtom', 'openrouteservice', 'osrm'].includes(day.routeSource) ? 'live routegeometrie' : 'offline corridorraming')}</dd></div><div><dt>Overnachting</dt><dd>${escapeHtml(day.sleepProposal?.name || day.overnight)}</dd></div><div><dt>Hoofdplan</dt><dd>${escapeHtml(day.primaryPlan)}</dd></div><div><dt>Regenalternatief</dt><dd>${escapeHtml(day.rainAlternative)}</dd></div></dl>${renderDayRecommendations(day)}${day.exceedsDailyLimit ? '<p class="limit-warning">Deze totale reisdag overschrijdt je ingestelde limiet.</p>' : ''}</div></article>`;
 }
 
 export function renderPlan(state) {
@@ -106,13 +128,18 @@ export function renderPlan(state) {
     ['Match', `${destination.score}/100`],
     ['Dagen', trip.days],
     ['Vervoer', profile.label],
+    ['Voorwaarden', plan.constraintStatus?.exact ? 'Exact passend' : plan.constraintStatus?.stretch ? 'Stretch' : 'Aanpassen'],
     ['Afstand heen', `± ${plan.routeMetrics.oneWayDistanceKm} km`],
     ['Reistijd heen', `± ${plan.routeMetrics.oneWayElapsedHours.toFixed(1)} u`],
     ['Budget', `€${budget.total.toLocaleString('nl-NL')}`]
   ].map(([label, value]) => `<div class="summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
-  $('planWarnings').innerHTML = plan.warnings.length ? plan.warnings.map(item => `<div class="inline-warning">${escapeHtml(item)}</div>`).join('') : '<div class="inline-success">De gekozen duur en totale reislimiet zijn verenigbaar.</div>';
+  $('planWarnings').innerHTML = plan.warnings.length ? plan.warnings.map(item => `<div class="inline-warning">${escapeHtml(item)}</div>`).join('') : '<div class="inline-success">Budget, reisduur, daglimiet en accommodatiewissels passen binnen je voorwaarden.</div>';
+  const weatherDays = plan.weather?.days || [];
+  $('weatherSummary').innerHTML = weatherDays.length
+    ? `<strong>Weer langs de bestemming</strong><p>${weatherDays.slice(0, 5).map(day => `${escapeHtml(day.date)}: ${Math.round(day.minimumC)}–${Math.round(day.maximumC)}°C, ${Math.round(day.precipitationChance || 0)}% regen, wind ${Math.round(day.windKmh || 0)} km/u`).join('<br>')}</p><small>Bron: Open-Meteo · weersverwachtingen kunnen veranderen.</small>`
+    : '<strong>Weer</strong><p>Voor deze vertrekdatum is nog geen live verwachting beschikbaar; gebruik de seizoensinschatting en controleer kort voor vertrek.</p>';
   $('itinerary').innerHTML = plan.days.map(renderDay).join('');
-  $('budgetSummary').innerHTML = [['Totaal', `€${budget.total.toLocaleString('nl-NL')}`], ['Per dag', `€${budget.perDay.toLocaleString('nl-NL')}`], ['Per reiziger-equivalent', `€${budget.perTravellerEquivalent.toLocaleString('nl-NL')}`], [budget.remaining >= 0 ? 'Resterend' : 'Overschrijding', `${budget.remaining >= 0 ? '' : '−'}€${Math.abs(budget.remaining).toLocaleString('nl-NL')}`]].map(([label, value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  $('budgetSummary').innerHTML = [['Verwacht totaal', `€${budget.total.toLocaleString('nl-NL')}`], ['Voorzichtige bovengrens', `€${budget.conservativeTotal.toLocaleString('nl-NL')}`], ['Per dag', `€${budget.perDay.toLocaleString('nl-NL')}`], [budget.remaining >= 0 ? 'Resterend' : 'Overschrijding', `${budget.remaining >= 0 ? '' : '−'}€${Math.abs(budget.remaining).toLocaleString('nl-NL')}`]].map(([label, value]) => `<div class="summary-card"><span>${label}</span><strong>${value}</strong></div>`).join('');
   $('budgetBreakdown').innerHTML = budget.rows.map(([label, amount]) => `<div class="budget-row"><span>${escapeHtml(label)}</span><strong>€${amount.toLocaleString('nl-NL')}</strong></div>`).join('') + `<div class="budget-row total"><strong>Totaal</strong><strong>€${budget.total.toLocaleString('nl-NL')}</strong></div>`;
   $('budgetAssumptions').innerHTML = `<summary>Aannames en vertrouwen</summary><p>Ramingvertrouwen: <strong>${escapeHtml(budget.confidence)}</strong>. Brandstof €${budget.assumptions.fuelPricePerLitre.toFixed(2)}/l, verbruik ${budget.assumptions.consumption} l/100 km, onvoorzien ${Math.round(budget.assumptions.contingencyRate * 100)}%. Overnachtingstype: ${escapeHtml(profile.accommodationLabel)}. Prijzen zijn niet-live.</p>`;
   $('validationList').innerHTML = validation.map(item => `<div class="validation-row ${item.level}"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.detail)}</strong></div>`).join('');
@@ -126,7 +153,7 @@ export function renderPlan(state) {
   $('optimizerSection').classList.remove('hidden');
   $('undoOptimizeBtn').classList.toggle('hidden', !state.undoSnapshot);
   $('optimizationSummary').innerHTML = state.optimizationSummary ? `<strong>Voor ${state.optimizationSummary.before}/100 → na ${state.optimizationSummary.after}/100</strong><ul>${state.optimizationSummary.changes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '';
-  $('mapDataStatus').textContent = plan.routing?.label || 'Offline corridorraming';
+  $('mapDataStatus').textContent = `${plan.routing?.label || 'Offline corridorraming'} · ${plan.placeData?.live ? `${plan.placeData.namedPlaces} live plaatsen` : 'offline plaatsen'}`;
   $('gpxNotice').textContent = plan.routing?.live
     ? 'GPX gebruikt live routegeometrie en gekozen waypoints; controleer de route vóór vertrek.'
     : 'GPX gebruikt offline corridorpunten en voertuiggerichte waypoints, geen gegarandeerde turn-by-turn route.';

@@ -62,13 +62,14 @@ export function renderMap(plan, elementId = 'map') {
   const bounds = [];
   segments.forEach(segment => {
     const coordinates = segment.points.map(point => [point.lat, point.lon]);
+    const liveRoute = ['tomtom', 'openrouteservice', 'osrm'].includes(segment.source);
     bounds.push(...coordinates);
     L.polyline(coordinates, {
-      weight: segment.source === 'tomtom' ? 5 : 4,
-      dashArray: segment.source === 'tomtom' ? null : '8 6',
+      weight: liveRoute ? 5 : 4,
+      dashArray: liveRoute ? null : '8 6',
       opacity: .9,
       color: segment.kind === 'return' ? colors.returnRoute : colors[segment.kind] || colors.outward
-    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${segment.source === 'tomtom' ? 'Live wegroute' : 'Indicatieve corridor'}`);
+    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : 'Indicatieve corridor'}`);
   });
 
   routePoints.forEach((point, index) => {
@@ -93,7 +94,7 @@ export function renderMap(plan, elementId = 'map') {
       fillColor: colors[item.type] || colors.activity,
       fillOpacity: .75,
       weight: 2
-    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br><small>${escapeHtml(item.confidence)} · nog live verifiëren</small>`);
+    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br><small>${escapeHtml(item.source)} · ${item.live ? 'live locatie, beschikbaarheid controleren' : 'offline categorievoorstel'}</small>`);
   });
 
   layerControl = L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(map);

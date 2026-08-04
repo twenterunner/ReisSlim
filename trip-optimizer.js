@@ -78,5 +78,6 @@ export function constraintsPreserved(before, after, trip) {
   return before.days.length === after.days.length
     && before.days[0].from === after.days[0].from
     && after.days.at(-1).to === trip.origin
-    && after.days.every(day => day.driveHours >= 0);
+    && after.days.every(day => day.driveHours >= 0 && Number(day.elapsedHours ?? day.driveHours) <= trip.maxDrive + .05)
+    && after.accommodationChanges <= trip.maxChanges;
 }

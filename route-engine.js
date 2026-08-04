@@ -15,7 +15,7 @@ export function haversineKm(a, b) {
 }
 
 export function calculateRouteMetrics(trip, destination) {
-  const origin = resolveOrigin(trip.origin);
+  const origin = resolveOrigin(trip);
   const destinationPoint = destination.bases[0];
   const baselineDirect = haversineKm(anchorOrigin, destinationPoint);
   const originDirect = origin ? haversineKm(origin, destinationPoint) : baselineDirect;

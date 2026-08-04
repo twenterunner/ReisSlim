@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=700">
+  <link rel="stylesheet" href="styles.css?v=800">
 </head>
 <body>
   <header class="topbar">
@@ -58,7 +58,7 @@
 
     <section id="plannerView" class="app-view">
       <section class="panel intro-card">
-        <div><p class="eyebrow">Planner</p><h1>Vertel ons wat voor reis je zoekt</h1><p class="muted">De planner gebruikt een transparant scoremodel en indicatieve kosten. Live prijzen en beschikbaarheid volgen later.</p></div>
+        <div><p class="eyebrow">Planner</p><h1>Vertel ons wat voor reis je zoekt</h1><p class="muted">Harde voorwaarden worden eerst gecontroleerd. Pas daarna rangschikt ReisSlim passende reizen op voorkeuren.</p></div>
         <div class="autosave-box"><span>Opslag</span><strong>Lokaal op dit apparaat</strong><small id="autosaveStatus" aria-live="polite">Automatisch opslaan actief</small></div>
       </section>
 
@@ -86,6 +86,11 @@
             </div>
             <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
+            <div class="constraint-options wide">
+              <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Maximaal twee stretch-ideeën tonen</strong><small>Alleen een kleine budget-, reistijd- of wisselafwijking; nooit voertuigveiligheid, vertrek of terugkeer.</small></span></label>
+              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer proberen</strong><small>Gebruikt OpenStreetMap-, route- en weerdata met automatische offline fallback.</small></span></label>
+            </div>
+            <details class="integration-settings wide"><summary>Optionele live route voor camper en caravan</summary><label>OpenRouteService API-sleutel<input id="orsApiKey" type="password" autocomplete="off" placeholder="Alleen lokaal op dit apparaat"><small>Wordt apart in je browser opgeslagen en nooit opgenomen in reisexport of GitHub-code.</small></label></details>
           </div>
           <fieldset><legend>Wat is belangrijk?</legend><p class="muted priority-help">Selecteer wat belangrijk is en geef per voorkeur aan hoe zwaar deze moet meetellen.</p><div id="preferenceGrid" class="preference-grid priority-grid"></div></fieldset>
           <label class="full-width">Extra wensen<textarea id="notes" rows="3" placeholder="Bijvoorbeeld: verwarmd zwembad, weinig steden, mooie motorwegen, maximaal twee hotels..."></textarea></label>
@@ -104,6 +109,7 @@
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
         <div id="planWarnings" aria-live="polite"></div>
+        <div id="weatherSummary" class="weather-summary"></div>
         <p id="gpxNotice" class="trust-notice"></p>
         <div class="itinerary-optimizer-grid">
           <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
@@ -140,18 +146,19 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.7.0 · Build 700 · Vehicle intelligence</span><br>Planning- en beslissingsondersteuning · Prijzen, rijtijden en beschikbaarheid zijn niet-live. Controleer officiële informatie altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.8.0 · Build 800 · Constraint-first intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="importmap">
     {"imports":{
-      "./config.js":"./config.js?v=700","./destinations.js":"./destinations.js?v=700","./trip-model.js":"./trip-model.js?v=700",
-      "./route-engine.js":"./route-engine.js?v=700","./storage.js":"./storage.js?v=700","./destination-engine.js":"./destination-engine.js?v=700",
-      "./itinerary-engine.js":"./itinerary-engine.js?v=700","./itinerary-validator.js":"./itinerary-validator.js?v=700","./budget-engine.js":"./budget-engine.js?v=700",
-      "./trip-quality-engine.js":"./trip-quality-engine.js?v=700","./trip-optimizer.js":"./trip-optimizer.js?v=700","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=700",
-      "./recommendation-engine.js":"./recommendation-engine.js?v=700","./routing-provider.js":"./routing-provider.js?v=700","./map-view.js":"./map-view.js?v=700",
-      "./gpx-generator.js":"./gpx-generator.js?v=700","./ui-renderer.js":"./ui-renderer.js?v=700"
+      "./config.js":"./config.js?v=800","./destinations.js":"./destinations.js?v=800","./trip-model.js":"./trip-model.js?v=800",
+      "./route-engine.js":"./route-engine.js?v=800","./storage.js":"./storage.js?v=800","./destination-engine.js":"./destination-engine.js?v=800",
+      "./constraint-engine.js":"./constraint-engine.js?v=800","./plan-solver.js":"./plan-solver.js?v=800","./itinerary-engine.js":"./itinerary-engine.js?v=800",
+      "./itinerary-validator.js":"./itinerary-validator.js?v=800","./budget-engine.js":"./budget-engine.js?v=800","./trip-quality-engine.js":"./trip-quality-engine.js?v=800",
+      "./trip-optimizer.js":"./trip-optimizer.js?v=800","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=800","./recommendation-engine.js":"./recommendation-engine.js?v=800",
+      "./routing-provider.js":"./routing-provider.js?v=800","./place-provider.js":"./place-provider.js?v=800","./map-view.js":"./map-view.js?v=800",
+      "./gpx-generator.js":"./gpx-generator.js?v=800","./ui-renderer.js":"./ui-renderer.js?v=800"
     }}
   </script>
-  <script type="module" src="app.js?v=700"></script>
+  <script type="module" src="app.js?v=800"></script>
 </body>
 </html>

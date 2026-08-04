@@ -24,7 +24,10 @@ export function calculateTripQuality(trip, destination, plan, budget) {
     realism: roundScore((plan.days.length === trip.days ? 30 : 0) + (plan.feasible ? 35 : 0) + (plan.routeMetrics.originKnown ? 15 : 5) + recommendationCoverage * 10 + (plan.routing?.live ? 10 : 5))
   };
   const weights = { driving: 1.3, budget: 1.1, relaxation: 1, family: trip.children ? 1 : .4, adventure: .8, weather: .8, variety: .7, crowds: .5, realism: 1.4 };
-  const overall = roundScore(weightedAverage(dimensions, weights));
+  const calculatedOverall = roundScore(weightedAverage(dimensions, weights));
+  const overall = plan.constraintStatus?.category === 'rejected'
+    ? Math.min(55, calculatedOverall)
+    : plan.constraintStatus?.category === 'stretch' ? Math.min(70, calculatedOverall) : calculatedOverall;
   const deductions = [];
   if (excessive) deductions.push(`${excessive} rijdag${excessive === 1 ? '' : 'en'} boven de ingestelde limiet.`);
   if (budget.total > trip.budget) deductions.push(`Indicatieve begroting €${budget.total - trip.budget} boven budget.`);

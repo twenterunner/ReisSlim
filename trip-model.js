@@ -1,11 +1,11 @@
-import { originCatalog, preferenceDefinitions } from './config.js';
+import { originCatalog, preferenceDefinitions, validCoordinate } from './config.js';
 import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence.js';
 
 const FIELD_IDS = [
   'tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children',
   'transport', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
   'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg',
-  'maxDrive', 'maxChanges', 'comfort', 'notes'
+  'maxDrive', 'maxChanges', 'comfort', 'allowStretch', 'liveData', 'notes'
 ];
 
 export function uniqueId() {
@@ -17,7 +17,11 @@ export function localDate(offsetDays = 0, now = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export function resolveOrigin(origin) {
+export function resolveOrigin(originOrTrip) {
+  if (originOrTrip && typeof originOrTrip === 'object' && validCoordinate(originOrTrip.originPoint)) {
+    return { ...originOrTrip.originPoint, name: originOrTrip.origin };
+  }
+  const origin = typeof originOrTrip === 'object' ? originOrTrip.origin : originOrTrip;
   const key = String(origin || '').trim().toLocaleLowerCase('nl-NL');
   return originCatalog[key] ? { ...originCatalog[key] } : null;
 }
@@ -33,6 +37,7 @@ export function normalizeTrip(input = {}) {
     id: input.id || uniqueId(),
     tripName: String(input.tripName || '').trim().slice(0, 60),
     origin: String(input.origin || '').trim(),
+    originPoint: validCoordinate(input.originPoint) ? { lat: Number(input.originPoint.lat), lon: Number(input.originPoint.lon), name: String(input.originPoint.name || input.origin || '').trim() } : null,
     startDate: String(input.startDate || ''),
     days: Number(input.days),
     budget: Number(input.budget),
@@ -48,6 +53,8 @@ export function normalizeTrip(input = {}) {
     maxDrive: Number(input.maxDrive),
     maxChanges: Number(input.maxChanges),
     comfort: ['budget', 'mid', 'comfort'].includes(input.comfort) ? input.comfort : 'mid',
+    allowStretch: input.allowStretch !== false && input.allowStretch !== 'false',
+    liveData: input.liveData !== false && input.liveData !== 'false',
     notes: String(input.notes || '').trim().slice(0, 500),
     preferences,
     preferenceWeights: weights,
@@ -79,13 +86,16 @@ export function getFormElements(root = document) {
   return Object.fromEntries(FIELD_IDS.map(id => [id, root.getElementById(id)]));
 }
 
-export function readTripForm(existingId = null, root = document) {
+export function readTripForm(existing = null, root = document) {
   const form = getFormElements(root);
+  const existingTrip = existing && typeof existing === 'object' ? existing : null;
   const preferences = [...root.querySelectorAll('[data-pref]:checked')].map(element => element.value);
   const preferenceWeights = Object.fromEntries(preferences.map(id => [id, Number(root.querySelector(`[data-priority="${id}"]`)?.value || 2)]));
+  const values = Object.fromEntries(Object.entries(form).map(([key, element]) => [key, element?.type === 'checkbox' ? element.checked : element?.value]));
   return normalizeTrip({
-    id: existingId || undefined,
-    ...Object.fromEntries(Object.entries(form).map(([key, element]) => [key, element?.value])),
+    id: existingTrip?.id || existing || undefined,
+    ...values,
+    originPoint: existingTrip?.origin === values.origin ? existingTrip.originPoint : null,
     preferences,
     preferenceWeights
   });
@@ -94,7 +104,9 @@ export function readTripForm(existingId = null, root = document) {
 export function writeTripForm(trip = {}, root = document) {
   const form = getFormElements(root);
   for (const [key, element] of Object.entries(form)) {
-    if (element && trip[key] !== undefined && trip[key] !== null) element.value = String(trip[key]);
+    if (!element || trip[key] === undefined || trip[key] === null) continue;
+    if (element.type === 'checkbox') element.checked = Boolean(trip[key]);
+    else element.value = String(trip[key]);
   }
   root.querySelectorAll('[data-pref]').forEach(box => { box.checked = trip.preferences?.includes(box.value) || false; });
   root.querySelectorAll('[data-priority]').forEach(select => {

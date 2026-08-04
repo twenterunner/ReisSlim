@@ -9,12 +9,13 @@ export function validatePlan(trip, destination, plan, budget) {
   const incompatible = (plan.recommendations || []).filter(item => !item.vehicleFit?.includes(vehicle)).length;
   const dimensionsReady = !vehicleProfile(trip).supportsDimensions
     || [trip.vehicleHeightM, trip.vehicleLengthM, trip.vehicleWeightKg].every(value => Number.isFinite(value) && value > 0);
+  const constraintStatus = plan.constraintStatus;
   return [
-    { level: budget.total <= trip.budget ? 'ok' : budget.total <= trip.budget * 1.1 ? 'warn' : 'bad', label: 'Budget', detail: `€${budget.total.toLocaleString('nl-NL')} van €${trip.budget.toLocaleString('nl-NL')}` },
-    { level: maxElapsed <= trip.maxDrive + .05 ? 'ok' : 'bad', label: 'Max. totale reistijd', detail: `${maxElapsed.toFixed(1)} uur; limiet ${trip.maxDrive.toFixed(1)} uur inclusief pauzes` },
+    { level: budget.total <= trip.budget ? 'ok' : constraintStatus?.stretch ? 'warn' : 'bad', label: 'Budget', detail: `€${budget.total.toLocaleString('nl-NL')} van €${trip.budget.toLocaleString('nl-NL')} (voorzichtig: €${budget.conservativeTotal.toLocaleString('nl-NL')})` },
+    { level: maxElapsed <= trip.maxDrive + .05 ? 'ok' : constraintStatus?.stretch ? 'warn' : 'bad', label: 'Max. totale reistijd', detail: `${maxElapsed.toFixed(1)} uur; limiet ${trip.maxDrive.toFixed(1)} uur inclusief pauzes` },
     { level: plan.days.length === trip.days ? 'ok' : 'bad', label: 'Aantal dagen', detail: `${plan.days.length} van ${trip.days}` },
-    { level: plan.feasible ? 'ok' : 'bad', label: 'Realisme', detail: plan.feasible ? 'Reisduur en totale daglimiet zijn verenigbaar' : `Minimaal ${plan.minimumDays} dagen aanbevolen` },
-    { level: plan.accommodationChanges <= trip.maxChanges ? 'ok' : 'warn', label: 'Accommodatiewissels', detail: `${plan.accommodationChanges} gepland; voorkeur maximaal ${trip.maxChanges}` },
+    { level: constraintStatus?.exact ? 'ok' : constraintStatus?.stretch ? 'warn' : 'bad', label: 'Harde voorwaarden', detail: constraintStatus?.summary || (plan.feasible ? 'Plan is haalbaar' : 'Plan moet worden aangepast') },
+    { level: plan.accommodationChanges <= trip.maxChanges ? 'ok' : constraintStatus?.stretch ? 'warn' : 'bad', label: 'Accommodatiewissels', detail: `${plan.accommodationChanges} gepland; maximum ${trip.maxChanges}` },
     { level: originAsStay ? 'bad' : 'ok', label: 'Vertrekplaats', detail: originAsStay ? 'Vertrekplaats wordt onterecht als verblijf gebruikt' : 'Alleen vertrek- en terugkeerpunt' },
     { level: invalidCoordinates ? 'bad' : 'ok', label: 'Kaartdata', detail: invalidCoordinates ? `${invalidCoordinates} ongeldige routepunten` : 'Alle opgenomen routepunten zijn geldig' },
     { level: incompatible ? 'bad' : 'ok', label: 'Voertuigmatch', detail: incompatible ? `${incompatible} voorstellen passen niet bij het voertuig` : `Alle voorstellen zijn gericht op ${vehicleProfile(trip).label.toLowerCase()}` },
