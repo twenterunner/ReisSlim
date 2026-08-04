@@ -1,15 +1,13 @@
-# ReisSlim v0.4.0 Stable (Build 400)
+# ReisSlim v0.5.0 — Trip Optimizer
 
-Destination Intelligence release.
+Build 500. GitHub Pages-ready PWA.
 
 ## Nieuw
-- Gewogen voorkeuren: nice to have, belangrijk of essentieel
-- Transparante multidimensionale bestemmingenscores
-- Persoonlijke uitleg waarom een bestemming past
-- Budget-, seizoen-, reisbelasting- en transportscore
-- Dataconfidentie en benodigde tussenstops
-- Vergelijk maximaal drie bestemmingen naast elkaar
-- Bestaande dashboard-, opslag-, kaart-, budget-, JSON- en GPX-functies behouden
+- Correcte heen- en terugreislabels vanuit de ingevoerde vertrekplaats.
+- Realistische waarschuwing wanneer de benodigde rijtijd de daglimiet overschrijdt.
+- Trip Quality Score met rijden, budget, ontspanning, familie, avontuur, weerbestendigheid, variatie en drukte.
+- Persoonlijke verbeteradviezen en knop **Verbeter mijn reis**.
+- Bestaande dashboard-, planner-, vergelijking-, kaart-, budget-, JSON- en GPX-functies behouden.
 
-## GitHub Pages
-Upload alle bestanden naar de repository-root en vervang de bestaande bestanden. Sluit daarna oude tabbladen of de geïnstalleerde PWA volledig en open opnieuw.
+## Installatie
+Upload alle bestanden naar de root van de GitHub repository en vervang de bestaande bestanden.

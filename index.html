@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=400">
+  <link rel="stylesheet" href="styles.css?v=500">
 </head>
 <body>
   <header class="topbar">
@@ -93,7 +93,16 @@
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
-        <h2>Dagplanning</h2><div id="itinerary" class="timeline"></div>
+        <div class="itinerary-optimizer-grid">
+          <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
+          <aside id="optimizerSection" class="optimizer-card hidden">
+            <div class="section-heading"><div><p class="eyebrow">Trip Optimizer</p><h2>Reiskwaliteit</h2></div><span class="beta-badge">BETA</span></div>
+            <div class="quality-hero"><div class="quality-ring"><strong id="qualityScore">—</strong><span>/100</span></div><div><strong id="qualityVerdict">Nog niet berekend</strong><p>Het hele reisplan wordt beoordeeld, niet alleen de bestemming.</p></div></div>
+            <div id="qualityDimensions" class="quality-dimensions"></div>
+            <div class="recommendation-box"><h3>Topaanbevelingen</h3><ol id="qualityRecommendations"></ol></div>
+            <button id="improveTripBtn" type="button" class="improve-button">Verbeter mijn reis</button>
+          </aside>
+        </div>
       </section>
       <section id="noPlanItinerary" class="panel empty-view"><h2>Nog geen reis gekozen</h2><p>Maak eerst reisvoorstellen en kies daarna een bestemming.</p><button data-go-planner type="button">Naar planner</button></section>
     </section>
@@ -115,8 +124,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.4.0 · Build 400 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.5.0 · Build 500 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script defer src="app.js?v=400"></script>
+  <script defer src="app.js?v=500"></script>
 </body>
 </html>
