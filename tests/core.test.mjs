@@ -10,7 +10,7 @@ import { constraintsPreserved, createUndoSnapshot, optimisePlan, restorePlan } f
 import { applyOptimizationProposal, proposeOptimizations } from '../trip-optimizer.js';
 import { buildProposalPortfolio, getMoreProposals, nearDuplicate, proposalDifference } from '../proposal-engine.js';
 import { buildItineraryVariants } from '../itinerary-variants.js';
-import { buildDiscoveryQuery, discoverySeeds, discoverDestinationBatch, normalizeDiscoveredDestinations } from '../destination-provider.js';
+import { buildDiscoveryQueries, buildDiscoveryQuery, discoverySeeds, discoverDestinationBatch, normalizeDiscoveredDestinations } from '../destination-provider.js';
 import { createGpx, createJson, safeFilename } from '../gpx-generator.js';
 import { migrateState, loadDraft, saveDraft } from '../storage.js';
 import { estimateLegTiming, vehicleSpec } from '../vehicle-intelligence.js';
@@ -203,7 +203,7 @@ test('Live discovery uses new deterministic search rings instead of a fixed dest
   assert.ok(first.length >= 4 && later.length >= 4);
   assert.notDeepEqual(first.map(point => [point.lat, point.lon]), later.map(point => [point.lat, point.lon]));
   assert.match(buildDiscoveryQuery(trip, 12), /place.*city\|town/);
-  assert.match(buildDiscoveryQuery(trip, 12), /timeout:12/);
+  assert.match(buildDiscoveryQuery(trip, 12), /timeout:8/);
 });
 
 test('OpenStreetMap discovery normalizes arbitrary towns into plannable dynamic regions', async () => {
@@ -418,7 +418,7 @@ test('Global discovery is not clipped to Europe and supports targeted locations'
   const seeds = discoverySeeds(globalTrip, 0, 8);
   assert.equal(seeds.length, 8);
   assert.ok(seeds.every(point => point.lat < 0));
-  assert.match(buildDiscoveryQuery(globalTrip, 0), /national_park/);
+  assert.match(buildDiscoveryQueries(globalTrip, 0)[1].query, /national_park/);
 });
 
 test('Loop topology reduces geometric overlap compared with an identical return', () => {

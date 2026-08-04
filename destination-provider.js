@@ -8,8 +8,9 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.nchc.org.tw/api/interpreter'
 ];
-const DISCOVERY_SCHEMA = 3;
+const DISCOVERY_SCHEMA = 4;
 const GOLDEN_ANGLE = 137.507764;
+const DISCOVERY_DEADLINE_MS = 12000;
 
 const clone = value => JSON.parse(JSON.stringify(value));
 async function respectNominatimRateLimit() {
@@ -102,34 +103,93 @@ async function fetchJson(url, options, fetchImpl, timeoutMs) {
   } finally { clearTimeout(timer); }
 }
 
-export async function resolveDestination(query, { fetchImpl = globalThis.fetch, endpoint = NOMINATIM_ENDPOINT, timeoutMs = 8000 } = {}) {
+export async function resolveDestination(query, { fetchImpl = globalThis.fetch, endpoint = NOMINATIM_ENDPOINT, timeoutMs = 8000, storage: suppliedStorage } = {}) {
   const value = String(query || '').trim();
   if (!value || typeof fetchImpl !== 'function') return null;
+  const cacheKey = `reisslim.destination-resolution.v${DISCOVERY_SCHEMA}:${encodeURIComponent(value.toLocaleLowerCase('nl-NL'))}`;
+  let storage = suppliedStorage;
+  if (storage === undefined) {
+    try { storage = globalThis.localStorage || null; } catch { storage = null; }
+  }
+  try {
+    const record = JSON.parse(storage?.getItem(cacheKey) || 'null');
+    if (record?.resolution && Date.now() - record.savedAt < 90 * 24 * 60 * 60 * 1000) {
+      return { ...record.resolution, cached: true, cacheAgeMs: Date.now() - record.savedAt };
+    }
+  } catch { /* destination resolution cache is optional */ }
   const url = new URL(endpoint);
   url.search = new URLSearchParams({ q: value, format: 'jsonv2', limit: '3', addressdetails: '1', extratags: '1', namedetails: '1' });
   try {
     await respectNominatimRateLimit();
     const matches = await fetchJson(url, { headers: { accept: 'application/json', 'accept-language': 'nl,en;q=0.8' } }, fetchImpl, timeoutMs);
-    return normalizeDestinationResolution(value, matches?.[0]);
+    const resolution = normalizeDestinationResolution(value, matches?.[0]);
+    if (resolution) {
+      try { storage?.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), resolution })); } catch { /* optional */ }
+    }
+    return resolution;
   } catch { return null; }
 }
 
-export function buildDiscoveryQuery(trip, cursor = 0, resolution = null) {
-  const seeds = discoverySeeds(trip, cursor, 8, resolution);
-  const radius = resolution?.bounds ? 70000 : 46000;
-  const clauses = seeds.map(seed => {
-    const around = `around:${radius},${seed.lat.toFixed(4)},${seed.lon.toFixed(4)}`;
+export function recommendAccessMode(trip, resolution) {
+  if (trip?.travelMode !== 'direct' || !resolution?.point) return null;
+  const origin = resolveOrigin(trip);
+  const distanceKm = origin ? haversineKm(origin, resolution.point) : null;
+  if (!Number.isFinite(distanceKm)) return null;
+  const localRoadReachKm = Math.max(1200, Number(trip.maxDrive || 5) * 65 * Math.max(2, Math.floor(Number(trip.days || 7) * .35)));
+  if (distanceKm <= localRoadReachKm) return null;
+  const modes = {
+    car: { travelMode: 'fly-drive', transport: 'car', label: 'Fly-drive' },
+    motorcycle: { travelMode: 'fly-ride', transport: 'motorcycle', label: 'Fly-ride' },
+    motorhome: { travelMode: 'fly-camper', transport: 'motorhome', label: 'Fly-camper' }
+  };
+  const recommendation = modes[trip.transport];
+  return {
+    required: true,
+    automatic: Boolean(recommendation),
+    distanceKm: Math.round(distanceKm),
+    roadReachKm: Math.round(localRoadReachKm),
+    ...(recommendation || {}),
+    reason: recommendation
+      ? `${resolution.name} ligt hemelsbreed circa ${Math.round(distanceKm).toLocaleString('nl-NL')} km van ${trip.origin}; ${recommendation.label} houdt de ingestelde dagelijkse rijlimiet beschikbaar voor de rondreis ter plaatse.`
+      : `${resolution.name} ligt buiten een realistische rechtstreekse wegcorridor voor deze reisduur. Kies een passende toegang of een dichterbij gelegen bestemming.`
+  };
+}
+
+function bboxOf(resolution) {
+  if (!resolution?.bounds) return null;
+  const [south, north, west, east] = resolution.bounds;
+  return `${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)}`;
+}
+
+export function buildDiscoveryQueries(trip, cursor = 0, resolution = null) {
+  const bbox = bboxOf(resolution);
+  const seeds = discoverySeeds(trip, cursor, bbox ? 4 : 3, resolution);
+  if (!seeds.length) return [];
+  const settlementClauses = bbox
+    ? [
+      `nwr["place"="city"]["name"](${bbox});`,
+      `nwr["place"="town"]["name"](${bbox});`,
+      `nwr["aeroway"="aerodrome"]["name"](${bbox});`
+    ]
+    : seeds.map(seed => `nwr(around:65000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)})["place"~"city|town"]["name"];`);
+  const enrichmentClauses = seeds.flatMap(seed => {
+    const around = `around:52000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)}`;
     return [
-      `nwr(${around})["place"~"city|town|village"]["name"];`,
-      `nwr(${around})["tourism"~"attraction|viewpoint|museum|zoo|theme_park"]["name"];`,
+      `nwr(${around})["tourism"~"attraction|viewpoint|museum"]["name"];`,
       `nwr(${around})["boundary"="national_park"]["name"];`,
       `nwr(${around})["leisure"="nature_reserve"]["name"];`,
-      `nwr(${around})["aeroway"="aerodrome"]["name"];`,
-      `nwr(${around})["tourism"~"hotel|guest_house|hostel|camp_site|caravan_site"];`,
-      `nwr(${around})["amenity"~"restaurant|cafe|fuel"];`
-    ].join('');
-  }).join('\n');
-  return `[out:json][timeout:12][maxsize:25165824];\n(\n${clauses}\n);\nout center tags 420;`;
+      `nwr(${around})["tourism"~"hotel|guest_house|camp_site|caravan_site"]["name"];`,
+      `nwr(${around})["amenity"~"restaurant|cafe|fuel"]["name"];`
+    ];
+  });
+  return [
+    { stage: 'anchors', query: `[out:json][timeout:8][maxsize:12582912];\n(\n${settlementClauses.join('\n')}\n);\nout center tags 180;` },
+    { stage: 'enrichment', query: `[out:json][timeout:8][maxsize:12582912];\n(\n${enrichmentClauses.join('\n')}\n);\nout center tags 240;` }
+  ];
+}
+
+export function buildDiscoveryQuery(trip, cursor = 0, resolution = null) {
+  return buildDiscoveryQueries(trip, cursor, resolution)[0]?.query || '';
 }
 
 function evidenceTags(tags = {}) {
@@ -287,48 +347,114 @@ export function buildDiscoveryCacheKey(trip, { cursor = 0, resolution = null } =
   return `reisslim.destination-discovery.v${DISCOVERY_SCHEMA}:${encodeURIComponent(JSON.stringify(identity))}`;
 }
 
-async function fetchOverpass(query, endpoints, fetchImpl, timeoutMs) {
+async function fetchOverpass(query, endpoints, fetchImpl, timeoutMs, deadlineAt) {
   let lastError = null;
   for (const endpoint of endpoints) {
+    const remainingMs = Math.max(0, deadlineAt - Date.now());
+    if (remainingMs < 250) break;
     try {
       const body = new URLSearchParams({ data: query }).toString();
-      const payload = await fetchJson(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8', accept: 'application/json' }, body }, fetchImpl, timeoutMs);
+      const payload = await fetchJson(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8', accept: 'application/json' }, body }, fetchImpl, Math.min(timeoutMs, remainingMs));
       return { payload, endpoint };
     } catch (error) { lastError = error; }
   }
   throw lastError || new Error('Geen Overpass-provider beschikbaar.');
 }
 
+function typedDestinationFallback(trip, resolution, excludedIds, warning) {
+  if (!resolution) return [];
+  return clusterDestinationRegions(trip, resolution, [])
+    .filter(item => !excludedIds.includes(item.id))
+    .map(item => ({
+      ...item,
+      summary: `${resolution.displayName} is rechtstreeks door OpenStreetMap Nominatim gevonden. Detailankers zijn tijdelijk niet beschikbaar; deze optie gebruikt daarom alleen geverifieerde bestemmingscoÃ¶rdinaten en neutrale aannames.`,
+      pros: ['Getypte bestemming is rechtstreeks gegeocodeerd', 'Geen ongerelateerde catalogusbestemming toegevoegd'],
+      cons: [warning || 'POI- en verblijfsverrijking is tijdelijk niet beschikbaar', 'Regio-indeling en beschikbaarheid vragen aanvullende live data'],
+      dynamic: true,
+      degraded: true,
+      discoverySource: 'OpenStreetMap Nominatim Â· beperkte live modus',
+      evidence: { ...item.evidence, anchors: 1, highlights: 0, settlements: 1, providerWarnings: [warning].filter(Boolean) },
+      provider: {
+        name: 'OpenStreetMap Nominatim', resolutionId: resolution.providerId || resolution.id,
+        sourceUrl: resolution.sourceUrl, fetchedAt: resolution.fetchedAt || new Date().toISOString(), confidence: 'limited'
+      }
+    }));
+}
+
 export async function discoverDestinationBatch(trip, {
   cursor = 0, excludedIds = [], fetchImpl = globalThis.fetch, endpoints = OVERPASS_ENDPOINTS,
-  storage = globalThis.localStorage, resolution: suppliedResolution = null, timeoutMs = 15000
+  storage = globalThis.localStorage, resolution: suppliedResolution = null, timeoutMs = 5000,
+  deadlineMs = DISCOVERY_DEADLINE_MS
 } = {}) {
   if (typeof fetchImpl !== 'function') return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.' };
   const resolution = suppliedResolution || (trip.destinationQuery ? await resolveDestination(trip.destinationQuery, { fetchImpl }) : null);
   if (trip.destinationQuery && !resolution) return { destinations: [], anchors: [], live: false, reason: 'De opgegeven bestemming kon niet dynamisch worden gevonden. Er zijn geen ongerelateerde fallbackreizen gegenereerd.' };
-  const query = buildDiscoveryQuery(trip, cursor, resolution);
-  if (!query.includes('nwr(')) return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.' };
+  const accessRecommendation = recommendAccessMode(trip, resolution);
+  const stages = buildDiscoveryQueries(trip, cursor, resolution);
+  if (!stages.length) return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.', resolution, accessRecommendation };
   const cacheKey = buildDiscoveryCacheKey(trip, { cursor, resolution });
   try {
     const record = JSON.parse(storage?.getItem(cacheKey) || 'null');
-    if (record?.payload && Date.now() - record.savedAt < 14 * 24 * 60 * 60 * 1000) {
+    const maximumAge = record?.degraded ? 30 * 60 * 1000 : 14 * 24 * 60 * 60 * 1000;
+    if (record?.payload && Date.now() - record.savedAt < maximumAge) {
       const anchors = normalizeAnchorElements(record.payload);
-      const destinations = clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
+      const destinations = record.degraded
+        ? typedDestinationFallback(trip, resolution, excludedIds, record.warning)
+        : clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
       destinations.forEach(item => { item.discoveryCache = { cached: true, ageMs: Date.now() - record.savedAt, key: cacheKey }; });
-      return { destinations, anchors, live: true, cached: true, cacheAgeMs: Date.now() - record.savedAt, source: record.endpoint || 'OpenStreetMap Overpass', resolution };
+      return { destinations, anchors, live: true, cached: true, degraded: Boolean(record.degraded), cacheAgeMs: Date.now() - record.savedAt, source: record.endpoint || 'OpenStreetMap Overpass', warnings: [record.warning].filter(Boolean), resolution, accessRecommendation };
     }
   } catch { /* exact-query cache is optional */ }
-  try {
-    const { payload, endpoint } = await fetchOverpass(query, endpoints, fetchImpl, timeoutMs);
-    try { storage?.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), endpoint, payload })); } catch { /* optional */ }
-    const anchors = normalizeAnchorElements(payload);
-    const destinations = clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
-    destinations.forEach(item => { item.discoveryCache = { cached: false, ageMs: 0, key: cacheKey }; });
-    if (!destinations.length) return { destinations: [], anchors, live: false, reason: 'Geen bruikbare dynamische regio kon uit de huidige providerdata worden opgebouwd. Er zijn geen catalogusreizen toegevoegd.', resolution };
-    return { destinations, anchors, live: true, cached: false, source: endpoint, resolution };
-  } catch (error) {
-    return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.', error: error?.name || 'provider-error', resolution };
+  const deadlineAt = Date.now() + Math.max(1000, deadlineMs);
+  const elements = [];
+  const usedEndpoints = [];
+  const warnings = [];
+  for (const stage of stages) {
+    try {
+      const { payload, endpoint } = await fetchOverpass(stage.query, endpoints, fetchImpl, timeoutMs, deadlineAt);
+      elements.push(...(payload?.elements || []));
+      usedEndpoints.push(endpoint);
+    } catch (error) {
+      warnings.push(`${stage.stage}: ${error?.name === 'AbortError' ? 'provider-timeout' : String(error?.message || 'provider-error')}`);
+      if (stage.stage === 'anchors') break;
+    }
   }
+  const payload = { elements };
+  if (elements.length) {
+    try { storage?.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), endpoint: [...new Set(usedEndpoints)].join(' + '), payload })); } catch { /* optional */ }
+  }
+  const anchors = normalizeAnchorElements(payload);
+  let destinations = clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
+  destinations.forEach(item => {
+    item.discoveryCache = { cached: false, ageMs: 0, key: cacheKey };
+    if (warnings.length) {
+      item.degraded = true;
+      item.evidence.providerWarnings = warnings;
+      item.cons = [...new Set([...item.cons, 'Een deel van de live verrijking reageerde niet binnen de tijdslimiet'])];
+    }
+  });
+  if (!destinations.length && resolution) destinations = typedDestinationFallback(trip, resolution, excludedIds, warnings[0]);
+  if (destinations.length) {
+    if (!anchors.length && resolution) {
+      try {
+        storage?.setItem(cacheKey, JSON.stringify({
+          savedAt: Date.now(), endpoint: 'OpenStreetMap Nominatim', payload: { elements: [] }, degraded: true, warning: warnings[0] || 'Overpass enrichment unavailable'
+        }));
+      } catch { /* optional */ }
+    }
+    return {
+      destinations, anchors, live: true, cached: false, degraded: !anchors.length || Boolean(warnings.length),
+      source: usedEndpoints.length ? [...new Set(usedEndpoints)].join(' + ') : 'OpenStreetMap Nominatim',
+      warnings, resolution, accessRecommendation
+    };
+  }
+  return {
+    destinations: [], anchors, live: false,
+    reason: resolution
+      ? 'De bestemming is gevonden, maar er kon geen nieuwe selecteerbare regio worden opgebouwd. Er zijn geen ongerelateerde fallbackreizen gegenereerd.'
+      : 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.',
+    error: warnings[0] || 'provider-error', resolution, accessRecommendation
+  };
 }
 
 export function normalizeDiscoveredDestinations(trip, payload, options = {}) {

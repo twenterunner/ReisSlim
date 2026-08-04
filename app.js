@@ -1,23 +1,23 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js';
-import { discoverDestinationBatch } from './destination-provider.js';
-import { buildItinerary } from './itinerary-engine.js';
-import { buildItineraryVariants } from './itinerary-variants.js';
-import { buildBudget } from './budget-engine.js';
-import { calculateTripQuality } from './trip-quality-engine.js';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js';
-import { validatePlan } from './itinerary-validator.js';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js';
-import { downloadGpx, downloadJson } from './gpx-generator.js';
-import { highlightMapDay, invalidateMap, renderMap } from './map-view.js';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js';
-import { evaluatePlanConstraints } from './constraint-engine.js';
-import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
-import { enrichDestinationImages, enrichHighlightImages } from './image-provider.js';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1101';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1101';
+import { discoverDestinationBatch, recommendAccessMode, resolveDestination } from './destination-provider.js?v=1101';
+import { buildItinerary } from './itinerary-engine.js?v=1101';
+import { buildItineraryVariants } from './itinerary-variants.js?v=1101';
+import { buildBudget } from './budget-engine.js?v=1101';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1101';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1101';
+import { validatePlan } from './itinerary-validator.js?v=1101';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1101';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1101';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1101';
+import { highlightMapDay, invalidateMap, renderMap } from './map-view.js?v=1101';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1101';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1101';
+import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js?v=1101';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1101';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1101';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1101';
+import { enrichDestinationImages, enrichHighlightImages } from './image-provider.js?v=1101';
 
 const defaults = () => normalizeTrip({
   origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500, travelMode: 'direct', routeTopology: 'loop', tripPace: 'balanced', destinationQuery: '',
@@ -29,7 +29,7 @@ const defaults = () => normalizeTrip({
 const state = {
   trip: null, ranked: [], ranking: null, destination: null, plan: null, budget: null,
   validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false,
-  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [], discoveryCursor: 0, discoveryBusy: false,
+  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [], discoveryCursor: 0, discoveryBusy: false, accessNotice: null,
   preferenceProfile: loadPreferenceProfile(), assistantPreview: null
 };
 
@@ -168,34 +168,79 @@ function appendMoreProposals(limit = 4) {
 async function discoverLiveOptions({ replace = false, append = false } = {}) {
   if (!state.trip.liveData || state.discoveryBusy) return 0;
   state.discoveryBusy = true;
-  setStatus('Nieuwe regio’s live ontdekken via OpenStreetMap…');
-  const result = await discoverDestinationBatch(state.trip, {
-    cursor: state.discoveryCursor,
-    excludedIds: [...state.catalog.map(item => item.id), ...state.dismissedIds]
-  });
-  state.discoveryCursor += 1;
-  state.discoveryBusy = false;
-  if (!result.destinations.length) {
+  try {
+    setStatus('Bestemming en toegang controleren…');
+    let resolution = null;
+    if (state.trip.destinationQuery) {
+      resolution = await resolveDestination(state.trip.destinationQuery);
+      if (!resolution) {
+        const reason = 'De opgegeven bestemming kon niet dynamisch worden gevonden. Er zijn geen ongerelateerde fallbackreizen gegenereerd.';
+        if (replace) {
+          state.catalog = [];
+          state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8 }));
+          state.ranked = [];
+          renderDestinations(state); renderComparison(state);
+        }
+        showError(reason); setStatus(reason);
+        return 0;
+      }
+      state.trip = normalizeTrip({ ...state.trip, destinationPoint: { ...resolution.point, name: resolution.name } });
+      const access = recommendAccessMode(state.trip, resolution);
+      if (access?.automatic) {
+        $('travelMode').value = access.travelMode;
+        $('transport').value = access.transport;
+        renderVehicleControls();
+        syncTravelModeControls();
+        state.trip = normalizeTrip({ ...readTripForm(state.trip), travelMode: access.travelMode, transport: access.transport });
+        state.accessNotice = { title: `${access.label} geselecteerd voor de toegang`, detail: access.reason };
+      } else if (access?.required) {
+        state.accessNotice = { title: 'Andere toegang nodig', detail: access.reason };
+      }
+    }
+    setStatus('Regioankers en highlights live ontdekken…');
+    const result = await discoverDestinationBatch(state.trip, {
+      cursor: state.discoveryCursor,
+      excludedIds: [...state.catalog.map(item => item.id), ...state.dismissedIds],
+      resolution
+    });
+    state.discoveryCursor += 1;
+    if (!result.destinations.length) {
+      if (replace) {
+        state.catalog = [];
+        state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8 }));
+        state.ranked = [];
+        renderDestinations(state); renderComparison(state);
+      }
+      showError(result.reason || 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.');
+      setStatus(result.reason || 'Dynamische ontdekking niet beschikbaar');
+      return 0;
+    }
+    const known = new Set(replace ? [] : state.catalog.map(item => item.id));
+    if (replace) state.catalog = [];
+    state.catalog.push(...result.destinations.filter(item => !known.has(item.id)));
+    showError();
+    if (replace) {
+      state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
+      state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state); void hydrateProposalImages();
+    } else if (append) appendMoreProposals(4);
+    const providerState = result.degraded ? 'beperkte live data' : 'live verrijkt';
+    const accessState = state.accessNotice ? `${state.accessNotice.title}. ` : '';
+    persistDraft(`${accessState}${result.destinations.length} regio’s beschikbaar (${providerState})`);
+    return result.destinations.length;
+  } catch (error) {
+    const reason = 'Dynamische ontdekking kon niet worden afgerond. Probeer opnieuw; de planner heeft geen ongerelateerde reizen toegevoegd.';
+    console.error(error);
     if (replace) {
       state.catalog = [];
       state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8 }));
       state.ranked = [];
       renderDestinations(state); renderComparison(state);
     }
-    showError(result.reason || 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.');
-    setStatus(result.reason || 'Dynamische ontdekking niet beschikbaar');
+    showError(reason); setStatus(reason);
     return 0;
+  } finally {
+    state.discoveryBusy = false;
   }
-  const known = new Set(replace ? [] : state.catalog.map(item => item.id));
-  if (replace) state.catalog = [];
-  state.catalog.push(...result.destinations.filter(item => !known.has(item.id)));
-  showError();
-  if (replace) {
-    state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
-    state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state); void hydrateProposalImages();
-  } else if (append) appendMoreProposals(4);
-  persistDraft(`${result.destinations.length} live ontdekte regio’s beschikbaar`);
-  return result.destinations.length;
 }
 
 function applyVariant(variantId) {
@@ -259,7 +304,7 @@ function rebuildFromRecord(record) {
 }
 
 function resetState(trip = defaults()) {
-  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [], discoveryCursor: 0, discoveryBusy: false });
+  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [], discoveryCursor: 0, discoveryBusy: false, accessNotice: null });
   writeTripForm(trip);
   renderVehicleControls();
   syncTravelModeControls();
@@ -334,7 +379,7 @@ function initialize() {
       const originPoint = await geocodeOrigin(state.trip.origin);
       if (originPoint) state.trip = normalizeTrip({ ...state.trip, originPoint });
     }
-    state.dismissedIds = []; state.catalog = []; state.discoveryCursor = 0;
+    state.dismissedIds = []; state.catalog = []; state.discoveryCursor = 0; state.accessNotice = null;
     state.preferenceProfile.privateMode = state.trip.privateMode;
     savePreferenceProfile(state.preferenceProfile);
     state.ranking = buildProposalPortfolio(state.trip, [], portfolioOptions({ limit: 8, focus: $('proposalFocus').value }));

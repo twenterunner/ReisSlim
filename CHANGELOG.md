@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 — 2026-08-04
+
+- split large country discovery into bounded anchor and enrichment stages;
+- preserve a typed, Nominatim-backed destination when Overpass enrichment is unavailable;
+- automatically select a suitable fly-drive, fly-ride or fly-camper access mode for unrealistic direct-road requests;
+- guarantee that discovery clears its busy/loading state after provider errors;
+- expose degraded provider evidence and hard-constraint adjustments instead of an empty generic failure;
+- add production regressions for the repeated Android discovery failure.
+
 ## 1.1.0 — 2026-08-04
 
 ### Added

@@ -1,4 +1,4 @@
-# ReisSlim 1.1.0 — zero-catalogue travel intelligence
+# ReisSlim 1.1.1 — resilient zero-catalogue travel intelligence
 
 ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips and multi-modal journeys. It supports direct trips by car, motorcycle, camper or caravan, plus fly-drive, fly-ride, fly-camper and train/ferry access. The deterministic planner works without a server; optional public data providers enrich destinations, routes, POIs, weather and open-license images.
 
