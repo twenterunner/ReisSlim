@@ -18,19 +18,27 @@ function destinationPoint(origin, distanceKm, bearingDegrees) {
 export function discoverySeeds(trip, cursor = 0, count = 8) {
   const origin = resolveOrigin(trip);
   if (!origin) return [];
+  if (trip.destinationPoint) {
+    return Array.from({ length: count }, (_, index) => {
+      const sequence = cursor * count + index;
+      const distanceKm = 12 + (index % 4) * 24 + cursor * 8;
+      return { ...destinationPoint(trip.destinationPoint, distanceKm, sequence * GOLDEN_ANGLE), distanceKm, sequence, targeted: true };
+    });
+  }
+  const global = trip.travelMode && trip.travelMode !== 'direct';
   const legs = Math.max(1, Math.min(4, Math.floor((trip.days - 1) / 2)));
-  const reach = Math.max(220, Math.min(2100, trip.maxDrive * 78 * legs));
+  const reach = global ? Math.min(14500, 2200 + trip.days * 520) : Math.max(220, Math.min(3400, trip.maxDrive * 78 * legs));
   const ring = .28 + ((cursor % 9) / 8) * .66;
   return Array.from({ length: count }, (_, index) => {
     const sequence = cursor * count + index;
-    const distanceKm = reach * Math.max(.22, Math.min(.96, ring + ((index % 3) - 1) * .08));
+    const distanceKm = reach * Math.max(global ? .32 : .22, Math.min(.96, ring + ((index % 3) - 1) * .08));
     return { ...destinationPoint(origin, distanceKm, sequence * GOLDEN_ANGLE), distanceKm, sequence };
-  }).filter(point => point.lat >= 35 && point.lat <= 70 && point.lon >= -11 && point.lon <= 30);
+  });
 }
 
 export function buildDiscoveryQuery(trip, cursor = 0) {
   const seeds = discoverySeeds(trip, cursor);
-  const clauses = seeds.map(point => `nwr(around:32000,${point.lat.toFixed(4)},${point.lon.toFixed(4)})["place"~"city|town"]["name"];`).join('\n');
+  const clauses = seeds.map(point => `nwr(around:42000,${point.lat.toFixed(4)},${point.lon.toFixed(4)})["place"~"city|town"]["name"];nwr(around:42000,${point.lat.toFixed(4)},${point.lon.toFixed(4)})["boundary"="national_park"]["name"];`).join('\n');
   return `[out:json][timeout:12][maxsize:16777216];\n(\n${clauses}\n);\nout center 180;`;
 }
 
@@ -49,16 +57,17 @@ function corridorStops(origin, target, name, distanceKm) {
 function dynamicProfile(trip, element) {
   const origin = resolveOrigin(trip); const point = pointOf(element); const name = element.tags?.['name:nl'] || element.tags?.name;
   if (!origin || !point || !name) return null;
-  const direct = haversineKm(origin, point); const distanceKm = Math.round(direct * 1.18);
+  const multimodal = trip.travelMode && trip.travelMode !== 'direct';
+  const direct = haversineKm(origin, point); const distanceKm = Math.round(direct * (multimodal ? 1 : 1.18));
   const code = String(element.tags?.['addr:country'] || element.tags?.['is_in:country_code'] || '').toUpperCase();
-  const country = countryNames[code] || element.tags?.['is_in:country'] || 'Europa';
+  const country = countryNames[code] || element.tags?.['is_in:country'] || element.tags?.['addr:country'] || 'Wereldregio';
   const seed = hash(`${name}:${point.lat.toFixed(3)}:${point.lon.toFixed(3)}`);
   const nightMid = countryCosts[code] || 125 + (seed % 25);
   const family = 6 + seed % 4; const motorcycle = 6 + (seed >> 3) % 4; const camper = 6 + (seed >> 5) % 4; const weather = 5 + (seed >> 7) % 4; const crowds = 6 + (seed >> 9) % 4;
   const basePoint = { name, ...point };
   return {
     id: `osm-${slug(name)}-${Math.round(point.lat * 100)}-${Math.round(point.lon * 100)}`, name: `${name} & omgeving`, country,
-    distanceKm, driveHours: Number((distanceKm / 88).toFixed(1)), nightMid, activityDaily: 38 + seed % 25, toll: Math.round(distanceKm * (['FR','IT','AT','CH'].includes(code) ? .08 : .025)),
+    distanceKm, driveHours: Number((distanceKm / (multimodal ? 780 : 88)).toFixed(1)), nightMid, activityDaily: 38 + seed % 25, toll: multimodal ? 0 : Math.round(distanceKm * (['FR','IT','AT','CH'].includes(code) ? .08 : .025)),
     tags: ['natuur', 'cultuur', 'eten', ...(trip.children ? ['kinderen'] : []), ...(trip.transport === 'motorcycle' ? ['motor'] : [])],
     season: [3,4,5,6,7,8,9,10], family, motorcycle, camper, weather, crowds,
     summary: `Live ontdekt reisgebied rond ${name}; route, verblijf, restaurants en activiteiten worden na selectie met actuele bronnen ingevuld.`,
@@ -76,8 +85,9 @@ function dynamicProfile(trip, element) {
 
 export function normalizeDiscoveredDestinations(trip, payload, { excludedIds = [], limit = 16 } = {}) {
   const excluded = new Set(excludedIds); const seenNames = new Set();
+  const maximumDistance = trip.travelMode && trip.travelMode !== 'direct' ? 15000 : 3600;
   return (payload?.elements || []).map(element => dynamicProfile(trip, element)).filter(Boolean)
-    .filter(item => item.distanceKm >= 120 && item.distanceKm <= 2200 && !excluded.has(item.id))
+    .filter(item => item.distanceKm >= 120 && item.distanceKm <= maximumDistance && !excluded.has(item.id))
     .sort((a, b) => a.distanceKm - b.distanceKm || a.id.localeCompare(b.id))
     .filter(item => { const key = item.name.toLocaleLowerCase('nl-NL'); if (seenNames.has(key)) return false; seenNames.add(key); return true; })
     .slice(0, limit);
@@ -86,7 +96,7 @@ export function normalizeDiscoveredDestinations(trip, payload, { excludedIds = [
 export async function discoverDestinationBatch(trip, { cursor = 0, excludedIds = [], fetchImpl = fetch, endpoint = DEFAULT_ENDPOINT, storage = globalThis.localStorage } = {}) {
   const query = buildDiscoveryQuery(trip, cursor);
   if (!query.includes('nwr(')) return { destinations: [], live: false, reason: 'Vertrekcoördinaten ontbreken.' };
-  const cacheKey = `reisslim.destination-discovery.v1:${trip.origin}:${trip.days}:${trip.maxDrive}:${cursor}`;
+  const cacheKey = `reisslim.destination-discovery.v2:${trip.origin}:${trip.travelMode}:${trip.days}:${trip.maxDrive}:${cursor}`;
   try {
     const cached = storage?.getItem(cacheKey);
     if (cached) return { destinations: normalizeDiscoveredDestinations(trip, JSON.parse(cached), { excludedIds }), live: true, cached: true, source: 'OpenStreetMap Overpass' };
@@ -103,4 +113,4 @@ export async function discoverDestinationBatch(trip, { cursor = 0, excludedIds =
   } finally { clearTimeout(timer); }
 }
 
-export const destinationDiscoveryConfig = Object.freeze({ endpoint: DEFAULT_ENDPOINT, attribution: '© OpenStreetMap-bijdragers, ODbL', publicInstanceNote: 'Eén compacte, door de gebruiker gestarte batch per actie; voor productie op schaal is een eigen/proxy-instantie nodig.' });
+export const destinationDiscoveryConfig = Object.freeze({ endpoint: DEFAULT_ENDPOINT, attribution: '© OpenStreetMap-bijdragers, ODbL', coverage: 'global-staged', publicInstanceNote: 'Eén compacte, door de gebruiker gestarte batch per actie; voor productie op schaal is een eigen/proxy-instantie nodig.' });

@@ -64,12 +64,13 @@ export function renderMap(plan, elementId = 'map') {
     const coordinates = segment.points.map(point => [point.lat, point.lon]);
     const liveRoute = ['tomtom', 'openrouteservice', 'osrm'].includes(segment.source);
     bounds.push(...coordinates);
+    const multimodal = segment.mode && segment.mode !== 'road';
     L.polyline(coordinates, {
       weight: liveRoute ? 5 : 4,
-      dashArray: liveRoute ? null : '8 6',
+      dashArray: liveRoute ? null : multimodal ? '3 9' : '8 6',
       opacity: .9,
       color: segment.kind === 'return' ? colors.returnRoute : colors[segment.kind] || colors.outward
-    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : 'Indicatieve corridor'}`);
+    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : multimodal ? `Indicatief ${escapeHtml(segment.mode)}-segment; geen bevestigd schema` : 'Indicatieve corridor'}`);
   });
 
   routePoints.forEach((point, index) => {

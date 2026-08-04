@@ -16,21 +16,50 @@ import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, save
 import { evaluatePlanConstraints } from './constraint-engine.js';
 import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js';
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
+import { enrichDestinationImages } from './image-provider.js';
 
 const defaults = () => normalizeTrip({
-  origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500,
+  origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500, travelMode: 'direct', routeTopology: 'loop', tripPace: 'balanced', destinationQuery: '',
   adults: 2, children: 2, transport: 'car', maxDrive: 5, maxChanges: 5,
-  comfort: 'mid', strictBudget: true, strictDrive: true, strictChanges: true, allowStretch: true, liveData: true, notes: '', preferences: preferenceDefinitions.slice(0, 5).map(([id]) => id),
+  comfort: 'mid', strictBudget: true, strictDrive: true, strictChanges: true, allowStretch: true, liveData: true, remoteTravel: false, privateMode: false, notes: '', preferences: preferenceDefinitions.slice(0, 5).map(([id]) => id),
   preferenceWeights: Object.fromEntries(preferenceDefinitions.slice(0, 5).map(([id]) => [id, 2]))
 });
 
 const state = {
   trip: null, ranked: [], ranking: null, destination: null, plan: null, budget: null,
   validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false,
-  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false
+  undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false,
+  preferenceProfile: loadPreferenceProfile(), assistantPreview: null
 };
 
 const clone = value => JSON.parse(JSON.stringify(value));
+
+function portfolioOptions(extra = {}) {
+  state.preferenceProfile.privateMode = Boolean(state.trip?.privateMode);
+  return { preferenceProfile: state.preferenceProfile, ...extra };
+}
+
+function syncTravelModeControls() {
+  const multimodal = $('travelMode').value !== 'direct';
+  const openJaw = $('routeTopology').querySelector('option[value="open-jaw"]');
+  if (openJaw) openJaw.disabled = !multimodal;
+  if (!multimodal && $('routeTopology').value === 'open-jaw') $('routeTopology').value = 'loop';
+}
+
+function learn(kind, destination) {
+  if (!destination) return;
+  state.preferenceProfile.privateMode = Boolean(state.trip?.privateMode);
+  state.preferenceProfile = recordPreferenceEvent(state.preferenceProfile, { kind, destinationId: destination.id, tags: destination.tags });
+  savePreferenceProfile(state.preferenceProfile);
+}
+
+async function hydrateProposalImages() {
+  if (!state.trip?.liveData || !state.ranked.length) return;
+  await enrichDestinationImages(state.ranked, { maximum: 4 });
+  renderDestinations(state);
+}
 
 function stateForStorage() {
   return { schemaVersion: STORAGE_SCHEMA_VERSION, engineVersion: ENGINE_VERSION, trip: state.trip, destinationId: state.destination?.destinationId || state.destination?.id || null, destinationProfile: state.destination?.dynamic ? state.destination : null, compareIds: state.compareIds, savedProposalIds: state.savedProposalIds, dismissedIds: state.dismissedIds, selectedVariantId: state.selectedVariantId, optimized: state.optimized, plan: state.plan };
@@ -85,14 +114,15 @@ function applyDestination(destination, optimize = false) {
   renderMap(state.plan);
   $('variantSection').classList.add('hidden');
   $('planSection').classList.remove('hidden');
-  $('noPlanItinerary').classList.add('hidden');
   $('mapHint').classList.add('hidden');
+  $('noPlanItinerary').classList.add('hidden');
   persistDraft();
   renderDashboard(state, loadTrips());
   if (state.trip.liveData) void enhanceLiveData(destination.id, state.plan);
 }
 
 function chooseProposal(destination) {
+  learn('select', destination);
   state.destination = destination;
   state.variants = buildItineraryVariants(state.trip, destination);
   state.selectedVariantId = null;
@@ -117,7 +147,7 @@ function appendMoreProposals(limit = 4) {
   const excluded = [...new Set([...state.ranked.map(item => item.id), ...state.dismissedIds])];
   const existingStretches = state.ranked.filter(item => item.category === 'stretch').length;
   let stretchSlots = Math.max(0, 2 - existingStretches);
-  const more = getMoreProposals(state.trip, state.catalog, excluded, { limit: limit + 2, focus: $('proposalFocus').value }).filter(item => {
+  const more = getMoreProposals(state.trip, state.catalog, excluded, portfolioOptions({ limit: limit + 2, focus: $('proposalFocus').value })).filter(item => {
     if (item.category !== 'stretch') return true;
     if (!stretchSlots) return false;
     stretchSlots -= 1; return true;
@@ -142,8 +172,8 @@ async function discoverLiveOptions({ replace = false, append = false } = {}) {
   const known = new Set(state.catalog.map(item => item.id));
   state.catalog.push(...result.destinations.filter(item => !known.has(item.id)));
   if (replace) {
-    state.ranking = buildProposalPortfolio(state.trip, state.catalog, { limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds });
-    state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state);
+    state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
+    state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state); void hydrateProposalImages();
   } else if (append) appendMoreProposals(4);
   persistDraft(`${result.destinations.length} live ontdekte regio’s beschikbaar`);
   return result.destinations.length;
@@ -161,6 +191,7 @@ function applyVariant(variantId) {
   });
   $('variantSection').classList.add('hidden');
   $('planSection').classList.remove('hidden');
+  $('mapHint').classList.add('hidden');
   renderPlan(state); renderOptimizationPreview(state); renderMap(state.plan);
   persistDraft(`${variant.label} reisplan opgeslagen`);
   renderDashboard(state, loadTrips());
@@ -194,8 +225,9 @@ function rebuildFromRecord(record) {
   state.dismissedIds = record.dismissedIds || [];
   writeTripForm(state.trip);
   renderVehicleControls();
+  syncTravelModeControls();
   state.catalog = record.destinationProfile?.dynamic ? [...destinations, record.destinationProfile] : [...destinations];
-  state.ranking = buildProposalPortfolio(state.trip, state.catalog, { limit: 8, excludedIds: state.dismissedIds });
+  state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, excludedIds: state.dismissedIds }));
   state.ranked = state.ranking.visible;
   state.destination = state.ranking.candidates.find(item => item.id === record.destinationId) || (record.destinationProfile?.id === record.destinationId ? record.destinationProfile : null);
   if (state.destination) {
@@ -207,9 +239,10 @@ function rebuildFromRecord(record) {
 }
 
 function resetState(trip = defaults()) {
-  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: state.routingRun + 1, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false });
+  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [...destinations], discoveryCursor: 0, discoveryBusy: false });
   writeTripForm(trip);
   renderVehicleControls();
+  syncTravelModeControls();
   $('resultsSection').classList.add('hidden');
   $('planSection').classList.add('hidden');
   $('variantSection').classList.add('hidden');
@@ -222,7 +255,8 @@ function resetState(trip = defaults()) {
 function initialize() {
   renderPreferenceGrid();
   renderVehicleControls();
-  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Dynamic portfolio intelligence`;
+  syncTravelModeControls();
+  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Global travel intelligence`;
   $('orsApiKey').value = readRoutingSettings().orsApiKey;
   const restored = loadDraft();
   if (restored?.trip) { rebuildFromRecord(restored); setStatus('Concept hersteld en met de actuele planner herberekend'); }
@@ -242,7 +276,23 @@ function initialize() {
     }
   });
   $('transport').addEventListener('change', () => renderVehicleControls({ resetDefaults: true }));
+  $('travelMode').addEventListener('change', () => {
+    const vehicle = { 'fly-drive': 'car', 'fly-ride': 'motorcycle', 'fly-camper': 'motorhome' }[$('travelMode').value];
+    if (vehicle) $('transport').value = vehicle;
+    renderVehicleControls({ resetDefaults: Boolean(vehicle) });
+    syncTravelModeControls();
+  });
   $('routeStyle').addEventListener('change', () => renderVehicleControls());
+  $('useLocationBtn').addEventListener('click', () => {
+    if (!navigator.geolocation) { showError('Locatiebepaling wordt niet ondersteund op dit apparaat.'); return; }
+    setStatus('Huidige locatie opvragen…');
+    navigator.geolocation.getCurrentPosition(position => {
+      const point = { lat: position.coords.latitude, lon: position.coords.longitude, name: 'Huidige locatie', source: 'Browser-geolocatie' };
+      $('origin').value = 'Huidige locatie';
+      state.trip = normalizeTrip({ ...readTripForm(state.trip), origin: 'Huidige locatie', originPoint: point });
+      persistDraft('Huidige locatie alleen lokaal opgeslagen');
+    }, () => showError('Locatie kon niet worden bepaald. Controleer de browsertoestemming.'), { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+  });
 
   $('tripForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -255,11 +305,19 @@ function initialize() {
       const originPoint = await geocodeOrigin(state.trip.origin);
       if (originPoint) state.trip = normalizeTrip({ ...state.trip, originPoint });
     }
+    if (state.trip.destinationQuery && !state.trip.destinationPoint && state.trip.liveData) {
+      setStatus('Gewenste bestemming lokaliseren…');
+      const destinationPoint = await geocodeOrigin(state.trip.destinationQuery);
+      if (destinationPoint) state.trip = normalizeTrip({ ...state.trip, destinationPoint });
+    }
     state.dismissedIds = []; state.catalog = [...destinations]; state.discoveryCursor = 0;
-    state.ranking = buildProposalPortfolio(state.trip, state.catalog, { limit: 8, focus: $('proposalFocus').value });
+    state.preferenceProfile.privateMode = state.trip.privateMode;
+    savePreferenceProfile(state.preferenceProfile);
+    state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value }));
     state.ranked = state.ranking.visible;
     state.destination = null; state.plan = null; state.variants = []; state.selectedVariantId = null; state.undoSnapshot = null; state.optimizationSummary = null; state.optimizationProposal = null;
     renderDestinations(state); renderComparison(state);
+    void hydrateProposalImages();
     $('resultsSection').classList.remove('hidden');
     $('planSection').classList.add('hidden');
     persistDraft();
@@ -279,12 +337,14 @@ function initialize() {
     const save = event.target.closest('[data-save-proposal]');
     if (save) {
       const id = save.dataset.saveProposal;
+      learn(state.savedProposalIds.includes(id) ? 'dismiss' : 'save', state.ranked.find(item => item.id === id));
       state.savedProposalIds = state.savedProposalIds.includes(id) ? state.savedProposalIds.filter(item => item !== id) : [...state.savedProposalIds, id];
       renderDestinations(state); persistDraft('Bewaarde voorstellen bijgewerkt'); return;
     }
     const dismiss = event.target.closest('[data-dismiss-proposal]');
     if (dismiss) {
       const id = dismiss.dataset.dismissProposal;
+      learn('dismiss', state.ranked.find(item => item.id === id));
       state.dismissedIds = [...new Set([...state.dismissedIds, id])];
       state.ranked = state.ranked.filter(item => item.id !== id);
       state.compareIds = state.compareIds.filter(item => item !== id);
@@ -315,14 +375,14 @@ function initialize() {
     else if (!localCount) setStatus('Schakel live data in om buiten de offline fallbackcatalogus te ontdekken');
   });
   $('proposalFocus').addEventListener('change', () => {
-    state.ranking = buildProposalPortfolio(state.trip, state.catalog, { limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds });
+    state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
     state.ranked = state.ranking.visible; state.compareIds = [];
     renderDestinations(state); renderComparison(state); persistDraft('Portfoliofocus bijgewerkt');
   });
   $('portfolioNotice').addEventListener('click', event => {
     if (!event.target.closest('[data-relax-constraints]')) return;
     $('strictBudget').checked = false; $('strictDrive').checked = false; $('strictChanges').checked = false;
-    state.trip = readTripForm(state.trip); state.ranking = buildProposalPortfolio(state.trip, state.catalog, { limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds });
+    state.trip = readTripForm(state.trip); state.ranking = buildProposalPortfolio(state.trip, state.catalog, portfolioOptions({ limit: 8, focus: $('proposalFocus').value, excludedIds: state.dismissedIds }));
     state.ranked = state.ranking.visible; renderDestinations(state); renderComparison(state); persistDraft('Grenzen als zachte voorkeuren toegepast');
   });
   $('variantCards').addEventListener('click', event => {
@@ -394,6 +454,37 @@ function initialize() {
     Object.assign(state, state.undoSnapshot); state.undoSnapshot = null; state.optimizationSummary = null;
     state.optimizationProposal = null; renderPlan(state); renderOptimizationPreview(state); renderMap(state.plan); persistDraft('Optimalisatie ongedaan gemaakt');
   });
+
+  $('assistantPreviewBtn').addEventListener('click', () => {
+    if (!state.trip) return;
+    state.assistantPreview = interpretAssistantMessage($('assistantMessage').value, state.trip);
+    const preview = state.assistantPreview;
+    $('assistantPreview').innerHTML = `<div class="assistant-preview-card"><strong>${preview.understood ? 'Voorgestelde wijziging' : 'Nog niet begrepen'}</strong><p>${String(preview.summary || preview.message || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character])}</p><small>${preview.understood ? 'Voorbeeldweergave: er is nog niets gewijzigd.' : 'Probeer één concrete opdracht.'}</small></div>`;
+    $('assistantApplyBtn').classList.toggle('hidden', !preview.understood);
+    $('assistantCancelBtn').classList.toggle('hidden', !preview.understood);
+  });
+  $('assistantCancelBtn').addEventListener('click', () => {
+    state.assistantPreview = null; $('assistantPreview').innerHTML = '';
+    $('assistantApplyBtn').classList.add('hidden'); $('assistantCancelBtn').classList.add('hidden');
+  });
+  $('assistantApplyBtn').addEventListener('click', () => {
+    const preview = state.assistantPreview;
+    if (!preview?.understood) return;
+    const before = clone(state.trip);
+    state.trip = normalizeTrip(applyAssistantPatch(state.trip, preview.patch));
+    if (preview.patch.optimizerMode) $('optimizationMode').value = preview.patch.optimizerMode;
+    writeTripForm(state.trip);
+    if (state.destination) applyDestination(state.destination, false);
+    state.undoAssistantTrip = before;
+    state.assistantPreview = null; $('assistantPreview').innerHTML = '<div class="inline-success">Wijziging toegepast. Het plan en de controles zijn opnieuw berekend.</div>';
+    $('assistantApplyBtn').classList.add('hidden'); $('assistantCancelBtn').classList.add('hidden');
+  });
+
+  document.querySelectorAll('[data-inspire]').forEach(button => button.addEventListener('click', () => {
+    $('destinationQuery').value = button.textContent.trim().split('\n')[0];
+    showView('plannerView');
+    $('destinationQuery').focus();
+  }));
 }
 
 document.addEventListener('DOMContentLoaded', initialize);

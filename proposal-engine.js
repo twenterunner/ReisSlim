@@ -1,4 +1,5 @@
 import { rankDestinationGroups } from './destination-engine.js';
+import { preferenceBonus } from './preference-engine.js';
 
 const clamp01 = value => Math.max(0, Math.min(1, value));
 const band = (value, size) => Math.floor(Number(value || 0) / size);
@@ -46,10 +47,11 @@ function explainTradeoff(item) {
   return 'Geen harde overschrijding; prijzen en beschikbaarheid blijven wel indicatief.';
 }
 
-function proposalFromDestination(item, trip, focus) {
+function proposalFromDestination(item, trip, focus, learnedProfile = null) {
   const [label, labelReason] = primaryStyle(item, trip);
+  const learned = preferenceBonus(item, learnedProfile);
   const bases = item.bases?.length || 1;
-  const recommendedBases = Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2));
+  const recommendedBases = trip.routeTopology === 'open-jaw' ? Math.min(2, bases) : Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2));
   return {
     ...item,
     proposalId: item.id,
@@ -57,9 +59,10 @@ function proposalFromDestination(item, trip, focus) {
     proposalLabel: label,
     labelReason,
     focusLabel: focusProfiles[focus]?.label || focusProfiles.balanced.label,
-    portfolioScore: item.score + focusBonus(item, focus),
+    portfolioScore: item.score + focusBonus(item, focus) + learned.score,
+    learnedPreferenceReasons: learned.reasons,
     recommendedBases,
-    routeCharacter: trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
+    routeCharacter: trip.travelMode !== 'direct' ? `${trip.travelMode} met lokale ${trip.routeTopology === 'open-jaw' ? 'open-jaw route' : 'rondreis'}` : trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
     tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${item.constraintStatus.travelLegs * 2} reisetappes`,
     keyTradeoff: explainTradeoff(item),
     evidence: [`Offline regioprofiel met ${item.bases.length} geankerde bases`, `${item.routeStops.length} corridorstops voor routeopbouw`, `Voertuigscore ${item.dimensions.transport}/100`],
@@ -103,9 +106,10 @@ export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = []
   return selected;
 }
 
-export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'balanced', excludedIds = [] } = {}) {
+export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'balanced', excludedIds = [], preferenceProfile = null } = {}) {
   const ranking = rankDestinationGroups(trip, catalog);
-  const candidates = [...ranking.exact, ...ranking.stretched].map(item => proposalFromDestination(item, trip, focus));
+  const requestedMismatch = ranking.rejected.find(item => item.intentMatch) || null;
+  const candidates = [...ranking.exact, ...ranking.stretched].map(item => proposalFromDestination(item, trip, focus, preferenceProfile));
   const visible = selectDiversePortfolio(candidates, { limit: Math.min(12, limit), excludedIds });
   const exact = visible.filter(item => item.category === 'exact');
   const stretched = visible.filter(item => item.category === 'stretch').slice(0, 2);
@@ -122,12 +126,12 @@ export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'bala
     stretched: accepted.filter(item => item.category === 'stretch'),
     visible: accepted,
     candidates,
-    shortage,
+    shortage, requestedMismatch,
     focus,
     focusOptions: focusProfiles
   };
 }
 
-export function getMoreProposals(trip, catalog, shownIds, { limit = 4, focus = 'balanced' } = {}) {
-  return buildProposalPortfolio(trip, catalog, { limit, focus, excludedIds: shownIds }).visible;
+export function getMoreProposals(trip, catalog, shownIds, { limit = 4, focus = 'balanced', preferenceProfile = null } = {}) {
+  return buildProposalPortfolio(trip, catalog, { limit, focus, excludedIds: shownIds, preferenceProfile }).visible;
 }

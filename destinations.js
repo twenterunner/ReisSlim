@@ -146,6 +146,18 @@ export const destinations = [
     pros: ['Weinig massatoerisme', 'Sterke motor- en natuurmatch', 'Betaalbaarder dan de Alpen'], cons: ['Minder live voorzieningen buiten dorpen', 'Sommige bergwegen zijn smal voor caravan'],
     routeStops: [stop('Maastricht',50.85,5.69,.18),stop('Luxemburg',49.61,6.13,.35),stop('Nancy',48.69,6.18,.55),stop('Besançon',47.24,6.02,.79)], bases: [base('Lons-le-Saunier',46.67,5.55),base('Saint-Claude',46.39,5.86),base('Lac de Chalain',46.67,5.79)],
     activities: [activity('natuur','Wandel naar een waterval en kies een rustige picknickplek.','Bezoek een kaasboerderij of ambachtsmuseum.',['natuur','wandelen']),activity('zwemmen','Plan een meer met korte oeverwandeling.','Kies thermen of een grotmuseum.',['zwemmen']),activity('motor','Rijd een plateaulussen met beperkte dagafstand.','Kies een lagere dalroute met culinaire stop.',['motor','eten'])]
+  },
+  {
+    id: 'namibia-fixture', name: 'Namibië: woestijn, kust & wildlife', country: 'Namibië', countryCode: 'NA',
+    distanceKm: 8600, driveHours: 11.5, nightMid: 155, activityDaily: 72, toll: 20,
+    tags: ['natuur','avontuur','wildlife','budget'], season: [4,5,6,7,8,9,10], family: 7, motorcycle: 5, camper: 8, weather: 8, crowds: 9,
+    summary: 'Verplichte wereldreis-fixture voor het testen van fly-drive, huurvoertuiglogistiek en afgelegen routegereedheid.',
+    pros: ['Sterke landschapsdiversiteit', 'Geschikt voor een ruime fly-drive of fly-camper', 'Goede test van remote-readiness'],
+    cons: ['Vlucht, huurvoertuig en afgelegen wegcondities moeten live worden bevestigd', 'Grote afstanden vragen ruime brandstof- en watermarges'],
+    routeStops: [stop('Sesriem-regio',-24.49,15.80,.27),stop('Swakopmund-regio',-22.68,14.53,.53),stop('Damaraland-regio',-20.50,14.30,.72),stop('Etosha-zuid',-19.33,15.93,.9)],
+    bases: [base('Windhoek',-22.56,17.08),base('Sesriem',-24.49,15.80),base('Swakopmund',-22.68,14.53),base('Etosha-zuid',-19.33,15.93)],
+    activities: [activity('natuur','Plan een vroege woestijnexcursie met hitte- en waterbuffer.','Gebruik de dag als route- en rustbuffer bij ongunstige omstandigheden.',['natuur','avontuur']),activity('wildlife','Reserveer een rustige wildlife-dag zonder extra lange avondrit.','Kies een lodgeactiviteit en controleer parktoegang.',['natuur','wildlife']),activity('cultuur','Combineer een lokale gids of erfgoedlocatie met een korte rijdag.','Kies een beschutte culturele activiteit bij de uitvalsbasis.',['cultuur'])],
+    fixture: true, accessModes: ['fly-drive','fly-camper'], remoteReadinessRequired: true
   }
 ];
 

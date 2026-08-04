@@ -1,4 +1,5 @@
 import { clamp } from './config.js';
+import { buildTravelReadiness } from './travel-readiness.js';
 
 const weightedAverage = (dimensions, weights) => Object.entries(weights)
   .reduce((sum, [key, weight]) => sum + dimensions[key] * weight, 0)
@@ -6,6 +7,7 @@ const weightedAverage = (dimensions, weights) => Object.entries(weights)
 const round = value => Math.round(clamp(value));
 
 export function calculateTripQuality(trip, destination, plan, budget) {
+  plan.readiness ||= buildTravelReadiness(trip, destination, plan);
   const days = plan.days || [];
   const travelDays = days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind)).length;
   const stayDays = days.length - travelDays;
@@ -20,6 +22,9 @@ export function calculateTripQuality(trip, destination, plan, budget) {
   const localDistance = days.filter(day => ['stay', 'flex', 'transfer'].includes(day.kind)).reduce((sum, day) => sum + Number(day.distanceKm || 0), 0);
   const changeExcess = Math.max(0, plan.accommodationChanges - trip.maxChanges);
   const driveUtilisation = maxElapsed / Math.max(1, trip.maxDrive);
+  const routeOverlap = Number(plan.routeMetrics?.exploration?.overlap ?? 1);
+  const readiness = plan.readiness;
+  const livePoiRatio = namedPlaces / Math.max(1, (plan.recommendations || []).length);
   const rawDimensions = {
     driving: clamp(96 - excessive * 34 - Math.max(0, driveUtilisation - .88) * 55 - Math.max(0, travelDays / Math.max(1, trip.days) - .45) * 75 - Math.max(0, localDistance / Math.max(1, trip.days) - 45) * .18),
     budget: clamp(98 - Math.max(0, budgetRatio - .82) * 135 - (budget.conservativeTotal > trip.budget ? 6 : 0)),
@@ -29,9 +34,17 @@ export function calculateTripQuality(trip, destination, plan, budget) {
     weather: clamp((destination.weather || 5) * 8 + rainCoverage * 20 + (plan.optimizationEvidence?.weatherChecked ? 6 : 0)),
     variety: clamp(42 + activityTypes.size * 14 + Math.min(10, flexDays * 3)),
     crowds: clamp((destination.crowds || 5) * 10),
-    realism: clamp((days.length === trip.days ? 28 : 0) + (plan.feasible ? 27 : 5) + (plan.routeMetrics?.originKnown ? 13 : 5) + recommendationCoverage * 12 + (plan.routing?.live ? 12 : 6) + Math.min(5, namedPlaces))
+    realism: clamp((days.length === trip.days ? 28 : 0) + (plan.feasible ? 27 : 5) + (plan.routeMetrics?.originKnown ? 13 : 5) + recommendationCoverage * 12 + (plan.routing?.live ? 12 : 6) + Math.min(5, namedPlaces)),
+    completeness: clamp((days.length === trip.days ? 45 : 5) + recommendationCoverage * 30 + rainCoverage * 15 + (plan.accessSegments?.length || !trip.travelMode || trip.travelMode === 'direct' ? 10 : 0)),
+    routeEfficiency: clamp(92 - excessive * 30 - Math.max(0, localDistance / Math.max(1, trip.days) - 55) * .3),
+    routeExploration: clamp(100 - routeOverlap * 80),
+    vehicleSuitability: clamp((destination.dimensions?.transport || 50) * .75 + (plan.recommendations || []).every(item => item.vehicleFit?.includes(trip.transport) || trip.travelMode !== 'direct') * 25),
+    safetyReadiness: clamp(readiness?.score ?? 45),
+    poiQuality: clamp(35 + recommendationCoverage * 25 + livePoiRatio * 40),
+    bookingReadiness: clamp(plan.accessSegments?.some(segment => segment.bookable === false) ? 38 : plan.placeData?.live ? 68 : 45),
+    documentationReadiness: clamp(readiness ? 100 - readiness.blockers * 15 : 35)
   };
-  const weights = { driving: 1.35, budget: 1.15, relaxation: 1.05, family: trip.children ? 1 : .4, adventure: .75, weather: .85, variety: .7, crowds: .45, realism: 1.45 };
+  const weights = { driving: 1.2, budget: 1.05, relaxation: .85, family: trip.children ? .8 : .3, adventure: .55, weather: .7, variety: .55, crowds: .35, realism: 1.2, completeness: 1, routeEfficiency: .8, routeExploration: .55, vehicleSuitability: 1, safetyReadiness: 1.15, poiQuality: .8, bookingReadiness: .65, documentationReadiness: .8 };
   let rawOverall = weightedAverage(rawDimensions, weights);
   if (plan.constraintStatus?.category === 'rejected') rawOverall = Math.min(55, rawOverall);
   else if (plan.constraintStatus?.category === 'stretch') rawOverall = Math.min(70, rawOverall);

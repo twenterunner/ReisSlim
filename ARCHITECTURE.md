@@ -1,63 +1,46 @@
-# Architectuur
+# ReisSlim v1.0 architecture
 
-## Doel
+## System boundary
 
-ReisSlim 0.9 is een GitHub Pages-compatibele PWA met een deterministische, constraint-first kern en optionele live providers. Zonder provider is de browser de enige runtime. Gedeelde providersleutels komen nooit in de PWA of repository; een persoonlijke OpenRouteService-sleutel kan uitsluitend lokaal worden bewaard.
+ReisSlim is a flat-file, GitHub Pages-compatible PWA. `app.js` owns the current UI state; deterministic domain modules own planning decisions; optional providers only supply normalized evidence. There is one canonical itinerary and one canonical budget. No provider may silently replace user constraints or claim verification it cannot prove.
 
-## Lagen
+## Data flow
 
-1. **Configuratie en data** — `config.js` bevat versie, voertuigprofielen, routering en expliciete aannames; `destinations.js` bevat uitsluitend de gecureerde offline fallback.
-2. **Domein** — `constraint-engine.js` scheidt harde voorwaarden van transparante zachte trade-offs; `proposal-engine.js` selecteert met een deterministische MMR-achtige diversiteitsstap; `itinerary-variants.js` bouwt reisstijlen; `plan-solver.js` verdeelt reisdagen en tijdvensters.
-3. **Provider en infrastructuur** — `destination-provider.js` ontdekt zonder vaste regiolimiet nieuwe bereikbare plaatsen via opeenvolgende Overpass-zoekringen. `routing-provider.js` kiest gateway, lokale OpenRouteService-integratie of beperkte OSRM-fallback. `place-provider.js` verzorgt vertrekgeocoding, route-POI's, Open-Meteo en lokale caches. De vlak geplaatste `route-worker.js` beschermt en normaliseert TomTom.
-4. **Presentatie** — `ui-renderer.js` rendert ge-escapete HTML; `app.js` orkestreert state en events. `index.html` en `styles.css` definiëren de mobiele shell.
-5. **PWA** — `manifest.webmanifest` en `service-worker.js` leveren installatiegegevens, versieverwijdering en offline shellgedrag.
+`TripRequest → origin normalization → staged discovery → hard-constraint gate → suitability scoring → MMR diversity → proposal variants → canonical itinerary → provider enrichment → budget/readiness/quality → map + JSON + GPX`
 
-## Stateflow
+Every selected plan must contain exactly the requested number of days, begin at the entered origin and end there unless a confirmed multi-modal open-jaw topology returns from another destination base. The home origin is never an activity or accommodation destination.
 
-`TripRequest → vehicle normalization → offline + dynamische kandidaten → feasibility gate → suitability ranking → diversity selection → portfolio → itinerary variants → detailed itinerary + budget → validation → UI/export`
+## Layers
 
-`offline itinerary → optional routing gateway → enriched geometry/timing → recommendations + budget + validation + quality → UI/export`
+1. **Request and migration** — `trip-model.js`, `storage.js`, `config.js` normalize schema 7 and rebuild stale v0.x derived plans.
+2. **Constraint and proposal domain** — `constraint-engine.js`, `destination-engine.js`, `proposal-engine.js`, `preference-engine.js` separate feasibility from ranking and apply bounded local learning.
+3. **Routing and itinerary** — `vehicle-intelligence.js`, `route-engine.js`, `route-topology.js`, `multimodal-engine.js`, `plan-solver.js`, `itinerary-engine.js` create road and access segments, timings, alternate return corridors and day schedules.
+4. **Decision support** — `budget-engine.js`, `travel-readiness.js`, `trip-quality-engine.js`, `trip-optimizer.js`, `assistant-engine.js` produce uncertainty ranges, blockers, quality dimensions and previewable changes.
+5. **Provider platform** — `provider-platform.js` defines envelopes, request budgets, timeouts, health and deduplication. Destination, route, place, weather and image adapters retain source, freshness, confidence and fallback state.
+6. **Presentation/export** — `ui-renderer.js`, `map-view.js`, `gpx-generator.js` render escaped data from the canonical plan. `service-worker.js` provides the offline shell.
 
-`app.js` bezit één actuele state. Alleen de invoer, bestemmingidentiteit en een eventueel opgeslagen dynamisch bestemmingsprofiel zijn duurzaam gezaghebbend. Afgeleide plannen worden na migratie of herladen met de huidige engine opnieuw berekend. Een optimalisatie bewaart één tijdelijke undo-snapshot.
+## Global discovery
 
-## Kandidaten en diversiteit
+`destination-provider.js` generates deterministic golden-angle search points. Direct road trips use reach derived from daily travel constraints; multi-modal trips use global rings up to intercontinental scale. A typed destination is geocoded once and turns discovery into local staged searches around that point. Each user action issues one bounded Overpass batch, caches it, deduplicates it and advances the cursor. There is no global candidate cap, although each request has a strict size and timeout.
 
-De veertien profielen in `destinations.js` garanderen bruikbaarheid zonder netwerk. Ze zijn geen productlimiet. `destination-provider.js` berekent per cursor een nieuwe geografische zoekring op basis van vertrekpunt, reisduur, maximale dagbelasting en voertuig. Een gebundelde Overpass-query levert steden en dorpen; de normalisator maakt daarvan een planningsprofiel met stabiele ID, corridor, basis, kostenband en bronbewijs. De volgende cursor verplaatst de zoekpunten deterministisch met een golden-angle-verdeling. Daardoor kan `Toon meer reisopties` steeds verder zoeken zonder vaste bovengrens, terwijl caches, timeouts en een resultaatlimiet per aanvraag de publieke dienst ontzien.
+Curated destinations remain an offline fallback. The Namibia fixture verifies fly-drive/fly-camper, open-jaw, remote readiness and uncertainty behavior; it does not control global coverage.
 
-Eerst worden alleen haalbare kandidaten op gebruikersfit gescoord. Daarna kiest `proposal-engine.js` iteratief de kandidaat met de beste combinatie van fit en afstand tot het al gekozen portfolio. Verschil omvat regio, afstand, budgetband, reisintensiteit, bases, route, activiteiten en voertuigfit. Bij te weinig geldige opties wordt de oorzaak getoond; de engine vult niet op met duplicaten of verborgen overtredingen.
+## Route topology and segments
 
-## Planningscontract
+Road plans represent every day as geometry plus waypoints. Loop topology shifts the return corridor and calculates sampled geodesic overlap and an exploration score; out-and-back deliberately reuses the corridor. Live routing operates per road segment and falls back independently.
 
-- Elk gegenereerd plan heeft exact `trip.days` dagen.
-- Dag 1 heeft `from === trip.origin`; de laatste dag heeft `to === trip.origin`.
-- De vertrekplaats is nooit een verblijf- of activiteitdag.
-- `roadHours` is tijd in beweging; `elapsedHours`/`driveHours` is de totale reisbelasting inclusief geplande voertuigpauzes en aankomstbuffer.
-- Rijdagen volgen gecureerde corridorstops en ieder werkelijk segment wordt afzonderlijk tegen `trip.maxDrive` getoetst.
-- Een normale bestemming is pas selecteerbaar wanneer budget, dagen, reistijd en minimale wissels vooraf passen.
-- Een stretch-idee heeft maximaal één begrensde afwijking en vereist bevestiging; afgewezen bestemmingen worden niet als reisvoorstel getoond.
-- Kaart en GPX lezen dezelfde `days[].geometry`, dagpunten, waypoints en voorstellen.
-- Ieder voorstel heeft een expliciete `vehicleFit`, bron, verificatiestatus en coördinaat; offline voorstellen claimen geen echte beschikbaarheid.
+Multi-modal access uses normalized segments with mode, direction, indicative duration, source, confidence, external search link and explicit `scheduleVerified`, `priceVerified` and `bookable` flags. ReisSlim never creates a flight number or live fare. Open-jaw is enabled only for multi-modal journeys with more than one destination base.
 
-## Providergrens
+## Provider contract
 
-De client verstuurt per routesegment alleen oorsprong, bestemming, eventuele waypoints en `vehicleSpec`. De gateway geeft provider-onafhankelijk terug:
+A normalized provider result includes provider, status, data, fetch/fresh timestamps, attribution, confidence, cache state and warnings. Adapters use abortable timeouts, input validation, local caching and graceful degradation. Shared production keys belong behind a gateway; no secret may ship in the PWA.
 
-`{ provider, distanceKm, roadHours, geometry[] }`
+## Budget, readiness and quality
 
-Bij een fout, timeout of onvolledig antwoord blijft het oorspronkelijke offline segment intact. Een gedeeltelijk resultaat heet expliciet `mixed`; alleen een compleet resultaat heet `live`.
+`budget-engine.js` is the only total calculator. Visible rows sum exactly to the central total. Multi-modal travel adds international access, rental and baggage, with low/central/high ranges and low confidence until live prices are supplied.
 
-Een commerciële v1.0 kan aanvullende adapters achter dezelfde gateway toevoegen:
+Travel Readiness is a checklist, not legal or medical advice. Advice, entry and health items remain `verified: false` until an official integration confirms them. The quality model exposes 18 dimensions including completeness, exploration, vehicle suitability, safety, POI quality, booking and documents.
 
-- `GeocodingProvider.resolve(origin)`;
-- `PlacesProvider.searchAlongRoute(geometry, categories, vehicleProfile)`;
-- `WeatherProvider.summary(region, dates)`;
-- `PricingProvider.range(region, party, dates)`.
-- `DestinationContextProvider.enrich(osmId, countries, season)` voor Wikidata/Wikipedia en landspecifieke kennis.
+## Persistence and privacy
 
-De UI en scoringslogica roepen geen provider rechtstreeks aan. De gateway is verantwoordelijk voor sleutelbescherming, oorsprongrestricties, caching, quota, observability en privacycontrole. Het offline pad blijft fallback en test-orakel.
-
-De browserclient gebruikt nu één compacte, handmatig gestarte Overpass-batch per ontdekkingsronde. Voor commercieel volume verhuist dit contract ongewijzigd naar een eigen/proxy-instantie met gedeelde cache, quota en monitoring.
-
-## Budgetcontract
-
-`budget-engine.js` is het enige gezag voor totalen. Voertuigprofielen leveren verbruik, tol-, parkeer- en accommodatiefactoren; bestemmingdata levert prijsankers. Iedere rij wordt afgerond en `total` is exact de som van de zichtbare rijen. Live prijsdata moet later als gedateerde broninput worden toegevoegd, niet als tweede berekeningsengine.
+Only input, selected identities, locally learned evidence and safe user settings are authoritative. Plans are rebuilt when the engine version changes. Preference signals are bounded, require repeated evidence for ranking, are inspectable in export code, and stop updating in private mode. Geolocation requires explicit browser permission.

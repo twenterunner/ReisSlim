@@ -16,6 +16,14 @@ npm run check:pwa
 
 De tests gebruiken alleen Node.js en bestrijken:
 
+- wereldwijde en doelgerichte discovery buiten Europa;
+- Namibia fly-drive, multi-modale segmenten en prijsbanden;
+- route-overlap en verkennende terugcorridors;
+- Travel Readiness zonder ongeverifieerde claims;
+- provider request budgets en degraded health;
+- lokaal leren, privémodus en assistant previews;
+- weerclassificatie en open-license beeldmetadata;
+
 - vertrek en terugkeer op de ingevoerde plaats;
 - vertrekplaats niet als verblijfsdag;
 - exact aantal dagen en te korte reizen;

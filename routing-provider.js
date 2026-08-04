@@ -30,6 +30,7 @@ export function routingEndpoint() {
 
 export function routingConfigured(trip = null, settings = readRoutingSettings()) {
   if (trip?.liveData === false) return false;
+  if (trip?.travelMode && trip.travelMode !== 'direct') return false;
   if (/^https:\/\//.test(routingEndpoint()) || settings.orsApiKey) return true;
   return trip ? ['car', 'motorcycle'].includes(transportId(trip.transport)) : false;
 }
