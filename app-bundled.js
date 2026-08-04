@@ -1,7 +1,7 @@
 'use strict';
 
-const VERSION = '0.2.1';
-const BUILD = '201';
+const VERSION = '0.3.0';
+const BUILD = '300';
 const CURRENT_KEY = 'reisslim.current.v2';
 const LEGACY_CURRENT_KEY = 'reisslim.current';
 const TRIPS_KEY = 'reisslim.trips.v2';
@@ -21,8 +21,8 @@ const destinations = [
   {id:'normandy',name:'Normandië & Bretagne',country:'Frankrijk',lat:48.64,lon:-1.51,distanceKm:820,driveHours:8.5,nightMid:150,foodDaily:120,activityDaily:50,toll:95,tags:['kust','cultuur','eten','kinderen','natuur'],season:[4,5,6,7,8,9],family:8,motorcycle:7,camper:9,weather:6,crowds:7,summary:'Kust, geschiedenis, dorpjes en veel variatie zonder bergachtige routes.',pros:['Sterke mix cultuur en kust','Veel campings en familieaccommodaties','Goede roadtripstructuur'],cons:['Weer wisselvallig','Meer rijafstand tussen sommige hoogtepunten'],stops:[['Saasveld',52.33,6.81],['Amiens',49.89,2.3],['Étretat',49.71,0.21],['Mont-Saint-Michel',48.64,-1.51],['Saint-Malo',48.65,-2.03]]}
 ];
 
-const FIELD_IDS = ['origin','startDate','days','budget','adults','children','transport','maxDrive','maxChanges','comfort','notes'];
-const state={trip:null,ranked:[],destination:null,itinerary:[],budget:null,validation:[]};
+const FIELD_IDS = ['tripName','origin','startDate','days','budget','adults','children','transport','maxDrive','maxChanges','comfort','notes'];
+const state={trip:null,ranked:[],destination:null,itinerary:[],budget:null,validation:[],activeView:'dashboardView'};
 const $=id=>document.getElementById(id);
 let map, mapLayer;
 
@@ -49,10 +49,24 @@ function saveTrip(data){
   const updated=[record,...(tripId?all.filter(x=>x.trip?.id!==tripId):all)].slice(0,20);
   try{localStorage.setItem(TRIPS_KEY,JSON.stringify(updated))}catch{}
 }
+
+function loadTrips(){return safeParse(localStorage.getItem(TRIPS_KEY),[]).sort((a,b)=>new Date(b.savedAt||0)-new Date(a.savedAt||0))}
+function deleteTrip(id){const updated=loadTrips().filter(item=>item.trip?.id!==id);localStorage.setItem(TRIPS_KEY,JSON.stringify(updated));renderDashboard()}
+function loadSavedTrip(id){const saved=loadTrips().find(item=>item.trip?.id===id);if(!saved)return;Object.assign(state,{trip:saved.trip,ranked:[],destination:saved.destination||null,itinerary:saved.itinerary||[],budget:saved.budget||null,validation:saved.validation||[]});writeTripForm(saved.trip);saveDraft(exportState());if(state.destination){state.ranked=rankDestinations(state.trip);renderDestinations();$('resultsSection').classList.remove('hidden');renderPlan();$('planSection').classList.remove('hidden')}showView(state.destination?'itineraryView':'plannerView');renderDashboard()}
+function showView(viewId){document.querySelectorAll('.app-view').forEach(view=>view.classList.toggle('active',view.id===viewId));document.querySelectorAll('.nav-item').forEach(button=>button.classList.toggle('active',button.dataset.view===viewId));state.activeView=viewId;if(viewId==='mapView'&&map)setTimeout(()=>map.invalidateSize(),100);window.scrollTo({top:0,behavior:'smooth'})}
+function tripTitle(trip,destination){return trip?.tripName?.trim()||destination?.name||`Reis vanaf ${trip?.origin||'Nederland'}`}
+function renderDashboard(){
+  const trips=loadTrips(),trip=state.trip||loadDraft()?.trip;
+  $('savedTripCount').textContent=String(trips.length);$('draftDays').textContent=trip?.days?String(trip.days):'—';$('draftBudget').textContent=trip?.budget?`€${Number(trip.budget).toLocaleString('nl-NL')}`:'—';
+  $('currentTripSummary').innerHTML=trip?`<h3>${tripTitle(trip,state.destination)}</h3><div class="current-trip-details"><div><span>Vertrek</span><strong>${trip.origin||'—'}</strong></div><div><span>Start</span><strong>${trip.startDate?new Date(trip.startDate+'T12:00:00').toLocaleDateString('nl-NL'):'—'}</strong></div><div><span>Reisduur</span><strong>${trip.days||'—'} dagen</strong></div></div>`:'Nog geen reisconcept.';
+  $('savedTripsList').innerHTML=trips.length?trips.map(item=>`<article class="saved-trip"><p class="eyebrow">${item.destination?.country||'Reisconcept'}</p><h3>${tripTitle(item.trip,item.destination)}</h3><p class="muted">${item.trip.days} dagen · €${Number(item.trip.budget).toLocaleString('nl-NL')} · ${item.trip.transport==='motorcycle'?'Motor':item.trip.transport==='camper'?'Camper':'Auto'}</p><div class="saved-trip-actions"><button type="button" data-open-trip="${item.trip.id}">Open</button><button type="button" class="delete-trip" data-delete-trip="${item.trip.id}">Verwijder</button></div></article>`).join(''):'<div class="empty-state">Nog geen opgeslagen reizen. Kies een bestemming en tik op Opslaan.</div>';
+  document.querySelectorAll('[data-open-trip]').forEach(b=>b.addEventListener('click',()=>loadSavedTrip(b.dataset.openTrip)));
+  document.querySelectorAll('[data-delete-trip]').forEach(b=>b.addEventListener('click',()=>{if(confirm('Deze opgeslagen reis verwijderen?'))deleteTrip(b.dataset.deleteTrip)}));
+}
 function getFormElements(){return Object.fromEntries(FIELD_IDS.map(id=>[id,$(id)]))}
 function readTripForm(existingId=null){
   const f=getFormElements();
-  return {id:existingId||uniqueId(),origin:f.origin.value.trim(),startDate:f.startDate.value,days:Number(f.days.value),budget:Number(f.budget.value),adults:Number(f.adults.value),children:Number(f.children.value),transport:f.transport.value,maxDrive:Number(f.maxDrive.value),maxChanges:Number(f.maxChanges.value),comfort:f.comfort.value,notes:f.notes.value.trim(),preferences:[...document.querySelectorAll('[data-pref]:checked')].map(x=>x.value),updatedAt:new Date().toISOString()};
+  return {id:existingId||uniqueId(),tripName:f.tripName.value.trim(),origin:f.origin.value.trim(),startDate:f.startDate.value,days:Number(f.days.value),budget:Number(f.budget.value),adults:Number(f.adults.value),children:Number(f.children.value),transport:f.transport.value,maxDrive:Number(f.maxDrive.value),maxChanges:Number(f.maxChanges.value),comfort:f.comfort.value,notes:f.notes.value.trim(),preferences:[...document.querySelectorAll('[data-pref]:checked')].map(x=>x.value),updatedAt:new Date().toISOString()};
 }
 function writeTripForm(trip={}){
   const f=getFormElements();
@@ -126,26 +140,34 @@ function showFormError(text){const el=$('formError');if(!el)return;el.textConten
 function exportState(){return {version:VERSION,build:BUILD,trip:state.trip,destination:state.destination,itinerary:state.itinerary,budget:state.budget,validation:state.validation}}
 
 function init(){
-  const required=['tripForm','preferenceGrid','resultsSection','planSection','resultCount','destinationCards','planTitle','summaryGrid','itinerary','budgetBreakdown','validationList','loadDemoBtn','newTripBtn','saveTripBtn','exportJsonBtn','exportGpxBtn'];
+  const required=['tripForm','preferenceGrid','resultsSection','planSection','resultCount','destinationCards','planTitle','summaryGrid','itinerary','budgetBreakdown','validationList','loadDemoBtn','newTripBtn','saveTripBtn','exportJsonBtn','exportGpxBtn','dashboardView','plannerView','itineraryView','mapView','budgetView','savedTripsList','currentTripSummary'];
   const missing=required.filter(id=>!$(id));if(missing.length){console.error('Missing UI elements',missing);return}
   $('preferenceGrid').innerHTML=preferenceDefinitions.map(([id,label],i)=>`<label class="pref"><input type="checkbox" data-pref value="${id}" ${i<5?'checked':''}> ${label}</label>`).join('');
   const version=$('versionLabel');if(version)version.textContent=`ReisSlim v${VERSION} · Build ${BUILD} · Stable`;
   const restored=loadDraft();
-  if(restored?.trip){state.trip=restored.trip;writeTripForm(restored.trip);setAutosaveStatus('Concept hersteld')}else{if(!$('startDate').value)$('startDate').value=futureDate(30);state.trip=readTripForm();saveDraft({trip:state.trip});setAutosaveStatus('Automatisch opslaan actief')}
+  if(restored?.trip){Object.assign(state,{trip:restored.trip,destination:restored.destination||null,itinerary:restored.itinerary||[],budget:restored.budget||null,validation:restored.validation||[]});writeTripForm(restored.trip);if(state.destination){state.ranked=rankDestinations(state.trip);renderDestinations();$('resultsSection').classList.remove('hidden');renderPlan();$('planSection').classList.remove('hidden');$('noPlanItinerary').classList.add('hidden');$('mapHint').classList.add('hidden')}setAutosaveStatus('Concept hersteld')}else{if(!$('startDate').value)$('startDate').value=futureDate(30);state.trip=readTripForm();saveDraft({trip:state.trip});setAutosaveStatus('Automatisch opslaan actief')}
 
+
+  document.querySelectorAll('.nav-item').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
+  document.querySelectorAll('[data-go-planner]').forEach(button=>button.addEventListener('click',()=>showView('plannerView')));
+  $('brandBtn').addEventListener('click',()=>showView('dashboardView'));
+  $('startPlanningBtn').addEventListener('click',()=>showView('plannerView'));
+  $('continueTripBtn').addEventListener('click',()=>showView('plannerView'));
+  document.querySelectorAll('[data-inspire]').forEach(button=>button.addEventListener('click',()=>{showView('plannerView');const d=destinations.find(x=>x.id===button.dataset.inspire);if(d){$('notes').value=`Ik wil graag richting ${d.name}.`;state.trip=readTripForm(state.trip?.id);saveDraft({trip:state.trip})}}));
+  renderDashboard();
   $('tripForm').addEventListener('submit',e=>{
     e.preventDefault();
     try{
       const trip=readTripForm(state.trip?.id),errors=validateFormTrip(trip);if(errors.length){showFormError(errors.join(' '));return}
-      showFormError('');state.trip=trip;saveDraft({trip});state.ranked=rankDestinations(trip);renderDestinations();$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+      showFormError('');state.trip=trip;saveDraft({trip});state.ranked=rankDestinations(trip);renderDestinations();$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');renderDashboard();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
     }catch(err){console.error(err);showFormError(`Er ging iets mis: ${err.message || 'onbekende fout'}`)}
   });
   let timer;
   const scheduleAutosave=()=>{clearTimeout(timer);setAutosaveStatus('Wijzigingen opslaan…');timer=setTimeout(()=>{try{state.trip=readTripForm(state.trip?.id);saveDraft({trip:state.trip});setAutosaveStatus('Automatisch opgeslagen')}catch{setAutosaveStatus('Opslaan mislukt')}},250)};
   $('tripForm').addEventListener('input',scheduleAutosave);$('tripForm').addEventListener('change',scheduleAutosave);
-  $('loadDemoBtn').addEventListener('click',()=>{const demo={id:state.trip?.id||uniqueId(),origin:'Saasveld',days:9,budget:3200,adults:2,children:2,transport:'car',maxDrive:5,maxChanges:3,comfort:'mid',notes:'Natuur, zwembad en niet te veel accommodatiewissels.',preferences:['natuur','bergen','zwemmen','wandelen','kinderen'],startDate:futureDate(30)};state.trip=demo;writeTripForm(demo);saveDraft({trip:demo});setAutosaveStatus('Voorbeeld opgeslagen')});
-  $('newTripBtn').addEventListener('click',()=>{if(!confirm('Nieuwe reis starten? De huidige conceptinvoer wordt gewist.'))return;clearDraft();state.trip=null;state.ranked=[];state.destination=null;state.itinerary=[];state.budget=null;state.validation=[];$('tripForm').reset();document.querySelectorAll('[data-pref]').forEach((box,i)=>box.checked=i<5);const defaults={origin:'Saasveld',startDate:futureDate(30),days:10,budget:3500,adults:2,children:2,transport:'car',maxDrive:5,maxChanges:3,comfort:'mid',notes:'',preferences:preferenceDefinitions.slice(0,5).map(x=>x[0])};writeTripForm(defaults);$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');state.trip=readTripForm();saveDraft({trip:state.trip});setAutosaveStatus('Nieuw concept gestart');window.scrollTo({top:0,behavior:'smooth'})});
-  $('saveTripBtn').addEventListener('click',()=>{if(!state.destination)return;saveTrip(exportState());$('saveTripBtn').textContent='Opgeslagen ✓';setTimeout(()=>$('saveTripBtn').textContent='Opslaan',1500)});
+  $('loadDemoBtn').addEventListener('click',()=>{const demo={id:state.trip?.id||uniqueId(),tripName:'Gezinsreis naar de bergen',origin:'Saasveld',days:9,budget:3200,adults:2,children:2,transport:'car',maxDrive:5,maxChanges:3,comfort:'mid',notes:'Natuur, zwembad en niet te veel accommodatiewissels.',preferences:['natuur','bergen','zwemmen','wandelen','kinderen'],startDate:futureDate(30)};state.trip=demo;writeTripForm(demo);saveDraft({trip:demo});setAutosaveStatus('Voorbeeld opgeslagen')});
+  $('newTripBtn').addEventListener('click',()=>{if(!confirm('Nieuwe reis starten? De huidige conceptinvoer wordt gewist.'))return;clearDraft();state.trip=null;state.ranked=[];state.destination=null;state.itinerary=[];state.budget=null;state.validation=[];$('tripForm').reset();document.querySelectorAll('[data-pref]').forEach((box,i)=>box.checked=i<5);const defaults={tripName:'',origin:'Saasveld',startDate:futureDate(30),days:10,budget:3500,adults:2,children:2,transport:'car',maxDrive:5,maxChanges:3,comfort:'mid',notes:'',preferences:preferenceDefinitions.slice(0,5).map(x=>x[0])};writeTripForm(defaults);$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');state.trip=readTripForm();saveDraft({trip:state.trip});setAutosaveStatus('Nieuw concept gestart');renderDashboard();showView('plannerView')});
+  $('saveTripBtn').addEventListener('click',()=>{if(!state.destination)return;if(!state.trip.tripName){state.trip.tripName=state.destination.name;writeTripForm(state.trip)}saveTrip(exportState());renderDashboard();$('saveTripBtn').textContent='Opgeslagen ✓';setTimeout(()=>$('saveTripBtn').textContent='Opslaan',1500)});
   $('exportJsonBtn').addEventListener('click',()=>{if(state.destination)downloadJson(exportState(),`${state.destination.id}-${state.trip.startDate}.json`)});
   $('exportGpxBtn').addEventListener('click',()=>{if(state.destination)downloadGpx(state.trip,state.destination,state.itinerary)});
 }
@@ -154,14 +176,15 @@ function renderDestinations(){
   $('destinationCards').innerHTML=state.ranked.slice(0,6).map(d=>`<article class="destination-card"><div class="card-body"><div class="score">${d.score}%</div><h3>${d.name}</h3><p class="muted">${d.summary}</p><div class="chips">${d.matches.map(m=>`<span class="chip">${m}</span>`).join('')}<span class="chip">± €${d.estimate.toLocaleString('nl-NL')}</span></div><div class="pros-cons"><div><strong>Sterk</strong><ul>${d.pros.map(x=>`<li>${x}</li>`).join('')}</ul></div><div><strong>Let op</strong><ul>${d.cons.map(x=>`<li>${x}</li>`).join('')}</ul></div></div><button data-select="${d.id}" type="button">Kies deze reis</button></div></article>`).join('');
   $('destinationCards').querySelectorAll('[data-select]').forEach(button=>button.addEventListener('click',()=>selectDestination(button.dataset.select)));
 }
-function selectDestination(id){state.destination=state.ranked.find(d=>d.id===id);if(!state.destination)return;state.itinerary=buildItinerary(state.trip,state.destination);state.budget=buildBudget(state.trip,state.destination);state.validation=validateTrip(state.trip,state.destination,state.itinerary,state.budget);renderPlan();$('planSection').classList.remove('hidden');saveDraft(exportState());$('planSection').scrollIntoView({behavior:'smooth',block:'start'})}
+function selectDestination(id){state.destination=state.ranked.find(d=>d.id===id);if(!state.destination)return;state.itinerary=buildItinerary(state.trip,state.destination);state.budget=buildBudget(state.trip,state.destination);state.validation=validateTrip(state.trip,state.destination,state.itinerary,state.budget);renderPlan();$('planSection').classList.remove('hidden');$('noPlanItinerary').classList.add('hidden');$('mapHint').classList.add('hidden');saveDraft(exportState());renderDashboard();showView('itineraryView')}
 function renderPlan(){
   $('planTitle').textContent=state.destination.name;
   $('summaryGrid').innerHTML=[['Match',`${state.destination.score}%`],['Dagen',state.trip.days],['Afstand heen',`${state.destination.distanceKm} km`],['Budget',`€${state.budget.total.toLocaleString('nl-NL')}`]].map(x=>`<div class="summary-card"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
-  $('itinerary').innerHTML=state.itinerary.map(d=>`<div class="day-card"><h4>Dag ${d.day} · ${new Date(`${d.date}T12:00:00`).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}</h4><strong>${d.location} — ${d.title}</strong><p>${d.description}</p><small>Indicatieve rijtijd: ${d.driveHours.toFixed(1)} uur</small></div>`).join('');
+  $('itinerary').innerHTML=state.itinerary.map(d=>`<div class="day-card"><div class="day-card-inner"><h4>Dag ${d.day} · ${new Date(`${d.date}T12:00:00`).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'})}</h4><strong>${d.location} — ${d.title}</strong><p>${d.description}</p><small>Indicatieve rijtijd: ${d.driveHours.toFixed(1)} uur</small></div></div>`).join('');
+  $('budgetSummary').innerHTML=[['Totaal',`€${state.budget.total.toLocaleString('nl-NL')}`],['Per dag',`€${Math.round(state.budget.total/state.trip.days).toLocaleString('nl-NL')}`],['Per persoon',`€${Math.round(state.budget.total/(state.trip.adults+state.trip.children)).toLocaleString('nl-NL')}`],['Ruimte',`€${(state.trip.budget-state.budget.total).toLocaleString('nl-NL')}`]].map(x=>`<div class="summary-card"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('');
   $('budgetBreakdown').innerHTML=state.budget.rows.map(r=>`<div class="budget-row"><span>${r[0]}</span><strong>€${r[1].toLocaleString('nl-NL')}</strong></div>`).join('')+`<div class="budget-row"><strong>Totaal</strong><strong>€${state.budget.total.toLocaleString('nl-NL')}</strong></div>`;
   $('validationList').innerHTML=state.validation.map(v=>`<div class="validation-row ${v.level}"><span>${v.label}</span><strong>${v.detail}</strong></div>`).join('');renderMap(state.itinerary);
 }
 
 document.addEventListener('DOMContentLoaded',init);
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?build=201').catch(console.warn))}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js?build=300').catch(console.warn))}

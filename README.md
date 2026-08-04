@@ -1,13 +1,16 @@
-# ReisSlim v0.2.1 Stable (Build 201)
+# ReisSlim v0.3.0 Stable (Build 300)
 
-Hotfix release for GitHub Pages/mobile deployment.
+GitHub Pages-ready Dutch roadtrip planner.
 
-## Fixes
-- Replaced fragile multi-module startup with one self-contained `app.js`.
-- Added visible error reporting when proposal generation fails.
-- Added UUID fallback for browsers without `crypto.randomUUID()`.
-- Updated service-worker cache strategy and cache version.
-- Preserved autosave, destination ranking, itinerary, budget, map, JSON and GPX exports.
+## New in v0.3.0
+- Dashboard with current draft and library summary
+- Multiple saved trips: save, open and delete
+- Bottom navigation for Planner, Itinerary, Map and Budget
+- Trip names
+- Refreshed mobile-first interface
+- Existing autosave, destination ranking, budget, itinerary, map, JSON and GPX retained
 
-## Deployment
-Upload every file in this package to the root of the GitHub repository and replace existing files. Wait for GitHub Pages to redeploy, then close all open ReisSlim tabs and reopen the site. If installed as a PWA, close it fully and open it again.
+## Deploy
+Upload every extracted file to the repository root, replacing the previous version. GitHub Pages should publish from `main` and `/(root)`.
+
+After deployment, close the installed PWA/browser tab and reopen it. Confirm the footer shows **v0.3.0 · Build 300**.
