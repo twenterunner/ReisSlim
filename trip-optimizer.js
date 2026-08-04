@@ -1,4 +1,5 @@
 import { countAccommodationChanges } from './itinerary-engine.js';
+import { buildRecommendations } from './recommendation-engine.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -18,15 +19,22 @@ export function optimisePlan(trip, destination, plan) {
   }
 
   if (!next.days.some(day => day.kind === 'flex') && stayDays.length >= 3) {
-    const day = stayDays[Math.floor(stayDays.length / 2)];
+    const eligibleDays = stayDays.filter(day => day.kind === 'stay');
+    const day = eligibleDays[Math.floor(eligibleDays.length / 2)];
+    if (day) {
     day.kind = 'flex';
     day.typeLabel = 'Flexibele rustdag';
     day.activityType = 'rust';
     day.distanceKm = Math.min(15, day.distanceKm || 15);
     day.driveHours = Math.min(.3, day.driveHours || .3);
+    day.roadHours = day.driveHours;
+    day.elapsedHours = day.driveHours;
+    day.breakHours = 0;
+    day.waypoints = [];
     day.primaryPlan = 'Houd deze dag bewust vrij: rust, boodschappen en maximaal één korte lokale activiteit.';
     day.rainAlternative = 'Gebruik de dag als volledige hersteldag of kies een rustige binnenactiviteit dichtbij.';
     changes.push(`Dag ${day.day} is een flexibele rustdag geworden.`);
+    }
   }
 
   const transfers = next.days.filter(day => day.kind === 'transfer');
@@ -38,7 +46,9 @@ export function optimisePlan(trip, destination, plan) {
         kind: 'stay', typeLabel: 'Verblijfsdag', from: previous.location, to: previous.location,
         location: previous.location, overnight: previous.location,
         fromPoint: clone(previous.toPoint), toPoint: clone(previous.toPoint),
-        distanceKm: 20, driveHours: .4,
+        distanceKm: 20, driveHours: .4, roadHours: .4, elapsedHours: .4, breakHours: 0,
+        restStops: 0, fuelStops: 0, stopCount: 0,
+        waypoints: [], geometry: [clone(previous.toPoint)], routeSource: 'local-estimate',
         primaryPlan: `Blijf in ${previous.location} en maak alleen een korte lokale uitstap.`,
         rainAlternative: 'Kies een overdekte activiteit dicht bij de bestaande accommodatie.'
       });
@@ -58,6 +68,7 @@ export function optimisePlan(trip, destination, plan) {
   if (activities.length > 1) changes.push('De activiteiten zijn opnieuw verdeeld voor meer variatie.');
 
   next.accommodationChanges = countAccommodationChanges(next.days, trip.origin);
+  next.recommendations = buildRecommendations(trip, destination, next.days);
   next.optimized = true;
   next.optimizationChanges = [...new Set(changes)];
   return { plan: next, changes: next.optimizationChanges };

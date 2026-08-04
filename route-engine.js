@@ -1,5 +1,6 @@
-import { originCatalog, transportProfiles, validCoordinate } from './config.js';
+import { originCatalog, validCoordinate } from './config.js';
 import { resolveOrigin } from './trip-model.js';
+import { estimateLegTiming, minimumTravelLegs, vehicleProfile } from './vehicle-intelligence.js';
 
 const anchorOrigin = originCatalog.saasveld;
 const radians = degrees => degrees * Math.PI / 180;
@@ -19,18 +20,38 @@ export function calculateRouteMetrics(trip, destination) {
   const baselineDirect = haversineKm(anchorOrigin, destinationPoint);
   const originDirect = origin ? haversineKm(origin, destinationPoint) : baselineDirect;
   const distanceRatio = baselineDirect ? originDirect / baselineDirect : 1;
-  const profile = transportProfiles[trip.transport] || transportProfiles.car;
+  const profile = vehicleProfile(trip);
   const oneWayDistanceKm = Math.max(1, Math.round(destination.distanceKm * distanceRatio));
-  const oneWayDriveHours = Number((destination.driveHours * distanceRatio * profile.timeFactor).toFixed(1));
+  const oneWayRoadHours = Number((destination.driveHours * distanceRatio * profile.roadTimeFactor).toFixed(1));
+  const oneWayTiming = estimateLegTiming(trip, { distanceKm: oneWayDistanceKm, roadHours: oneWayRoadHours });
+  const requiredLegs = minimumCorridorLegs(trip, destination, oneWayDistanceKm, oneWayRoadHours);
   return {
-    origin: origin ? { ...origin, name: trip.origin, role: 'origin' } : null,
+    origin: origin ? { ...origin, name: trip.origin, role: 'origin', progress: 0 } : null,
     originKnown: Boolean(origin),
-    destination: { ...destinationPoint, role: 'destination' },
+    destination: { ...destinationPoint, role: 'destination', progress: 1 },
     oneWayDistanceKm,
-    oneWayDriveHours,
-    requiredLegs: Math.max(1, Math.ceil(oneWayDriveHours / trip.maxDrive)),
+    oneWayRoadHours,
+    oneWayElapsedHours: oneWayTiming.elapsedHours,
+    oneWayDriveHours: oneWayTiming.elapsedHours,
+    breakHours: oneWayTiming.breakHours,
+    requiredLegs,
+    routeSource: 'offline-corridor',
     warning: origin ? null : `Voor ${trip.origin} ontbreken offline coördinaten; afstanden gebruiken Saasveld als indicatief Nederlands vertrekanker.`
   };
+}
+
+function minimumCorridorLegs(trip, destination, distanceKm, roadHours) {
+  const maximum = Math.min(8, Math.max(1, (destination.routeStops?.length || 0) + 1));
+  for (let legs = 1; legs <= maximum; legs += 1) {
+    const stops = selectRouteStops(destination, legs);
+    const nodes = [{ progress: 0 }, ...stops, { progress: 1 }];
+    const fits = nodes.slice(0, -1).every((from, index) => {
+      const segment = segmentMetrics(from, nodes[index + 1], distanceKm, roadHours);
+      return estimateLegTiming(trip, segment).elapsedHours <= trip.maxDrive + .05;
+    });
+    if (fits) return legs;
+  }
+  return Math.max(maximum, minimumTravelLegs(trip, distanceKm, roadHours));
 }
 
 export function selectRouteStops(destination, legCount) {
@@ -47,7 +68,7 @@ export function selectRouteStops(destination, legCount) {
 
 export function buildTravelNodes(trip, destination, legCount) {
   const metrics = calculateRouteMetrics(trip, destination);
-  const fallbackOrigin = { ...anchorOrigin, name: trip.origin, role: 'origin', approximate: true };
+  const fallbackOrigin = { ...anchorOrigin, name: trip.origin, role: 'origin', progress: 0, approximate: true };
   const origin = metrics.origin || fallbackOrigin;
   const stops = selectRouteStops(destination, legCount).map(point => ({ ...point, role: 'overnight' }));
   return {
@@ -57,12 +78,34 @@ export function buildTravelNodes(trip, destination, legCount) {
   };
 }
 
-export function segmentMetrics(from, to, totalDistanceKm, totalDriveHours) {
+export function segmentMetrics(from, to, totalDistanceKm, totalRoadHours) {
   const fromProgress = Number.isFinite(from.progress) ? from.progress : 0;
   const toProgress = Number.isFinite(to.progress) ? to.progress : 1;
   const share = Math.max(.02, Math.abs(toProgress - fromProgress));
   return {
     distanceKm: Math.max(1, Math.round(totalDistanceKm * share)),
-    driveHours: Number((totalDriveHours * share).toFixed(1))
+    roadHours: Number((totalRoadHours * share).toFixed(1))
   };
+}
+
+export function interpolateRoutePoint(from, to, ratio, attributes = {}) {
+  if (!validCoordinate(from) || !validCoordinate(to)) return null;
+  return {
+    lat: Number((from.lat + (to.lat - from.lat) * ratio).toFixed(5)),
+    lon: Number((from.lon + (to.lon - from.lon) * ratio).toFixed(5)),
+    ...attributes
+  };
+}
+
+export function buildBreakWaypoints(from, to, timing, transport) {
+  const count = Math.max(0, timing?.stopCount || 0);
+  return Array.from({ length: count }, (_, index) => {
+    const ratio = (index + 1) / (count + 1);
+    return interpolateRoutePoint(from, to, ratio, {
+      name: timing.fuelStops > index ? `Brandstof- en ruststop ${index + 1}` : `Ruststop ${index + 1}`,
+      role: timing.fuelStops > index ? 'fuel' : 'rest',
+      transport,
+      approximate: true
+    });
+  }).filter(Boolean);
 }

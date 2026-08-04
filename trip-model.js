@@ -1,6 +1,12 @@
-import { originCatalog, preferenceDefinitions, transportProfiles } from './config.js';
+import { originCatalog, preferenceDefinitions } from './config.js';
+import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence.js';
 
-const FIELD_IDS = ['tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children', 'transport', 'maxDrive', 'maxChanges', 'comfort', 'notes'];
+const FIELD_IDS = [
+  'tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children',
+  'transport', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
+  'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg',
+  'maxDrive', 'maxChanges', 'comfort', 'notes'
+];
 
 export function uniqueId() {
   return globalThis.crypto?.randomUUID?.() || `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -21,6 +27,8 @@ export function normalizeTrip(input = {}) {
     ? input.preferences.filter(id => preferenceDefinitions.some(([known]) => known === id))
     : [];
   const weights = Object.fromEntries(preferences.map(id => [id, Math.max(1, Math.min(3, Number(input.preferenceWeights?.[id]) || 2))]));
+  const transport = transportId(input.transport);
+  const spec = vehicleSpec({ ...input, transport });
   return {
     id: input.id || uniqueId(),
     tripName: String(input.tripName || '').trim().slice(0, 60),
@@ -30,7 +38,13 @@ export function normalizeTrip(input = {}) {
     budget: Number(input.budget),
     adults: Number(input.adults),
     children: Number(input.children || 0),
-    transport: transportProfiles[input.transport] ? input.transport : 'car',
+    transport,
+    routeStyle: spec.routeStyle,
+    fuelRangeKm: spec.fuelRangeKm,
+    vehicleMaxSpeedKmh: spec.maxSpeedKmh,
+    vehicleHeightM: spec.heightM,
+    vehicleLengthM: spec.lengthM,
+    vehicleWeightKg: spec.weightKg,
     maxDrive: Number(input.maxDrive),
     maxChanges: Number(input.maxChanges),
     comfort: ['budget', 'mid', 'comfort'].includes(input.comfort) ? input.comfort : 'mid',
@@ -51,6 +65,13 @@ export function validateTripInput(trip) {
   if (!Number.isInteger(trip.children) || trip.children < 0 || trip.children > 8) errors.push('Kies 0 tot 8 kinderen.');
   if (!Number.isFinite(trip.maxDrive) || trip.maxDrive < 2 || trip.maxDrive > 10) errors.push('Kies 2 tot 10 uur maximale rijtijd per dag.');
   if (!Number.isInteger(trip.maxChanges) || trip.maxChanges < 1 || trip.maxChanges > 10) errors.push('Kies 1 tot 10 accommodatiewissels.');
+  if (!Number.isFinite(trip.fuelRangeKm) || trip.fuelRangeKm < 100 || trip.fuelRangeKm > 1500) errors.push('Kies een actieradius van 100 tot 1.500 kilometer.');
+  const profile = vehicleProfile(trip);
+  if (profile.supportsDimensions) {
+    if (!Number.isFinite(trip.vehicleHeightM) || trip.vehicleHeightM < 1.8 || trip.vehicleHeightM > 4.5) errors.push('Kies een voertuighoogte van 1,8 tot 4,5 meter.');
+    if (!Number.isFinite(trip.vehicleLengthM) || trip.vehicleLengthM < 4 || trip.vehicleLengthM > 20) errors.push('Kies een totale voertuiglengte van 4 tot 20 meter.');
+    if (!Number.isFinite(trip.vehicleWeightKg) || trip.vehicleWeightKg < 1500 || trip.vehicleWeightKg > 20000) errors.push('Kies een totaalgewicht van 1.500 tot 20.000 kilogram.');
+  }
   return errors;
 }
 

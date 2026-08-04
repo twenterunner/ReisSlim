@@ -1,5 +1,6 @@
-import { budgetAssumptions, roundMoney, transportProfiles } from './config.js';
+import { budgetAssumptions, roundMoney } from './config.js';
 import { calculateRouteMetrics } from './route-engine.js';
+import { transportId, vehicleProfile } from './vehicle-intelligence.js';
 
 export function travellerEquivalents(trip) {
   return trip.adults + trip.children * budgetAssumptions.childEquivalent;
@@ -12,17 +13,19 @@ export function buildBudget(trip, destination, itinerary = null) {
   const rooms = Math.max(1, Math.ceil((trip.adults + trip.children) / budgetAssumptions.peoplePerRoom));
   const comfort = budgetAssumptions.comfortFactor[trip.comfort] || 1;
   const restaurantShare = budgetAssumptions.restaurantShare[trip.comfort] ?? .45;
-  const profile = transportProfiles[trip.transport] || transportProfiles.car;
+  const profile = vehicleProfile(trip);
+  const transport = transportId(trip.transport);
   const localDistanceKm = itinerary?.days?.reduce((sum, day) => sum + (day.kind === 'stay' || day.kind === 'flex' || day.kind === 'transfer' ? Number(day.distanceKm || 0) : 0), 0)
     ?? trip.days * 45;
   const totalDistanceKm = route.oneWayDistanceKm * 2 + localDistanceKm;
-  const accommodation = roundMoney(nights * destination.nightMid * rooms * comfort);
+  const accommodationUnits = ['motorhome', 'caravan'].includes(transport) ? 1 : rooms;
+  const accommodation = roundMoney(nights * destination.nightMid * accommodationUnits * comfort * profile.accommodationFactor);
   const fuel = roundMoney(totalDistanceKm / 100 * profile.consumption * budgetAssumptions.fuelPricePerLitre);
   const parking = roundMoney(Math.max(0, trip.days - 2) * profile.parkingDaily);
   const groceries = roundMoney(trip.days * equivalents * budgetAssumptions.groceriesPerEquivalentDay * (1 - restaurantShare));
   const restaurants = roundMoney(trip.days * equivalents * budgetAssumptions.restaurantPerEquivalentDay * restaurantShare);
   const activities = roundMoney(trip.days * destination.activityDaily * (equivalents / 3.2));
-  const tolls = roundMoney(destination.toll);
+  const tolls = roundMoney(destination.toll * profile.tollFactor);
   const subtotal = accommodation + fuel + tolls + parking + groceries + restaurants + activities;
   const contingency = roundMoney(Math.max(budgetAssumptions.minimumContingency, subtotal * budgetAssumptions.contingencyRate));
   const rows = [
@@ -39,6 +42,6 @@ export function buildBudget(trip, destination, itinerary = null) {
     perDay: roundMoney(total / trip.days),
     perTravellerEquivalent: roundMoney(total / Math.max(1, equivalents)),
     confidence,
-    assumptions: { ...budgetAssumptions, consumption: profile.consumption }
+    assumptions: { ...budgetAssumptions, consumption: profile.consumption, vehicle: profile.label, accommodationFactor: profile.accommodationFactor, tollFactor: profile.tollFactor }
   };
 }

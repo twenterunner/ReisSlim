@@ -1,9 +1,10 @@
-const CACHE = 'reisslim-v0.6.0-build-601';
+const CACHE = 'reisslim-v0.7.0-build-700';
 const ASSETS = [
-  './', './index.html', './styles.css?v=601', './app.js?v=601', './manifest.webmanifest', './icon.svg',
-  './config.js', './destinations.js', './trip-model.js', './route-engine.js', './storage.js',
-  './destination-engine.js', './itinerary-engine.js', './itinerary-validator.js', './budget-engine.js',
-  './trip-quality-engine.js', './trip-optimizer.js', './map-view.js', './gpx-generator.js', './ui-renderer.js'
+  './', './index.html', './styles.css?v=700', './app.js?v=700', './manifest.webmanifest', './icon.svg',
+  './config.js?v=700', './destinations.js?v=700', './trip-model.js?v=700', './route-engine.js?v=700', './storage.js?v=700',
+  './destination-engine.js?v=700', './itinerary-engine.js?v=700', './itinerary-validator.js?v=700', './budget-engine.js?v=700',
+  './trip-quality-engine.js?v=700', './trip-optimizer.js?v=700', './vehicle-intelligence.js?v=700', './recommendation-engine.js?v=700',
+  './routing-provider.js?v=700', './map-view.js?v=700', './gpx-generator.js?v=700', './ui-renderer.js?v=700'
 ];
 
 self.addEventListener('install', event => {

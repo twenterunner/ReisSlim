@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=601">
+  <link rel="stylesheet" href="styles.css?v=700">
 </head>
 <body>
   <header class="topbar">
@@ -73,8 +73,17 @@
             <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
             <label>Volwassenen<input id="adults" type="number" min="1" max="8" value="2" required></label>
             <label>Kinderen<input id="children" type="number" min="0" max="8" value="2" required></label>
-            <label>Vervoer<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="camper">Camper</option></select></label>
-            <label>Max. rijden per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required></label>
+            <label>Vervoer<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="motorhome">Camper / motorhome</option><option value="caravan">Auto met caravan</option></select></label>
+            <label>Max. totale reistijd per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required><small>Inclusief geplande pauzes, brandstof en aankomstbuffer.</small></label>
+            <div id="vehicleProfilePanel" class="vehicle-profile-panel wide">
+              <div><p class="eyebrow">Voertuigprofiel</p><strong id="vehicleProfileTitle">Auto</strong><small id="vehicleProfileSummary"></small></div>
+              <label>Routestijl<select id="routeStyle"><option value="balanced">Gebalanceerd</option><option value="fastest">Snelste</option><option value="scenic">Toeristisch</option></select></label>
+              <label>Actieradius (km)<input id="fuelRangeKm" type="number" min="100" max="1500" step="10" value="650" required></label>
+              <label class="vehicle-dimension-field">Maximumsnelheid (km/u)<input id="vehicleMaxSpeedKmh" type="number" min="60" max="130" step="5" value="100"></label>
+              <label class="vehicle-dimension-field">Totale hoogte (m)<input id="vehicleHeightM" type="number" min="1.8" max="4.5" step="0.05" value="3.1"></label>
+              <label class="vehicle-dimension-field">Totale lengte (m)<input id="vehicleLengthM" type="number" min="4" max="20" step="0.1" value="7.2"></label>
+              <label class="vehicle-dimension-field">Totaalgewicht (kg)<input id="vehicleWeightKg" type="number" min="1500" max="20000" step="50" value="3500"></label>
+            </div>
             <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
           </div>
@@ -115,7 +124,7 @@
     </section>
 
     <section id="mapView" class="app-view">
-      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart</h1></div></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming om de route te tonen.</p><p class="trust-notice">De stippellijn verbindt indicatieve dag- en overnachtingspunten; controleer de echte wegroute altijd in een navigatie-app.</p></section>
+      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart & waypoints</h1></div><span id="mapDataStatus" class="badge">Offline</span></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming om de route te tonen.</p><p class="trust-notice">Route, pauzes en voorstellen tonen hun databron. Offline lijnen zijn corridorramingen; controleer voertuigbeperkingen en de echte wegroute altijd in een navigatie-app.</p></section>
     </section>
 
     <section id="budgetView" class="app-view">
@@ -131,8 +140,18 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.6.0 · Build 601 · Foundation</span><br>Planning- en beslissingsondersteuning · Prijzen, rijtijden en beschikbaarheid zijn niet-live. Controleer officiële informatie altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.7.0 · Build 700 · Vehicle intelligence</span><br>Planning- en beslissingsondersteuning · Prijzen, rijtijden en beschikbaarheid zijn niet-live. Controleer officiële informatie altijd bij de bron.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="app.js?v=601"></script>
+  <script type="importmap">
+    {"imports":{
+      "./config.js":"./config.js?v=700","./destinations.js":"./destinations.js?v=700","./trip-model.js":"./trip-model.js?v=700",
+      "./route-engine.js":"./route-engine.js?v=700","./storage.js":"./storage.js?v=700","./destination-engine.js":"./destination-engine.js?v=700",
+      "./itinerary-engine.js":"./itinerary-engine.js?v=700","./itinerary-validator.js":"./itinerary-validator.js?v=700","./budget-engine.js":"./budget-engine.js?v=700",
+      "./trip-quality-engine.js":"./trip-quality-engine.js?v=700","./trip-optimizer.js":"./trip-optimizer.js?v=700","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=700",
+      "./recommendation-engine.js":"./recommendation-engine.js?v=700","./routing-provider.js":"./routing-provider.js?v=700","./map-view.js":"./map-view.js?v=700",
+      "./gpx-generator.js":"./gpx-generator.js?v=700","./ui-renderer.js":"./ui-renderer.js?v=700"
+    }}
+  </script>
+  <script type="module" src="app.js?v=700"></script>
 </body>
 </html>

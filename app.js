@@ -1,4 +1,4 @@
-import { BUILD, ENGINE_VERSION, VERSION, preferenceDefinitions } from './config.js';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js';
 import { destinations, getDestination } from './destinations.js';
 import { rankDestinations } from './destination-engine.js';
 import { buildItinerary } from './itinerary-engine.js';
@@ -10,7 +10,8 @@ import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } fro
 import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js';
 import { downloadGpx, downloadJson } from './gpx-generator.js';
 import { invalidateMap, renderMap } from './map-view.js';
-import { $, renderComparison, renderDashboard, renderDestinations, renderPlan, renderPreferenceGrid, setStatus, showError, showView } from './ui-renderer.js';
+import { enrichPlanWithLiveRouting, routingConfigured } from './routing-provider.js';
+import { $, renderComparison, renderDashboard, renderDestinations, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 
 const defaults = () => normalizeTrip({
   origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500,
@@ -22,13 +23,13 @@ const defaults = () => normalizeTrip({
 const state = {
   trip: null, ranked: [], destination: null, plan: null, budget: null,
   validation: [], quality: null, compareIds: [], optimized: false,
-  undoSnapshot: null, optimizationSummary: null
+  undoSnapshot: null, optimizationSummary: null, routingRun: 0
 };
 
 const clone = value => JSON.parse(JSON.stringify(value));
 
 function stateForStorage() {
-  return { schemaVersion: 3, engineVersion: ENGINE_VERSION, trip: state.trip, destinationId: state.destination?.id || null, compareIds: state.compareIds, optimized: state.optimized, plan: state.plan };
+  return { schemaVersion: STORAGE_SCHEMA_VERSION, engineVersion: ENGINE_VERSION, trip: state.trip, destinationId: state.destination?.id || null, compareIds: state.compareIds, optimized: state.optimized, plan: state.plan };
 }
 
 function exportState() {
@@ -67,12 +68,33 @@ function applyDestination(destination, optimize = false) {
   $('mapHint').classList.add('hidden');
   persistDraft();
   renderDashboard(state, loadTrips());
+  if (routingConfigured()) void enhanceLiveRouting(destination.id, state.plan);
+}
+
+async function enhanceLiveRouting(destinationId, originalPlan) {
+  const run = ++state.routingRun;
+  $('mapDataStatus').textContent = 'Live route laden…';
+  try {
+    const plan = await enrichPlanWithLiveRouting(state.trip, state.destination, originalPlan);
+    if (run !== state.routingRun || state.destination?.id !== destinationId) return;
+    state.plan = plan;
+    state.budget = buildBudget(state.trip, state.destination, plan);
+    state.quality = calculateTripQuality(state.trip, state.destination, plan, state.budget);
+    state.validation = validatePlan(state.trip, state.destination, plan, state.budget);
+    renderPlan(state);
+    renderMap(state.plan);
+    persistDraft(plan.routing?.live ? 'Live voertuigroute opgeslagen' : 'Offline route actief');
+  } catch (error) {
+    console.warn('Live routering niet beschikbaar', error);
+    if (run === state.routingRun) $('mapDataStatus').textContent = 'Offline corridorraming';
+  }
 }
 
 function rebuildFromRecord(record) {
   state.trip = normalizeTrip(record.trip);
   state.compareIds = record.compareIds || [];
   writeTripForm(state.trip);
+  renderVehicleControls();
   state.ranked = rankDestinations(state.trip, destinations);
   state.destination = getDestination(record.destinationId) ? state.ranked.find(item => item.id === record.destinationId) : null;
   if (state.destination) {
@@ -84,8 +106,9 @@ function rebuildFromRecord(record) {
 }
 
 function resetState(trip = defaults()) {
-  Object.assign(state, { trip, ranked: [], destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], optimized: false, undoSnapshot: null, optimizationSummary: null });
+  Object.assign(state, { trip, ranked: [], destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], optimized: false, undoSnapshot: null, optimizationSummary: null, routingRun: state.routingRun + 1 });
   writeTripForm(trip);
+  renderVehicleControls();
   $('resultsSection').classList.add('hidden');
   $('planSection').classList.add('hidden');
   $('noPlanItinerary').classList.remove('hidden');
@@ -96,7 +119,8 @@ function resetState(trip = defaults()) {
 
 function initialize() {
   renderPreferenceGrid();
-  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Foundation`;
+  renderVehicleControls();
+  $('versionLabel').textContent = `ReisSlim v${VERSION} · Build ${BUILD} · Vehicle intelligence`;
   const restored = loadDraft();
   if (restored?.trip) { rebuildFromRecord(restored); setStatus('Concept hersteld en met de actuele planner herberekend'); }
   else resetState();
@@ -114,6 +138,8 @@ function initialize() {
       if (select) select.disabled = !event.target.checked;
     }
   });
+  $('transport').addEventListener('change', () => renderVehicleControls({ resetDefaults: true }));
+  $('routeStyle').addEventListener('change', () => renderVehicleControls());
 
   $('tripForm').addEventListener('submit', event => {
     event.preventDefault();

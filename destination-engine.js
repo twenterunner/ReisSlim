@@ -1,6 +1,7 @@
 import { clamp, roundScore } from './config.js';
 import { buildBudget } from './budget-engine.js';
 import { calculateRouteMetrics } from './route-engine.js';
+import { transportId, vehicleProfile } from './vehicle-intelligence.js';
 
 const tagScore = (destination, tag, matched = 90, unmatched = 45) => destination.tags?.includes(tag) ? matched : unmatched;
 
@@ -24,12 +25,15 @@ export function scoreDestination(trip, destination) {
   const budget = buildBudget(trip, destination);
   const preference = preferenceScore(trip, destination);
   const season = destination.season?.includes(month) ? 90 : 40;
-  const transport = trip.transport === 'motorcycle' ? destination.motorcycle * 10 : trip.transport === 'camper' ? destination.camper * 10 : destination.family * 10;
+  const vehicle = transportId(trip.transport);
+  const transport = vehicle === 'motorcycle'
+    ? destination.motorcycle * 10
+    : ['motorhome', 'caravan'].includes(vehicle) ? destination.camper * 10 : destination.family * 10;
   const minimumDays = route.requiredLegs * 2 + 1;
   const driving = roundScore(100 - Math.max(0, route.requiredLegs - 1) * 15 - Math.max(0, minimumDays - trip.days) * 15);
   const budgetFit = budgetScore(budget.total, trip.budget);
   const dimensions = {
-    budget: budgetFit, driving, season, family: destination.family * 10,
+    budget: budgetFit, driving, season, transport, family: destination.family * 10,
     motorcycle: destination.motorcycle * 10, camper: destination.camper * 10,
     scenery: roundScore((tagScore(destination, 'natuur') + tagScore(destination, 'bergen') + tagScore(destination, 'kust')) / 3),
     walking: tagScore(destination, 'wandelen'), swimming: tagScore(destination, 'zwemmen'),
@@ -47,7 +51,7 @@ export function scoreDestination(trip, destination) {
   return {
     ...destination, score, dimensions, estimate: budget.total, budget, route, matches: preference.matches,
     minimumDays, feasible: minimumDays <= trip.days, confidence, compromises,
-    explanation: `Past bij ${matchLabels}; budget, seizoen, vervoer en rijbelasting zijn afzonderlijk meegewogen.`
+    explanation: `Past bij ${matchLabels}; budget, seizoen, ${vehicleProfile(trip).label.toLowerCase()} en totale reisbelasting zijn afzonderlijk meegewogen.`
   };
 }
 

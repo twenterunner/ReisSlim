@@ -1,0 +1,136 @@
+import { routingConfig, validCoordinate } from './config.js';
+import { buildRecommendations } from './recommendation-engine.js';
+import { estimateLegTiming, minimumTravelLegs, vehicleSpec } from './vehicle-intelligence.js';
+
+export function routingEndpoint() {
+  return String(globalThis.REISSLIM_ROUTING_API_URL || routingConfig.apiUrl || '').trim();
+}
+
+export function routingConfigured() {
+  return /^https:\/\//.test(routingEndpoint());
+}
+
+export function buildRoutingRequest(trip, day) {
+  return {
+    day: day.day,
+    origin: { lat: day.fromPoint.lat, lon: day.fromPoint.lon },
+    destination: { lat: day.toPoint.lat, lon: day.toPoint.lon },
+    waypoints: [],
+    vehicle: vehicleSpec(trip)
+  };
+}
+
+function waypointsOnGeometry(geometry, timing, transport) {
+  const count = Math.max(0, timing.stopCount || 0);
+  if (geometry.length < 2 || !count) return [];
+  return Array.from({ length: count }, (_, index) => {
+    const position = Math.min(geometry.length - 1, Math.max(1, Math.round((index + 1) * (geometry.length - 1) / (count + 1))));
+    return {
+      ...geometry[position],
+      name: timing.fuelStops > index ? `Brandstof- en ruststop ${index + 1}` : `Ruststop ${index + 1}`,
+      role: timing.fuelStops > index ? 'fuel' : 'rest',
+      transport,
+      approximate: true
+    };
+  });
+}
+
+function applyResult(trip, day, result) {
+  const geometry = Array.isArray(result.geometry) ? result.geometry.filter(validCoordinate) : [];
+  if (geometry.length < 2 || !Number.isFinite(result.distanceKm) || !Number.isFinite(result.roadHours)) return false;
+  const timing = estimateLegTiming(trip, {
+    distanceKm: result.distanceKm,
+    roadHours: result.roadHours,
+    arrival: day.kind !== 'return' || day.to !== trip.origin
+  });
+  Object.assign(day, {
+    distanceKm: Math.round(result.distanceKm),
+    roadHours: timing.roadHours,
+    driveHours: timing.elapsedHours,
+    elapsedHours: timing.elapsedHours,
+    breakHours: timing.breakHours,
+    restStops: timing.restStops,
+    fuelStops: timing.fuelStops,
+    stopCount: timing.stopCount,
+    waypoints: waypointsOnGeometry(geometry, timing, trip.transport),
+    geometry,
+    routeSource: result.provider || 'live-provider',
+    exceedsDailyLimit: timing.elapsedHours > trip.maxDrive + .05
+  });
+  return true;
+}
+
+async function fetchRoute(apiUrl, request, fetchImpl, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(apiUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Routing gateway antwoordde met ${response.status}.`);
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function enrichPlanWithLiveRouting(trip, destination, plan, options = {}) {
+  const apiUrl = options.apiUrl ?? routingEndpoint();
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  if (!apiUrl || typeof fetchImpl !== 'function') return plan;
+  const next = typeof globalThis.structuredClone === 'function'
+    ? globalThis.structuredClone(plan)
+    : JSON.parse(JSON.stringify(plan));
+  const routeDays = next.days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind)
+    && validCoordinate(day.fromPoint) && validCoordinate(day.toPoint));
+  const settled = await Promise.allSettled(routeDays.map(day => fetchRoute(
+    apiUrl,
+    buildRoutingRequest(trip, day),
+    fetchImpl,
+    options.timeoutMs || routingConfig.requestTimeoutMs
+  )));
+  let applied = 0;
+  settled.forEach((entry, index) => {
+    if (entry.status === 'fulfilled' && applyResult(trip, routeDays[index], entry.value)) applied += 1;
+  });
+  if (!applied) {
+    next.routing = { ...next.routing, error: 'Live routering niet beschikbaar; offline corridor blijft actief.' };
+    return next;
+  }
+
+  const outbound = next.days.filter(day => day.kind === 'outward');
+  next.routeMetrics.oneWayDistanceKm = outbound.reduce((sum, day) => sum + day.distanceKm, 0);
+  next.routeMetrics.oneWayRoadHours = Number(outbound.reduce((sum, day) => sum + day.roadHours, 0).toFixed(1));
+  next.routeMetrics.oneWayElapsedHours = Number(outbound.reduce((sum, day) => sum + day.driveHours, 0).toFixed(1));
+  next.routeMetrics.oneWayDriveHours = next.routeMetrics.oneWayElapsedHours;
+  next.routeMetrics.breakHours = Number(outbound.reduce((sum, day) => sum + day.breakHours, 0).toFixed(1));
+  next.requiredLegs = minimumTravelLegs(
+    trip,
+    next.routeMetrics.oneWayDistanceKm,
+    next.routeMetrics.oneWayRoadHours
+  );
+  next.routeMetrics.requiredLegs = next.requiredLegs;
+  next.minimumDays = next.requiredLegs * 2 + 1;
+  next.routeMetrics.routeSource = applied === routeDays.length ? 'tomtom' : 'mixed';
+  next.recommendations = buildRecommendations(trip, destination, next.days);
+  const excessive = next.days.filter(day => day.exceedsDailyLimit).length;
+  next.feasible = next.minimumDays <= trip.days && excessive === 0;
+  const warnings = [];
+  if (next.minimumDays > trip.days) warnings.push(`Deze bestemming vraagt minimaal ${next.minimumDays} dagen om onder ${trip.maxDrive} uur totale reistijd per dag te blijven.`);
+  if (next.routeMetrics.warning) warnings.push(next.routeMetrics.warning);
+  if (excessive) warnings.push(`${excessive} rijdag${excessive === 1 ? '' : 'en'} overschrijdt de ingestelde totale daglimiet.`);
+  if (next.accommodationChanges > trip.maxChanges) warnings.push(`De route vraagt circa ${next.accommodationChanges} accommodatiewissels; jouw voorkeur is maximaal ${trip.maxChanges}.`);
+  next.warnings = warnings;
+  next.routing = {
+    source: applied === routeDays.length ? 'tomtom' : 'mixed',
+    label: applied === routeDays.length ? routingConfig.providerLabel : 'Gedeeltelijk live, gedeeltelijk offline',
+    live: applied === routeDays.length,
+    completedSegments: applied,
+    totalSegments: routeDays.length,
+    error: applied < routeDays.length ? 'Niet alle segmenten konden live worden berekend.' : null
+  };
+  return next;
+}

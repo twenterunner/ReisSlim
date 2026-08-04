@@ -1,7 +1,7 @@
-export const VERSION = '0.6.0';
-export const BUILD = '601';
-export const ENGINE_VERSION = 3;
-export const STORAGE_SCHEMA_VERSION = 3;
+export const VERSION = '0.7.0';
+export const BUILD = '700';
+export const ENGINE_VERSION = 4;
+export const STORAGE_SCHEMA_VERSION = 4;
 
 export const preferenceDefinitions = [
   ['natuur', 'Natuur'], ['bergen', 'Bergen'], ['zwemmen', 'Zwemmen'],
@@ -11,9 +11,49 @@ export const preferenceDefinitions = [
 ];
 
 export const transportProfiles = {
-  car: { label: 'Auto', consumption: 7.2, timeFactor: 1, parkingDaily: 12 },
-  motorcycle: { label: 'Motor', consumption: 4.8, timeFactor: 1.08, parkingDaily: 6 },
-  camper: { label: 'Camper', consumption: 10.5, timeFactor: 1.12, parkingDaily: 18 }
+  car: {
+    label: 'Auto', routeMode: 'car', consumption: 7.2, roadTimeFactor: 1,
+    breakEveryHours: 2.25, breakMinutes: 15, fuelStopMinutes: 12,
+    defaultFuelRangeKm: 650, arrivalBufferMinutes: 10, parkingDaily: 12,
+    tollFactor: 1, accommodationFactor: 1, supportsDimensions: false,
+    accommodationLabel: 'hotel of appartement met passende parking'
+  },
+  motorcycle: {
+    label: 'Motor', routeMode: 'motorcycle', consumption: 4.8, roadTimeFactor: 1.05,
+    breakEveryHours: 1.5, breakMinutes: 20, fuelStopMinutes: 12,
+    defaultFuelRangeKm: 260, arrivalBufferMinutes: 15, parkingDaily: 6,
+    tollFactor: .65, accommodationFactor: .92, supportsDimensions: false,
+    weatherReserveMinutesPerHour: 5,
+    accommodationLabel: 'motorvriendelijk verblijf met veilige, liefst overdekte parking'
+  },
+  motorhome: {
+    label: 'Camper / motorhome', routeMode: 'truck', consumption: 11.5, roadTimeFactor: 1.12,
+    breakEveryHours: 2, breakMinutes: 20, fuelStopMinutes: 18,
+    defaultFuelRangeKm: 520, arrivalBufferMinutes: 35, parkingDaily: 18,
+    tollFactor: 1.3, accommodationFactor: .34, supportsDimensions: true,
+    defaultHeightM: 3.1, defaultLengthM: 7.2, defaultWeightKg: 3500, defaultMaxSpeedKmh: 100,
+    accommodationLabel: 'camperplaats of camping met stroom, water en servicevoorzieningen'
+  },
+  caravan: {
+    label: 'Auto met caravan', routeMode: 'truck', consumption: 12.5, roadTimeFactor: 1.18,
+    breakEveryHours: 1.75, breakMinutes: 20, fuelStopMinutes: 20,
+    defaultFuelRangeKm: 460, arrivalBufferMinutes: 45, parkingDaily: 16,
+    tollFactor: 1.4, accommodationFactor: .3, supportsDimensions: true,
+    defaultHeightM: 2.7, defaultLengthM: 11.5, defaultWeightKg: 3200, defaultMaxSpeedKmh: 90,
+    accommodationLabel: 'caravancamping met ruime standplaats en eenvoudige manoeuvreertoegang'
+  }
+};
+
+export const routeStyles = {
+  balanced: { label: 'Gebalanceerd', description: 'Een praktische route met ruimte voor prettige stops.' },
+  fastest: { label: 'Snelste', description: 'Minimaliseer reistijd en omwegen.' },
+  scenic: { label: 'Toeristisch', description: 'Geef mooie wegen en uitzichtpunten extra gewicht.' }
+};
+
+export const routingConfig = {
+  apiUrl: '',
+  requestTimeoutMs: 7000,
+  providerLabel: 'TomTom via ReisSlim gateway'
 };
 
 export const budgetAssumptions = {

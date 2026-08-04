@@ -1,4 +1,4 @@
-import { collectRoutePoints } from './itinerary-engine.js';
+import { collectPlanWaypoints, collectRouteGeometry } from './itinerary-engine.js';
 import { validCoordinate } from './config.js';
 
 export const escapeXml = value => String(value ?? '')
@@ -12,11 +12,12 @@ export function safeFilename(value, extension) {
 }
 
 export function createGpx(trip, destination, plan) {
-  const trackPoints = collectRoutePoints(plan).filter(validCoordinate);
-  const dailyPoints = collectRoutePoints(plan, { daily: true }).filter(validCoordinate);
-  const waypoints = dailyPoints.map(point => `<wpt lat="${point.lat}" lon="${point.lon}"><name>${escapeXml(`Dag ${point.day || 0}: ${point.name}`)}</name><desc>${escapeXml(point.date || '')}</desc></wpt>`).join('');
-  const track = trackPoints.map(point => `<trkpt lat="${point.lat}" lon="${point.lon}"><name>${escapeXml(point.name)}</name></trkpt>`).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ReisSlim ${escapeXml(trip.startDate)}" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${escapeXml(destination.name)}</name><desc>Indicatieve planningstrack; niet gegarandeerd geschikt voor turn-by-turn navigatie.</desc></metadata>${waypoints}<trk><name>${escapeXml(destination.name)}</name><desc>Controleer de route in je navigatie-app vóór vertrek.</desc><trkseg>${track}</trkseg></trk></gpx>`;
+  const trackPoints = collectRouteGeometry(plan).filter(validCoordinate);
+  const planPoints = collectPlanWaypoints(plan).filter(validCoordinate);
+  const waypoints = planPoints.map(point => `<wpt lat="${point.lat}" lon="${point.lon}"><name>${escapeXml(`Dag ${point.day || 0}: ${point.name}`)}</name><desc>${escapeXml(`${point.date || ''} · ${point.role || 'routepunt'} · controleer actuele geschiktheid`)}</desc><type>${escapeXml(point.role || 'waypoint')}</type></wpt>`).join('');
+  const track = trackPoints.map(point => `<trkpt lat="${point.lat}" lon="${point.lon}"><name>${escapeXml(point.name || 'Routepunt')}</name></trkpt>`).join('');
+  const source = plan.routing?.live ? 'live providergeometrie' : 'offline corridorpunten';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ReisSlim ${escapeXml(trip.startDate)}" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${escapeXml(destination.name)}</name><desc>Voertuiggerichte planning met ${escapeXml(source)}; geen gegarandeerde turn-by-turn navigatie.</desc></metadata>${waypoints}<trk><name>${escapeXml(destination.name)}</name><desc>Controleer wegroute, beperkingen en waypoints in je navigatie-app vóór vertrek.</desc><trkseg>${track}</trkseg></trk></gpx>`;
 }
 
 export function createJson(data) {
