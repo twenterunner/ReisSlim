@@ -1,0 +1,14 @@
+{
+  "name": "reisslim",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "description": "Lokale, transparante roadtripplanner voor Nederlandse reizigers.",
+  "scripts": {
+    "test": "node --test --test-reporter=spec",
+    "check:syntax": "node scripts/check-syntax.mjs",
+    "check:pwa": "node scripts/check-pwa.mjs",
+    "check": "node scripts/check-syntax.mjs && node --test --test-reporter=spec && node scripts/check-pwa.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
