@@ -1,46 +1,81 @@
-const CURRENT_KEY = 'reisslim.current.v2';
-const LEGACY_CURRENT_KEY = 'reisslim.current';
-const TRIPS_KEY = 'reisslim.trips.v2';
+import { ENGINE_VERSION, STORAGE_SCHEMA_VERSION } from './config.js';
+import { normalizeTrip } from './trip-model.js';
+
+export const STORAGE_KEYS = {
+  current: 'reisslim.current.v3', trips: 'reisslim.trips.v3',
+  legacyCurrent: ['reisslim.current.v2', 'reisslim.current'],
+  legacyTrips: ['reisslim.trips.v2']
+};
 
 function safeParse(value, fallback) {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
 }
 
-export function saveDraft(data) {
-  localStorage.setItem(CURRENT_KEY, JSON.stringify({...data, savedAt: new Date().toISOString()}));
+export function migrateState(input) {
+  if (!input || typeof input !== 'object' || !input.trip) return null;
+  const trip = normalizeTrip(input.trip);
+  return {
+    schemaVersion: STORAGE_SCHEMA_VERSION,
+    engineVersion: ENGINE_VERSION,
+    trip,
+    destinationId: input.destinationId || input.destination?.id || null,
+    compareIds: Array.isArray(input.compareIds) ? input.compareIds.slice(0, 3) : [],
+    optimized: Boolean(input.optimized),
+    needsRebuild: Number(input.engineVersion) !== ENGINE_VERSION || !input.plan,
+    savedAt: input.savedAt || new Date().toISOString()
+  };
 }
 
-export function loadDraft() {
-  const current = safeParse(localStorage.getItem(CURRENT_KEY), null);
-  if (current) return current;
-  const legacy = safeParse(localStorage.getItem(LEGACY_CURRENT_KEY), null);
-  if (legacy) {
-    saveDraft(legacy);
-    localStorage.removeItem(LEGACY_CURRENT_KEY);
+function readFirst(storage, keys) {
+  for (const key of keys) {
+    let value = null;
+    try { value = safeParse(storage.getItem(key), null); } catch { value = null; }
+    if (value) return { key, value };
   }
-  return legacy;
+  return null;
 }
 
-export function clearDraft() {
-  localStorage.removeItem(CURRENT_KEY);
-  localStorage.removeItem(LEGACY_CURRENT_KEY);
+export function saveDraft(state, storage = localStorage) {
+  const record = { ...state, schemaVersion: STORAGE_SCHEMA_VERSION, engineVersion: ENGINE_VERSION, savedAt: new Date().toISOString() };
+  storage.setItem(STORAGE_KEYS.current, JSON.stringify(record));
+  return record;
 }
 
-export function saveTrip(data) {
-  const all = loadTrips();
-  const record = {...data, savedAt: new Date().toISOString()};
-  const tripId = record.trip?.id;
-  const withoutCurrent = tripId ? all.filter(x => x.trip?.id !== tripId) : all;
-  const updated = [record, ...withoutCurrent].slice(0, 20);
-  localStorage.setItem(TRIPS_KEY, JSON.stringify(updated));
+export function loadDraft(storage = localStorage) {
+  const found = readFirst(storage, [STORAGE_KEYS.current, ...STORAGE_KEYS.legacyCurrent]);
+  if (!found) return null;
+  const migrated = migrateState(found.value);
+  if (migrated && found.key !== STORAGE_KEYS.current) {
+    saveDraft(migrated, storage);
+    try { storage.removeItem(found.key); } catch { /* best effort */ }
+  }
+  return migrated;
+}
+
+export function clearDraft(storage = localStorage) {
+  [STORAGE_KEYS.current, ...STORAGE_KEYS.legacyCurrent].forEach(key => {
+    try { storage.removeItem(key); } catch { /* best effort */ }
+  });
+}
+
+export function loadTrips(storage = localStorage) {
+  const found = readFirst(storage, [STORAGE_KEYS.trips, ...STORAGE_KEYS.legacyTrips]);
+  const records = Array.isArray(found?.value) ? found.value.map(migrateState).filter(Boolean) : [];
+  const sorted = records.sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0));
+  if (found && found.key !== STORAGE_KEYS.trips) storage.setItem(STORAGE_KEYS.trips, JSON.stringify(sorted));
+  return sorted;
+}
+
+export function saveTrip(state, storage = localStorage) {
+  const record = saveDraft(state, storage);
+  const existing = loadTrips(storage).filter(item => item.trip.id !== record.trip.id);
+  const updated = [record, ...existing].slice(0, 20);
+  storage.setItem(STORAGE_KEYS.trips, JSON.stringify(updated));
   return updated;
 }
 
-export function loadTrips() {
-  return safeParse(localStorage.getItem(TRIPS_KEY), []);
+export function deleteTrip(id, storage = localStorage) {
+  const updated = loadTrips(storage).filter(item => item.trip.id !== id);
+  storage.setItem(STORAGE_KEYS.trips, JSON.stringify(updated));
+  return updated;
 }
-
-// Backwards-compatible aliases used by earlier builds.
-export const saveCurrent = saveDraft;
-export const loadCurrent = loadDraft;
-export const clearCurrent = clearDraft;

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=500">
+  <link rel="stylesheet" href="styles.css?v=601">
 </head>
 <body>
   <header class="topbar">
@@ -66,7 +66,8 @@
         <form id="tripForm">
           <div class="form-grid">
             <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie Slovenië"></label>
-            <label>Vertrekplaats<input id="origin" value="Saasveld" required></label>
+            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Kies bij voorkeur een plaats uit de offline catalogus voor consistente kaart- en GPX-punten.</small></label>
+            <datalist id="originOptions"><option>Saasveld</option><option>Amsterdam</option><option>Rotterdam</option><option>Utrecht</option><option>Eindhoven</option><option>Groningen</option><option>Maastricht</option><option>Zwolle</option><option>Enschede</option><option>Hengelo</option><option>Almelo</option><option>Arnhem</option><option>Nijmegen</option></datalist>
             <label>Startdatum<input id="startDate" type="date" required></label>
             <label>Aantal dagen<input id="days" type="number" min="3" max="30" value="10" required></label>
             <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
@@ -74,7 +75,7 @@
             <label>Kinderen<input id="children" type="number" min="0" max="8" value="2" required></label>
             <label>Vervoer<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="camper">Camper</option></select></label>
             <label>Max. rijden per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required></label>
-            <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="3" required></label>
+            <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
           </div>
           <fieldset><legend>Wat is belangrijk?</legend><p class="muted priority-help">Selecteer wat belangrijk is en geef per voorkeur aan hoe zwaar deze moet meetellen.</p><div id="preferenceGrid" class="preference-grid priority-grid"></div></fieldset>
@@ -91,16 +92,22 @@
 
     <section id="itineraryView" class="app-view">
       <section id="planSection" class="panel hidden">
-        <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div></div>
+        <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
+        <div id="planWarnings" aria-live="polite"></div>
+        <p id="gpxNotice" class="trust-notice"></p>
         <div class="itinerary-optimizer-grid">
           <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
           <aside id="optimizerSection" class="optimizer-card hidden">
             <div class="section-heading"><div><p class="eyebrow">Trip Optimizer</p><h2>Reiskwaliteit</h2></div><span class="beta-badge">BETA</span></div>
             <div class="quality-hero"><div class="quality-ring"><strong id="qualityScore">—</strong><span>/100</span></div><div><strong id="qualityVerdict">Nog niet berekend</strong><p>Het hele reisplan wordt beoordeeld, niet alleen de bestemming.</p></div></div>
+            <p id="qualityDisclaimer" class="quality-disclaimer"></p>
             <div id="qualityDimensions" class="quality-dimensions"></div>
+            <div id="qualityDeductions" class="deduction-box"></div>
             <div class="recommendation-box"><h3>Topaanbevelingen</h3><ol id="qualityRecommendations"></ol></div>
+            <div id="optimizationSummary" class="optimization-summary" aria-live="polite"></div>
             <button id="improveTripBtn" type="button" class="improve-button">Verbeter mijn reis</button>
+            <button id="undoOptimizeBtn" type="button" class="secondary improve-button hidden">Maak verbetering ongedaan</button>
           </aside>
         </div>
       </section>
@@ -108,11 +115,11 @@
     </section>
 
     <section id="mapView" class="app-view">
-      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart</h1></div></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming om de route te tonen.</p></section>
+      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart</h1></div></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming om de route te tonen.</p><p class="trust-notice">De stippellijn verbindt indicatieve dag- en overnachtingspunten; controleer de echte wegroute altijd in een navigatie-app.</p></section>
     </section>
 
     <section id="budgetView" class="app-view">
-      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Kosten</p><h1>Budget</h1></div></div><div id="budgetSummary" class="summary-grid"></div><div id="budgetBreakdown"></div><h2>Controlepunten</h2><div id="validationList"></div></section>
+      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Kosten</p><h1>Budget</h1></div></div><div id="budgetSummary" class="summary-grid"></div><div id="budgetBreakdown"></div><details id="budgetAssumptions" class="assumptions"></details><h2>Controlepunten</h2><div id="validationList"></div></section>
     </section>
   </main>
 
@@ -124,8 +131,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.5.0 · Build 500 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.6.0 · Build 601 · Foundation</span><br>Planning- en beslissingsondersteuning · Prijzen, rijtijden en beschikbaarheid zijn niet-live. Controleer officiële informatie altijd bij de bron.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script defer src="app.js?v=500"></script>
+  <script type="module" src="app.js?v=601"></script>
 </body>
 </html>
