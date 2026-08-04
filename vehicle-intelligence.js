@@ -1,0 +1,81 @@
+import { transportProfiles } from './config.js';
+
+export const legacyTransportAliases = { camper: 'motorhome' };
+
+export function transportId(value) {
+  const id = legacyTransportAliases[value] || value;
+  return transportProfiles[id] ? id : 'car';
+}
+
+export function vehicleProfile(tripOrId) {
+  const id = typeof tripOrId === 'string' ? tripOrId : tripOrId?.transport;
+  return transportProfiles[transportId(id)];
+}
+
+export function vehicleSpec(trip) {
+  const profile = vehicleProfile(trip);
+  return {
+    transport: transportId(trip?.transport),
+    routeMode: profile.routeMode,
+    routeStyle: ['balanced', 'fastest', 'scenic'].includes(trip?.routeStyle) ? trip.routeStyle : 'balanced',
+    fuelRangeKm: positive(trip?.fuelRangeKm, profile.defaultFuelRangeKm),
+    maxSpeedKmh: profile.supportsDimensions ? positive(trip?.vehicleMaxSpeedKmh, profile.defaultMaxSpeedKmh) : null,
+    heightM: profile.supportsDimensions ? positive(trip?.vehicleHeightM, profile.defaultHeightM) : null,
+    lengthM: profile.supportsDimensions ? positive(trip?.vehicleLengthM, profile.defaultLengthM) : null,
+    weightKg: profile.supportsDimensions ? positive(trip?.vehicleWeightKg, profile.defaultWeightKg) : null
+  };
+}
+
+function positive(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+export function estimateLegTiming(trip, { distanceKm, roadHours, arrival = true } = {}) {
+  const profile = vehicleProfile(trip);
+  const spec = vehicleSpec(trip);
+  const movingHours = Math.max(0, Number(roadHours) || 0);
+  const distance = Math.max(0, Number(distanceKm) || 0);
+  const restStops = movingHours <= .25 ? 0 : Math.floor(Math.max(0, movingHours - .05) / profile.breakEveryHours);
+  const fuelStops = Math.max(0, Math.ceil(distance / Math.max(80, spec.fuelRangeKm * .86)) - 1);
+  const stopCount = Math.max(restStops, fuelStops);
+  const restMinutes = restStops * profile.breakMinutes;
+  const additionalFuelMinutes = Math.max(0, fuelStops - restStops) * profile.fuelStopMinutes;
+  const weatherReserveMinutes = Math.round(movingHours * (profile.weatherReserveMinutesPerHour || 0));
+  const arrivalMinutes = arrival ? profile.arrivalBufferMinutes : 0;
+  const nonDrivingMinutes = restMinutes + additionalFuelMinutes + weatherReserveMinutes + arrivalMinutes;
+  return {
+    roadHours: Number(movingHours.toFixed(1)),
+    elapsedHours: Number((movingHours + nonDrivingMinutes / 60).toFixed(1)),
+    breakHours: Number((nonDrivingMinutes / 60).toFixed(1)),
+    restStops,
+    fuelStops,
+    stopCount,
+    restMinutes,
+    weatherReserveMinutes,
+    arrivalMinutes
+  };
+}
+
+export function minimumTravelLegs(trip, distanceKm, roadHours, maximum = 8) {
+  for (let legs = 1; legs <= maximum; legs += 1) {
+    const timing = estimateLegTiming(trip, { distanceKm: distanceKm / legs, roadHours: roadHours / legs });
+    if (timing.elapsedHours <= trip.maxDrive + .05) return legs;
+  }
+  return maximum;
+}
+
+export function travelGuidance(trip, timing) {
+  const id = transportId(trip.transport);
+  const stopText = timing.stopCount
+    ? `${timing.stopCount} geplande pauze${timing.stopCount === 1 ? '' : 's'}`
+    : 'een korte pauze naar behoefte';
+  if (id === 'motorcycle') return `Plan ${stopText}, bewaak actieradius en weer, en vermijd een zwaar programma na aankomst.`;
+  if (id === 'motorhome') return `Plan ${stopText}, controleer hoogte- en gewichtsbeperkingen en reserveer tijd voor aankomst en opstellen.`;
+  if (id === 'caravan') return `Plan ${stopText}, vermijd krappe toegangswegen en arriveer ruim vóór sluiting van de camping.`;
+  return `Plan ${stopText} en houd parkeren en aankomsttijd vrij van het activiteitenprogramma.`;
+}
+
+export function vehicleMatchLabel(trip) {
+  return vehicleProfile(trip).accommodationLabel;
+}

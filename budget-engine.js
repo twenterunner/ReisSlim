@@ -1,12 +1,58 @@
-export function buildBudget(trip,destination){
-  const nights=trip.days-1,people=trip.adults+trip.children*.6,roomFactor=Math.max(1,Math.ceil((trip.adults+trip.children)/4));
-  const comfortFactor=trip.comfort==='budget'?.78:trip.comfort==='comfort'?1.28:1;
-  const accommodation=Math.round(nights*destination.nightMid*roomFactor*comfortFactor);
-  const food=Math.round(trip.days*destination.foodDaily*(people/3.2));
-  const activities=Math.round(trip.days*destination.activityDaily*(people/3.2));
-  const consumption=trip.transport==='motorcycle'?4.8:trip.transport==='camper'?10.5:7.2;
-  const fuel=Math.round((destination.distanceKm*2+trip.days*85)/100*consumption*1.95);
-  const contingency=200;
-  const rows=[['Accommodatie',accommodation],['Eten & drinken',food],['Activiteiten',activities],['Brandstof',fuel],['Tol & vignetten',destination.toll],['Buffer',contingency]];
-  return {rows,total:rows.reduce((a,r)=>a+r[1],0)};
+import { budgetAssumptions, roundMoney } from './config.js';
+import { calculateRouteMetrics } from './route-engine.js';
+import { transportId, vehicleProfile } from './vehicle-intelligence.js';
+import { estimateAccessCosts, isMultimodal } from './multimodal-engine.js';
+
+export function travellerEquivalents(trip) {
+  return trip.adults + trip.children * budgetAssumptions.childEquivalent;
+}
+
+export function buildBudget(trip, destination, itinerary = null) {
+  const route = itinerary?.routeMetrics || calculateRouteMetrics(trip, destination);
+  const equivalents = travellerEquivalents(trip);
+  const nights = Math.max(0, trip.days - 1);
+  const rooms = Math.max(1, Math.ceil((trip.adults + trip.children) / budgetAssumptions.peoplePerRoom));
+  const comfort = budgetAssumptions.comfortFactor[trip.comfort] || 1;
+  const restaurantShare = budgetAssumptions.restaurantShare[trip.comfort] ?? .45;
+  const profile = vehicleProfile(trip);
+  const transport = transportId(trip.transport);
+  const localDistanceKm = itinerary?.days?.reduce((sum, day) => sum + (day.kind === 'stay' || day.kind === 'flex' || day.kind === 'transfer' ? Number(day.distanceKm || 0) : 0), 0)
+    ?? trip.days * 45;
+  const totalDistanceKm = route.oneWayDistanceKm * 2 + localDistanceKm;
+  const accommodationUnits = ['motorhome', 'caravan'].includes(transport) ? 1 : rooms;
+  const strategy = itinerary?.costStrategy || {};
+  const accommodation = roundMoney(nights * destination.nightMid * accommodationUnits * comfort * profile.accommodationFactor * (strategy.accommodationFactor || 1));
+  const accessCosts = estimateAccessCosts(trip, destination);
+  const fuel = roundMoney((isMultimodal(trip) ? localDistanceKm : totalDistanceKm) / 100 * profile.consumption * budgetAssumptions.fuelPricePerLitre);
+  const parking = roundMoney(Math.max(0, trip.days - 2) * profile.parkingDaily);
+  const groceries = roundMoney(trip.days * equivalents * budgetAssumptions.groceriesPerEquivalentDay * (1 - restaurantShare));
+  const restaurants = roundMoney(trip.days * equivalents * budgetAssumptions.restaurantPerEquivalentDay * restaurantShare * (strategy.restaurantFactor || 1));
+  const activities = roundMoney(trip.days * destination.activityDaily * (equivalents / 3.2) * (strategy.activityFactor || 1));
+  const tolls = roundMoney(destination.toll * profile.tollFactor);
+  const subtotal = accommodation + fuel + tolls + parking + groceries + restaurants + activities;
+  const contingency = roundMoney(Math.max(budgetAssumptions.minimumContingency, subtotal * budgetAssumptions.contingencyRate));
+  const rows = [
+    ...(accessCosts ? [['Internationale verbinding', accessCosts.transport], ['Huurvoertuig', accessCosts.rental], ['Bagage & uitrusting', accessCosts.baggage]] : []),
+    ['Accommodatie', accommodation], ['Brandstof', fuel], ['Tol & vignetten', tolls],
+    ['Parkeren', parking], ['Boodschappen', groceries], ['Restaurants', restaurants],
+    ['Activiteiten', activities], ['Onvoorzien', contingency]
+  ];
+  const total = rows.reduce((sum, [, amount]) => sum + amount, 0);
+  const remaining = roundMoney(trip.budget - total);
+  const confidence = route.originKnown && destination.nightMid && destination.activityDaily ? 'redelijk' : 'beperkt';
+  const uncertaintyRate = accessCosts ? 0.24 : confidence === 'redelijk' ? 0.08 : 0.15;
+  const conservativeTotal = accessCosts ? roundMoney(total - accessCosts.central + accessCosts.high) : roundMoney(total * (1 + uncertaintyRate));
+  const lowTotal = accessCosts ? roundMoney(total - accessCosts.central + accessCosts.low) : roundMoney(total * Math.max(.82, 1 - uncertaintyRate));
+  return {
+    rows, total, subtotal, remaining, nights, rooms, equivalents,
+    lowTotal, conservativeTotal,
+    conservativeRemaining: roundMoney(trip.budget - conservativeTotal),
+    uncertaintyRate,
+    totalDistanceKm: roundMoney(totalDistanceKm),
+    perDay: roundMoney(total / trip.days),
+    perTravellerEquivalent: roundMoney(total / Math.max(1, equivalents)),
+    confidence: accessCosts ? 'beperkt' : confidence,
+    accessCosts,
+    assumptions: { ...budgetAssumptions, consumption: profile.consumption, vehicle: profile.label, accommodationFactor: profile.accommodationFactor, tollFactor: profile.tollFactor, accessAssumptions: accessCosts?.assumptions || [] }
+  };
 }

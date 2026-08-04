@@ -1,1 +1,14 @@
-{"name":"ReisSlim – slimme roadtripplanner","short_name":"ReisSlim","start_url":"./","display":"standalone","background_color":"#f4f6f5","theme_color":"#123f3a","description":"Nederlandse roadtripplanner met bestemmingselectie, budget en GPX-export."}
+{
+  "id": "./",
+  "name": "ReisSlim – slimme roadtripplanner",
+  "short_name": "ReisSlim",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f5",
+  "theme_color": "#123f3a",
+  "description": "Globale constraint-first reisplanner voor roadtrips, fly-drive, fly-ride, fly-camper en trein/ferry met routes, readiness, budget, kaart en GPX-export.",
+  "categories": ["travel", "navigation", "lifestyle"],
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

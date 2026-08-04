@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ReisSlim">
+  <rect width="512" height="512" rx="112" fill="#123f3a"/>
+  <path d="M118 374V132h120c78 0 126 39 126 103 0 43-23 76-65 91l83 48h-91l-70-43h-30v43zm73-103h43c34 0 53-13 53-37s-19-36-53-36h-43z" fill="#fff"/>
+  <circle cx="380" cy="132" r="42" fill="#e6a53b"/>
+</svg>
