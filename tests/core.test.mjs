@@ -15,7 +15,7 @@ import { createGpx, createJson, safeFilename } from '../gpx-generator.js';
 import { migrateState, loadDraft, saveDraft } from '../storage.js';
 import { estimateLegTiming, vehicleSpec } from '../vehicle-intelligence.js';
 import { buildRoutingRequest, enrichPlanWithLiveRouting } from '../routing-provider.js';
-import { buildTomTomUrl, normalizeTomTomRoute } from '../api/route-worker.js';
+import { buildTomTomUrl, normalizeTomTomRoute } from '../route-worker.js';
 import { evaluatePlanConstraints } from '../constraint-engine.js';
 import { buildOverpassQuery, enrichPlanWithPlaces, geocodeOrigin, normalizeOverpassPlaces } from '../place-provider.js';
 
