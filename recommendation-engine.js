@@ -47,6 +47,7 @@ function proposal({ day, type, name, reason, point, transport, seed = 0 }) {
     reason,
     point: offsetPoint(point, seed),
     vehicleFit: [transport],
+    vehicleProfileId: transport,
     confidence: 'categorievoorstel',
     verified: false,
     source: 'ReisSlim offline voertuigregels',
@@ -136,6 +137,11 @@ export function buildRecommendations(trip, destination, days) {
     all.push(...recommendations);
   }
   return all;
+}
+
+export function recommendationsMatchVehicle(plan, vehicle) {
+  const canonical = transportId(vehicle);
+  return (plan?.recommendations || []).every(item => item.vehicleProfileId === canonical && item.vehicleFit?.includes(canonical));
 }
 
 export function collectRecommendationPoints(plan) {

@@ -1,7 +1,7 @@
 import { clamp, roundScore } from './config.js';
 import { buildBudget } from './budget-engine.js';
-import { calculateRouteMetrics } from './route-engine.js';
-import { transportId } from './vehicle-intelligence.js';
+import { calculateRouteMetrics, haversineKm } from './route-engine.js';
+import { estimateLegTiming, transportId } from './vehicle-intelligence.js';
 import { STRETCH_LIMITS, closestAdjustments, evaluateDestinationConstraints } from './constraint-engine.js';
 
 const tagScore = (destination, tag, matched = 90, unmatched = 45) => destination.tags?.includes(tag) ? matched : unmatched;
@@ -20,6 +20,15 @@ function budgetScore(total, budget) {
   return roundScore(100 - (ratio - .9) * 150);
 }
 
+function destinationIntentScore(trip, destination) {
+  const query = String(trip.destinationQuery || '').trim().toLocaleLowerCase('nl-NL');
+  if (!query || ['verras me', 'overal', 'wereldwijd'].includes(query)) return 0;
+  const words = query.split(/\s+/).filter(word => word.length > 2);
+  const haystack = [destination.name, destination.country, destination.summary, ...(destination.tags || [])].join(' ').toLocaleLowerCase('nl-NL');
+  const matches = words.filter(word => haystack.includes(word)).length;
+  return matches ? Math.min(30, 18 + matches * 6) : -12;
+}
+
 export function scoreDestination(trip, destination) {
   const month = new Date(`${trip.startDate}T12:00:00`).getMonth() + 1;
   const route = calculateRouteMetrics(trip, destination);
@@ -28,12 +37,22 @@ export function scoreDestination(trip, destination) {
     : route;
   const budget = buildBudget(trip, destination);
   const preference = preferenceScore(trip, destination);
-  const season = destination.season?.includes(month) ? 90 : 40;
+  const season = destination.season?.length ? (destination.season.includes(month) ? 90 : 40) : 50;
   const vehicle = transportId(trip.transport);
   const transport = vehicle === 'motorcycle'
     ? destination.motorcycle * 10
     : ['motorhome', 'caravan'].includes(vehicle) ? destination.camper * 10 : destination.family * 10;
   const constraintStatus = evaluateDestinationConstraints(trip, { route, relaxedRoute, budget });
+  if (trip.routeTopology === 'open-jaw' && destination.bases?.length > 1) {
+    const from = destination.bases[0]; const to = destination.bases.at(-1);
+    const distanceKm = Math.round((haversineKm(from, to) || 0) * 1.25);
+    const speed = { car: 52, motorcycle: 50, motorhome: 46, caravan: 43 }[vehicle] || 50;
+    const timing = estimateLegTiming(trip, { distanceKm, roadHours: distanceKm / speed, arrival: true });
+    if (timing.elapsedHours > trip.maxDrive + .05) {
+      constraintStatus.violations.push({ key: 'topology', label: 'Open-jaw transfer', actual: timing.elapsedHours, limit: trip.maxDrive, detail: `De transfer tussen eerste en laatste basis duurt indicatief ${timing.elapsedHours.toFixed(1)} uur en overschrijdt je daglimiet.`, adjustment: `Kies een rondreis, verhoog de daglimiet of selecteer een bestemming met dichter bij elkaar gelegen open-jaw bases.`, stretchable: false, severity: (timing.elapsedHours - trip.maxDrive) / Math.max(1, trip.maxDrive) });
+      Object.assign(constraintStatus, { category: 'rejected', exact: false, stretch: false, selectable: false, summary: constraintStatus.violations.map(item => item.detail).join(' ') });
+    }
+  }
   const minimumDays = constraintStatus.minimumDays;
   const driving = roundScore(100 - Math.max(0, route.requiredLegs - 1) * 15 - Math.max(0, minimumDays - trip.days) * 15);
   const budgetFit = budgetScore(budget.total, trip.budget);
@@ -45,15 +64,17 @@ export function scoreDestination(trip, destination) {
     food: tagScore(destination, 'eten', 90, 55), culture: tagScore(destination, 'cultuur', 90, 50),
     crowds: destination.crowds * 10
   };
-  const score = roundScore(preference.score * .36 + budgetFit * .2 + season * .14 + transport * .16 + driving * .14);
+  const intentScore = destinationIntentScore(trip, destination);
+  const score = roundScore(preference.score * .36 + budgetFit * .2 + season * .14 + transport * .16 + driving * .14 + intentScore);
   const compromises = [];
   compromises.push(...constraintStatus.violations.map(item => item.detail));
-  if (season < 60) compromises.push('De reis valt buiten de voorkeursmaanden in de offline bestemmingdata.');
-  if (!route.originKnown) compromises.push('De vertrekplaats is niet beschikbaar in de offline coördinatencatalogus.');
+  if (destination.season?.length && season < 60) compromises.push('De reis valt buiten de voorkeursmaanden die uit providerbewijs zijn afgeleid.');
+  if (!destination.season?.length) compromises.push('Seizoensgeschiktheid is onbekend en telt als neutrale prior met lager vertrouwen.');
+  if (!route.originKnown) compromises.push('De vertrekplaats kon niet worden gegeocodeerd; de routebelasting heeft lager vertrouwen.');
   const confidence = route.originKnown ? (destination.routeStops?.length >= route.requiredLegs - 1 ? 'redelijk' : 'beperkt') : 'beperkt';
   const matchLabels = preference.matches.length ? preference.matches.slice(0, 3).join(', ') : 'algemene reiswensen';
   return {
-    ...destination, score, dimensions, estimate: budget.total, budget, route, matches: preference.matches,
+    ...destination, score, dimensions, estimate: budget.total, budget, route, matches: preference.matches, intentMatch: intentScore > 0,
     minimumDays, feasible: constraintStatus.exact, category: constraintStatus.category,
     constraintStatus, confidence, compromises,
     explanation: constraintStatus.exact
@@ -62,7 +83,7 @@ export function scoreDestination(trip, destination) {
   };
 }
 
-const byMatch = (a, b) => b.score - a.score || a.estimate - b.estimate || a.name.localeCompare(b.name, 'nl');
+const byMatch = (a, b) => Number(b.intentMatch) - Number(a.intentMatch) || b.score - a.score || a.estimate - b.estimate || a.name.localeCompare(b.name, 'nl');
 
 export function rankDestinationGroups(trip, destinationList) {
   const scored = destinationList.map(destination => scoreDestination(trip, destination));

@@ -1,11 +1,11 @@
-const CACHE = 'reisslim-v0.9.0-build-900';
+const CACHE = 'reisslim-v1.1.0-build-1100';
 const ASSETS = [
-  './', './index.html', './styles.css?v=900', './app.js?v=900', './manifest.webmanifest', './icon.svg',
-  './config.js?v=900', './destinations.js?v=900', './destination-provider.js?v=900', './trip-model.js?v=900', './route-engine.js?v=900', './storage.js?v=900',
-  './destination-engine.js?v=900', './proposal-engine.js?v=900', './constraint-engine.js?v=900', './plan-solver.js?v=900', './itinerary-engine.js?v=900', './itinerary-variants.js?v=900',
-  './itinerary-validator.js?v=900', './budget-engine.js?v=900', './trip-quality-engine.js?v=900', './trip-optimizer.js?v=900',
-  './vehicle-intelligence.js?v=900', './recommendation-engine.js?v=900', './routing-provider.js?v=900', './place-provider.js?v=900',
-  './map-view.js?v=900', './gpx-generator.js?v=900', './ui-renderer.js?v=900'
+  './', './index.html', './styles.css?v=1100', './app.js?v=1100', './manifest.webmanifest', './icon.svg',
+  './config.js', './destination-provider.js', './trip-model.js', './route-engine.js', './route-topology.js', './route-graph-engine.js', './storage.js',
+  './destination-engine.js', './proposal-engine.js', './constraint-engine.js', './plan-solver.js', './itinerary-engine.js', './itinerary-variants.js',
+  './itinerary-validator.js', './budget-engine.js', './trip-quality-engine.js', './trip-optimizer.js', './multimodal-engine.js', './provider-platform.js',
+  './vehicle-intelligence.js', './recommendation-engine.js', './routing-provider.js', './place-provider.js', './travel-readiness.js', './preference-engine.js',
+  './assistant-engine.js', './weather-engine.js', './image-provider.js', './map-view.js', './gpx-generator.js', './ui-renderer.js'
 ];
 
 self.addEventListener('install', event => {

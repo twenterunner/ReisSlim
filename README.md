@@ -1,82 +1,61 @@
-# ReisSlim 0.9.0 — dynamische reisintelligentie
+# ReisSlim 1.1.0 — zero-catalogue travel intelligence
 
-ReisSlim is een mobiele Progressive Web App voor Nederlandse reizigers die zelf een Europese roadtrip willen plannen. De planner controleert eerst budget, dagen, dagelijkse totale reistijd, accommodatiewissels en voertuigprofiel. Alleen daarna worden haalbare reizen op voorkeuren gerangschikt. De volledige basis blijft lokaal bruikbaar; route, plaatsen en weer kunnen optioneel live worden verrijkt.
+ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips and multi-modal journeys. It supports direct trips by car, motorcycle, camper or caravan, plus fly-drive, fly-ride, fly-camper and train/ferry access. The deterministic planner works without a server; optional public data providers enrich destinations, routes, POIs, weather and open-license images.
 
-## Mogelijkheden
+## What v1.1 does
 
-- dashboard, automatisch concept en maximaal twintig opgeslagen reizen;
-- normaal 6 tot 12 wezenlijk verschillende reisconcepten, geselecteerd op geschiktheid én diversiteit;
-- onbeperkt uitbreidbare bestemmingsontdekking via opeenvolgende, handmatig gestarte OpenStreetMap/Overpass-zoekringen;
-- veertien gecureerde regio's als betrouwbare offline fallback, niet als grens van het zoekgebied;
-- harde voorwaarden vóór voorkeursscores, met een afzonderlijke exacte-resultatengroep;
-- maximaal twee begrensde stretch-ideeën die ieder precies één kleine afwijking tonen;
-- concrete minimale aanpassingen wanneer geen exacte reis past;
-- gewogen voorkeuren en vergelijking van maximaal vier zichtbare bestemmingen;
-- opslaan, afwijzen, focussen en meer opties ophalen zonder eerder getoonde voorstellen te herhalen;
-- drie vergelijkbare reisstijlen per bestemming: ontspannen, gebalanceerd en actief;
-- heen- en terugreis vanaf de werkelijk ingevoerde vertrekplaats;
-- aparte profielen voor auto, motor, camper/motorhome en auto met caravan;
-- totale reisbelasting per dag: rijdende tijd plus voertuigafhankelijke rust-, brandstof-, weer- en aankomsttijd;
-- routevoorkeur, actieradius en voor grote voertuigen maximumsnelheid, hoogte, lengte en gewicht;
-- indicatieve corridorroute met dagsegmenten, pauze-/brandstofwaypoints en afzonderlijke kaartlagen;
-- voertuiggerichte voorstellen voor overnachten, eten, activiteiten, rustpunten en voertuigservice;
-- optionele namen, coördinaten, openingstijden en bronlinks uit OpenStreetMap/Overpass;
-- optionele Open-Meteo-verwachting voor de bestemming en reisdata;
-- dagtijdschema's met vertrek, aankomst, check-in en activiteitenvenster;
-- dagkaarten met route, afstand, rijdende tijd, totale tijd, waypoints, overnachting, hoofdplan en regenalternatief;
-- centrale begroting voor accommodatie, brandstof, tol, parkeren, boodschappen, restaurants, activiteiten en onvoorzien;
-- transparante planning-quality indicator met negen dimensies, aftrekredenen en aanbevelingen;
-- transparante optimalisatie met echte planwijzigingen, minimumverbeteringsdrempel, selectie per wijziging, locks en undo;
-- kaart en GPX op basis van dezelfde routegeometrie, dagpunten en voorstellen;
-- optionele live TomTom-routegeometrie via een sleutelbeschermende gateway, met automatische offline fallback;
-- lokale opslag, offline applicatieshell en GitHub Pages-compatibele relatieve paden.
+- accepts any typed origin or privacy-aware current location;
+- resolves any typed city, region, country, island or bounded destination using provider identity, type and bounds;
+- discovers provider-backed gateways, settlements, highlights and services, then clusters them into feasible trip regions;
+- never uses a finite destination catalogue or unrelated fallback in the production proposal flow;
+- creates 6–12 diverse proposals when enough candidates satisfy the hard constraints;
+- permits at most two clearly labelled, bounded stretch ideas;
+- supports loops with a different return corridor, out-and-back routes and multi-modal open-jaw trips;
+- models flight/train/ferry and rental segments without inventing schedules, fares, bookability or availability;
+- applies motorcycle pace and rest logic, camper/caravan dimensions and remote-route checks;
+- proposes route stops, accommodation categories, restaurants, activities, fuel and service locations, then replaces them with named OpenStreetMap places when available;
+- shows Open-Meteo weather with local symbols and vehicle-aware suitability;
+- provides low, central and high budget estimates, including international transport, rental and baggage;
+- exports daily GPX tracks and waypoints from the same geometry used on the map;
+- includes a Travel Readiness dashboard with official source links and explicit unverified states;
+- learns bounded preferences locally, supports private mode and never silently applies conversational changes;
+- builds a constrained highlight/overnight graph, explains omissions and renders selectable route layers per travel day;
+- migrates older saved trips to schema 8 and rebuilds derived data with the current vehicle profile.
 
-## Lokaal draaien
+Namibia, South Africa, Croatia and Bulgaria exist only as recorded provider-shaped acceptance fixtures. They are not imported by production modules and do not control worldwide coverage.
 
-Er is geen buildstap of betaalde API nodig voor de offline planner. Gebruik een statische server, omdat ES-modules niet betrouwbaar via `file://` werken.
+## Run locally
+
+No build step or npm install is required. ES modules need a static web server:
 
 ```bash
 python -m http.server 8080
 ```
 
-Open daarna `http://localhost:8080`.
+Open `http://localhost:8080`. On Android, GitHub Pages or a Codespaces forwarded port provides the same static app. Direct `file://` opening is not supported.
 
-## Optionele live data
+## Test
 
-Auto en motor kunnen bij ingeschakelde live data een OSRM-weggeometrie proberen; motorreistijd en pauzes blijven door ReisSlim voertuigafhankelijk berekend. Voor camper/caravan kan de gebruiker optioneel een eigen OpenRouteService-sleutel lokaal invoeren, zodat lengte-, hoogte- en gewichtskenmerken worden meegestuurd. De sleutel staat nooit in reisexport of repository. De bestaande TomTom-gateway blijft de aanbevolen productieoptie voor sleutelbescherming. Zonder live antwoord gebruikt de app de geteste offline corridorraming.
-
-OpenStreetMap/Overpass levert plaatsnamen maar geen boekbaarheid, actuele prijs of gegarandeerde opening. ReisSlim start direct met de offline fallback en kan daarna per gebruikersactie een compacte nieuwe zoekring ophalen. De cursor kan onbeperkt doorgaan: er bestaat geen vaste lijst of maximumaantal regio's. Resultaten worden lokaal gecachet en bekende, getoonde of afgewezen bestemmingen worden uitgesloten. Nominatim wordt alleen na formulierverzending gebruikt voor een onbekende vertrekplaats en wordt lokaal gecachet; er is geen autocomplete.
-
-De publieke Overpass-instantie is geschikt voor gematigd, handmatig gebruik. Gebruik voor een commerciële productiebelasting een eigen instantie of sleutelbeschermende gateway met caching en limieten.
-
-## Kwaliteitscontroles
-
-Node.js 20 of nieuwer is voldoende; er zijn geen npm-afhankelijkheden.
+Node.js 20+ is sufficient:
 
 ```bash
 npm run check
 ```
 
-Dit voert JavaScript-syntaxcontrole, alle unit-/integratie-/migratie-/GPX-tests, een lokale server-smoketest en PWA-manifest/service-workercontroles uit. Zie [TESTING.md](TESTING.md).
+This runs syntax, unit, integration, migration, GPX, static-server and PWA checks. See [TESTING.md](TESTING.md).
+
+## Providers, privacy and trust
+
+Dynamic proposal generation uses Nominatim and Overpass without a bundled API key. OSRM/OpenRouteService, Open-Meteo and Wikimedia Commons enrich the selected plan. If discovery fails and no exact-request cache exists, ReisSlim shows no unrelated trips. A personal OpenRouteService key is stored separately in the browser and is never included in saved-trip JSON or source control. See [API_SOURCES.md](API_SOURCES.md).
+
+Trips, dismissed/saved proposals and preference evidence stay in browser `localStorage`. Private mode disables new learning. Current-location coordinates are only used after explicit browser permission. See [PERSONALIZATION.md](PERSONALIZATION.md).
+
+ReisSlim is planning and decision support. It does not claim live inventory, confirmed prices, a booked connection, legal entry eligibility, medical clearance or route safety. Official advice, documents, opening times, vehicle restrictions, weather and booking conditions must be confirmed at the linked source.
 
 ## GitHub Pages
 
-Publiceer de root van `main` via **Settings → Pages → Deploy from a branch**. Alle applicatie- en service-workerpaden zijn relatief, zodat de app op een projectsite zoals `/ReisSlim/` blijft werken. Verhoog bij elke release versie en build in `config.js`, `index.html`, `service-worker.js`, `package.json`, README en changelog.
+Publish the repository root through **Settings → Pages → Deploy from a branch**. All paths are project-site relative, and the v1.1 service worker caches the flat runtime shell without `destinations.js`.
 
-## Privacy en vertrouwen
+## Architecture
 
-Concepten, integratie-instellingen en opgeslagen reizen staan uitsluitend in `localStorage` van de browser. Leaflet haalt kaarttegels rechtstreeks bij OpenStreetMap op wanneer de kaart zichtbaar is. Met live data ingeschakeld kunnen vertreknaam, routecoördinaten en voertuigkenmerken naar Nominatim, OSRM/OpenRouteService of de ingestelde gateway gaan; route-/bestemmingscoördinaten gaan naar Overpass en Open-Meteo. Live data kan per reis worden uitgeschakeld.
-
-Alle prijzen, seizoensscores en plaatsvoorstellen zijn indicatief. Offline afstanden en reistijden zijn ramingen; de interface noemt de gebruikte bron. De GPX is een planningstrack, geen gegarandeerde turn-by-turn navigatie. Reizigers blijven zelf verantwoordelijk voor officiële reisadviezen, verkeersregels, voertuigbeperkingen, beschikbaarheid, prijzen, weer, openingstijden en veiligheid.
-
-## Bekende beperkingen
-
-- De offline vertrekcatalogus bevat een beperkte set Nederlandse plaatsen. Een onbekende plaats behoudt de juiste tekst, maar gebruikt Saasveld alleen als expliciet gemarkeerd afstandsanker en krijgt geen vals vertrekpunt in GPX.
-- Offline routes verbinden gecureerde corridor- en dagpunten; alleen de optionele provider volgt het wegennet.
-- Live accommodatie-, restaurant-, activiteit- en serviceplaatsen zijn bronvermeldingen, geen boekbare of beschikbaarheidsgecontroleerde aanbiedingen.
-- Dynamisch ontdekte plaatsen krijgen voorlopig indicatieve regioprofielen; prijs-, tol-, brandstof- en beschikbaarheidsdata hebben nog geen live bron.
-- De SVG-appicon werkt op moderne browsers; rastericonen van 192 en 512 pixels zijn een aanbevolen volgende stap.
-
-## Vervolg naar v1.0
-
-De route- en bestemmingsprovidergrenzen zijn nu aanwezig. De volgende fase kan dezelfde gateway uitbreiden met Wikidata/Wikipedia-context, live boekingslinks, weer, verkeersrisico, tol en prijsranges zonder de deterministische fallback of centrale budgetlogica te herschrijven. Zie [ARCHITECTURE.md](ARCHITECTURE.md).
+The domain is provider-independent and uses one canonical itinerary, budget and export model. Derived state is rebuilt after migrations. See [ARCHITECTURE.md](ARCHITECTURE.md) and [CHANGELOG.md](CHANGELOG.md).

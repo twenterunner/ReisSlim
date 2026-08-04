@@ -18,6 +18,14 @@ import { buildRoutingRequest, enrichPlanWithLiveRouting } from '../routing-provi
 import { buildTomTomUrl, normalizeTomTomRoute } from '../route-worker.js';
 import { evaluatePlanConstraints } from '../constraint-engine.js';
 import { buildOverpassQuery, enrichPlanWithPlaces, geocodeOrigin, normalizeOverpassPlaces } from '../place-provider.js';
+import { geometryOverlap, routeExplorationMetrics } from '../route-topology.js';
+import { buildAccessSegments, estimateAccessCosts } from '../multimodal-engine.js';
+import { buildTravelReadiness } from '../travel-readiness.js';
+import { createRequestBudget, providerEnvelope, providerHealth } from '../provider-platform.js';
+import { applyAssistantPatch, interpretAssistantMessage } from '../assistant-engine.js';
+import { emptyPreferenceProfile, preferenceBonus, recordPreferenceEvent } from '../preference-engine.js';
+import { weatherCondition, weatherSuitability } from '../weather-engine.js';
+import { normalizeCommonsImage } from '../image-provider.js';
 
 const makeTrip = overrides => normalizeTrip({
   id: 'fixed-trip', tripName: 'Testreis', origin: 'Utrecht', startDate: '2026-07-01',
@@ -207,10 +215,10 @@ test('OpenStreetMap discovery normalizes arbitrary towns into plannable dynamic 
   ] };
   const dynamic = normalizeDiscoveredDestinations(trip, payload);
   assert.ok(dynamic.length >= 2);
-  assert.ok(dynamic.every(item => item.dynamic && item.bases.length && item.routeStops.length >= 2));
+  assert.ok(dynamic.every(item => item.dynamic && item.bases.length && Array.isArray(item.routeStops)));
   const discovered = await discoverDestinationBatch(trip, { cursor: 4, storage: null, fetchImpl: async () => ({ ok: true, json: async () => payload }) });
   assert.equal(discovered.live, true);
-  assert.ok(discovered.destinations.every(item => item.id.startsWith('osm-')));
+  assert.ok(discovered.destinations.every(item => item.id.startsWith('dynamic-')));
 });
 
 test('Normal proposals satisfy every hard destination constraint and stretch ideas are capped', () => {
@@ -402,5 +410,81 @@ test('Old stored data migrates without crashing and discards stale derived plans
   assert.equal('itinerary' in migrated, false);
   const storage = new MemoryStorage(); storage.setItem('reisslim.current.v2', JSON.stringify(legacy));
   assert.doesNotThrow(() => loadDraft(storage));
-  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v6'));
+  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v8'));
+});
+
+test('Global discovery is not clipped to Europe and supports targeted locations', () => {
+  const globalTrip = makeTrip({ travelMode: 'fly-drive', destinationPoint: { lat: -22.56, lon: 17.08, name: 'Windhoek' } });
+  const seeds = discoverySeeds(globalTrip, 0, 8);
+  assert.equal(seeds.length, 8);
+  assert.ok(seeds.every(point => point.lat < 0));
+  assert.match(buildDiscoveryQuery(globalTrip, 0), /national_park/);
+});
+
+test('Loop topology reduces geometric overlap compared with an identical return', () => {
+  const outbound = [{ lat: 52, lon: 6 }, { lat: 50, lon: 8 }, { lat: 48, lon: 10 }];
+  const alternate = [{ lat: 48, lon: 10 }, { lat: 50.8, lon: 6.8 }, { lat: 52, lon: 6 }];
+  assert.equal(geometryOverlap(outbound, outbound), 1);
+  assert.ok(routeExplorationMetrics(outbound, alternate).explorationScore > 0);
+});
+
+test('Namibia fly-drive builds honest multi-modal segments and uncertainty range', () => {
+  const trip = makeTrip({ travelMode: 'fly-drive', routeTopology: 'open-jaw', maxDrive: 12, transport: 'car', days: 14, budget: 9000, originPoint: { lat: 52.09, lon: 5.12 } });
+  const namibia = destinations.find(item => item.id === 'namibia-fixture');
+  const plan = buildItinerary(trip, namibia);
+  const costs = estimateAccessCosts(trip, namibia);
+  assert.equal(plan.days.length, 14);
+  assert.equal(plan.accessSegments.some(segment => segment.mode === 'flight' && segment.bookable === false), true);
+  assert.ok(plan.accessSegments[0].durationHours > 0);
+  assert.equal(plan.days[0].schedule.departure, undefined);
+  assert.equal(plan.days.some(day => day.kind === 'transfer'), true);
+  assert.ok(costs.low < costs.central && costs.high > costs.central);
+  assert.equal(buildAccessSegments(trip, namibia).every(segment => segment.scheduleVerified === false || segment.mode === 'rental'), true);
+});
+
+test('An explicitly requested destination outside constraints is explained, not silently ranked as a normal proposal', () => {
+  const trip = makeTrip({ travelMode: 'fly-drive', destinationQuery: 'Namibië', budget: 5000 });
+  const portfolio = buildProposalPortfolio(trip, destinations, { limit: 8 });
+  assert.equal(portfolio.requestedMismatch?.id, 'namibia-fixture');
+  assert.equal(portfolio.visible.some(item => item.id === 'namibia-fixture'), false);
+  assert.ok(portfolio.requestedMismatch.constraintStatus.violations.length > 0);
+});
+
+test('Travel readiness never claims unverified entry or advisory data is complete', () => {
+  const trip = makeTrip({ travelMode: 'fly-drive', remoteTravel: true });
+  const namibia = destinations.find(item => item.id === 'namibia-fixture');
+  const readiness = buildTravelReadiness(trip, namibia, buildItinerary(trip, namibia));
+  assert.ok(readiness.blockers >= 3);
+  assert.equal(readiness.items.find(item => item.id === 'documents').verified, false);
+});
+
+test('Provider platform enforces request budgets and reports degraded health', () => {
+  const budget = createRequestBudget({ maximum: 2 });
+  assert.equal(budget.claim(), true); assert.equal(budget.claim(), true); assert.equal(budget.claim(), false);
+  const health = providerHealth([providerEnvelope('a', {}), providerEnvelope('b', null, { status: 'unavailable' })]);
+  assert.equal(health.status, 'degraded');
+});
+
+test('Local learning is evidence-based, bounded and disabled in private mode', () => {
+  let profile = emptyPreferenceProfile();
+  profile = recordPreferenceEvent(profile, { kind: 'save', tags: ['natuur'] });
+  profile = recordPreferenceEvent(profile, { kind: 'select', tags: ['natuur'] });
+  assert.ok(preferenceBonus({ tags: ['natuur'] }, profile).score > 0);
+  profile.privateMode = true;
+  assert.equal(preferenceBonus({ tags: ['natuur'] }, profile).score, 0);
+});
+
+test('Assistant previews deterministic changes before applying them', () => {
+  const trip = makeTrip();
+  const preview = interpretAssistantMessage('maak de reis rustiger', trip);
+  assert.equal(preview.requiresConfirmation, true);
+  assert.equal(applyAssistantPatch(trip, { days: 12 }).days, 12);
+  assert.equal(interpretAssistantMessage('boek een vlucht voor mij', trip).understood, false);
+});
+
+test('Weather and open-license image metadata normalize without false verification', () => {
+  assert.equal(weatherCondition(95).id, 'storm');
+  assert.ok(weatherSuitability({ weatherCode: 95, windKmh: 70, precipitationChance: 90 }, makeTrip({ transport: 'motorcycle' })).score < 40);
+  const image = normalizeCommonsImage({ query: { pages: { 1: { pageid: 1, title: 'File:Test.jpg', imageinfo: [{ thumburl: 'https://upload.wikimedia.org/test.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:Test.jpg', extmetadata: { Artist: { value: 'Maker' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }] } } } });
+  assert.equal(image.license, 'CC BY-SA 4.0');
 });

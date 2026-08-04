@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.1.0 — 2026-08-04
+
+### Added
+
+- zero-catalogue destination resolution by geographic type and boundary;
+- provider-evidence anchors, dynamic region clustering and deterministic constrained route graphs;
+- generic highlight omission with constraint reason and additional-day guidance;
+- selectable per-day map route layers and day-card highlighting;
+- multiple named, vehicle-filtered accommodation candidates where provider data permits;
+- recorded acceptance fixtures for South Africa, Croatia, Bulgaria, Namibia and an unknown geocoded region.
+
+### Fixed
+
+- proposal cards no longer render from the old catalogue before live discovery;
+- failed discovery cannot substitute unrelated destinations;
+- cached discovery identity includes destination resolution, vehicle and material constraints;
+- changing vehicle triggers a complete replan and every recommendation carries a canonical vehicle-profile identity;
+- Wikimedia Commons selection scans all returned candidates for an open licence;
+- Namibia fly-drive planning uses multiple bases and can omit Fish River Canyon under tight limits.
+
+### Changed
+
+- version/build to 1.1.0/1100 and engine/storage schema to 8;
+- `destinations.js` removed from the production import path and PWA cache;
+- hard-coded dashboard destinations replaced with worldwide neutral onboarding.
+
+## 1.0.0 — 2026-08-04
+
+### Added
+
+- staged global discovery with targeted destination geocoding and no Europe boundary;
+- direct, fly-drive, fly-ride, fly-camper and train/ferry journey modes;
+- normalized access/rental segments that never invent schedules, fares or bookability;
+- loop, out-and-back and multi-modal open-jaw topology with geometric overlap metrics;
+- Namibia remote fly-drive/fly-camper fixture;
+- provider envelopes, request budgets, timeouts, health, cache and deduplication primitives;
+- low/central/high multi-modal budgets for transport, rental and baggage;
+- Travel Readiness with official advisory, entry and health links and explicit unverified states;
+- local evidence-based preference learning, private mode and export/import primitives;
+- deterministic conversational change previews;
+- WMO weather icons and vehicle-aware weather suitability;
+- open-license Wikimedia Commons imagery with visible attribution;
+- 18-dimensional trip-quality model and daily segmented GPX export.
+
+### Changed
+
+- version/build to 1.0.0/1000, engine and storage schema to 7;
+- trip duration to 60 days and accommodation-change limit to 20;
+- return corridors no longer repeat the outbound route unless out-and-back is selected;
+- PWA cache includes every v1 flat runtime module and safely replaces old caches;
+- documentation now covers providers, privacy, personalization, uncertainty and global architecture.
+
 ## 0.9.0 — 2026-08-04
 
 ### Toegevoegd

@@ -21,10 +21,13 @@ export function calculateRouteMetrics(trip, destination) {
   const originDirect = origin ? haversineKm(origin, destinationPoint) : baselineDirect;
   const distanceRatio = baselineDirect ? originDirect / baselineDirect : 1;
   const profile = vehicleProfile(trip);
-  const oneWayDistanceKm = Math.max(1, Math.round(destination.distanceKm * distanceRatio));
-  const oneWayRoadHours = Number((destination.driveHours * distanceRatio * profile.roadTimeFactor).toFixed(1));
+  const multimodal = trip.travelMode && trip.travelMode !== 'direct';
+  const oneWayDistanceKm = multimodal && origin && validCoordinate(destinationPoint)
+    ? Math.max(1, Math.round(haversineKm(origin, destinationPoint)))
+    : Math.max(1, Math.round(destination.distanceKm * distanceRatio));
+  const oneWayRoadHours = multimodal ? 1.2 : Number((destination.driveHours * distanceRatio * profile.roadTimeFactor).toFixed(1));
   const oneWayTiming = estimateLegTiming(trip, { distanceKm: oneWayDistanceKm, roadHours: oneWayRoadHours });
-  const requiredLegs = minimumCorridorLegs(trip, destination, oneWayDistanceKm, oneWayRoadHours);
+  const requiredLegs = multimodal ? 1 : minimumCorridorLegs(trip, destination, oneWayDistanceKm, oneWayRoadHours);
   return {
     origin: origin ? { ...origin, name: trip.origin, role: 'origin', progress: 0 } : null,
     originKnown: Boolean(origin),
@@ -35,7 +38,7 @@ export function calculateRouteMetrics(trip, destination) {
     oneWayDriveHours: oneWayTiming.elapsedHours,
     breakHours: oneWayTiming.breakHours,
     requiredLegs,
-    routeSource: 'offline-corridor',
+    routeSource: multimodal ? 'multimodal-planning-estimate' : 'offline-corridor',
     warning: origin ? null : `Voor ${trip.origin} ontbreken offline coördinaten; afstanden gebruiken Saasveld als indicatief Nederlands vertrekanker.`
   };
 }

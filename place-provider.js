@@ -7,6 +7,13 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
 const CACHE_PREFIX = 'reisslim.live.v1.';
 
+async function respectNominatimRateLimit() {
+  const previous = Number(globalThis.__reisslimNominatimRequestAt || 0);
+  const waitMs = Math.max(0, 1050 - (Date.now() - previous));
+  if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+  globalThis.__reisslimNominatimRequestAt = Date.now();
+}
+
 const clone = value => typeof globalThis.structuredClone === 'function'
   ? globalThis.structuredClone(value)
   : JSON.parse(JSON.stringify(value));
@@ -58,6 +65,7 @@ export async function geocodeOrigin(origin, options = {}) {
   const url = new URL(options.nominatimUrl || NOMINATIM_URL);
   url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1', addressdetails: '0' });
   try {
+    await respectNominatimRateLimit();
     const result = await fetchJson(url, { headers: { accept: 'application/json' } }, 7000, fetchImpl);
     const match = result?.[0];
     const point = match ? { lat: Number(match.lat), lon: Number(match.lon), name: query, source: 'OpenStreetMap Nominatim' } : null;
@@ -142,6 +150,23 @@ function suitability(place, recommendation, trip) {
   return score;
 }
 
+function accommodationFitsVehicle(place, vehicle) {
+  const camping = ['camp_site', 'caravan_site'].includes(place.tags?.tourism);
+  if (vehicle === 'caravan') return ['caravan_site', 'camp_site'].includes(place.tags?.tourism);
+  if (vehicle === 'motorhome') return camping;
+  return !camping;
+}
+
+function accommodationEvidence(place, vehicle) {
+  const tags = place.tags || {};
+  if (vehicle === 'motorcycle') return tags.covered === 'yes' || tags.parking === 'yes' || tags['parking:condition']
+    ? 'Parkeerbewijs staat in de brondata; controleer of dit veilig en overdekt genoeg is.'
+    : 'Veilige of overdekte motorparking is niet bevestigd en moet vóór boeken worden gecontroleerd.';
+  if (vehicle === 'motorhome') return 'OSM classificeert dit als camper- of campinglocatie; water, stroom, afval en voertuigmaat zijn niet bevestigd.';
+  if (vehicle === 'caravan') return 'OSM classificeert dit als camping; aanrijroute, manoeuvreerruimte en standplaatsmaat zijn niet bevestigd.';
+  return tags.parking ? 'Parkeersignaal gevonden in de brondata; voorwaarden en beschikbaarheid zijn niet bevestigd.' : 'Parkeermogelijkheid en beschikbaarheid moeten vóór boeken worden gecontroleerd.';
+}
+
 function enrichRecommendations(plan, places, trip) {
   const used = new Set();
   const maximumKm = { accommodation: 12, restaurant: 8, activity: 15, fuel: 10, rest: 10, service: 12 };
@@ -167,6 +192,25 @@ function enrichRecommendations(plan, places, trip) {
         url: selected.place.website || selected.place.url,
         lastChecked: new Date().toISOString()
       });
+    }
+    const vehicle = transportId(trip.transport);
+    const anchor = day.toPoint || day.fromPoint;
+    if (validCoordinate(anchor) && !(day.kind === 'return' && day.to === trip.origin)) {
+      const options = places.filter(place => place.type === 'accommodation' && accommodationFitsVehicle(place, vehicle))
+        .map(place => ({ place, distanceKm: haversineKm(anchor, place.point) }))
+        .filter(item => item.distanceKm !== null && item.distanceKm <= 18)
+        .sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 3)
+        .map(({ place, distanceKm }, index) => ({
+          id: `day-${day.day}-accommodation-live-${place.id}`, day: day.day, type: 'accommodation', name: place.name,
+          reason: accommodationEvidence(place, vehicle), point: place.point, vehicleFit: [vehicle], vehicleProfileId: vehicle,
+          confidence: 'OpenStreetMap-locatie', verified: false, live: true, source: 'OpenStreetMap via Overpass',
+          detourKm: Number(distanceKm.toFixed(1)), openingHours: place.openingHours, url: place.website || place.url,
+          lastChecked: new Date().toISOString(), availabilityWarning: 'Prijs en beschikbaarheid zijn niet geverifieerd.', rank: index + 1
+        }));
+      if (options.length) {
+        day.recommendations = [...day.recommendations.filter(item => item.type !== 'accommodation'), ...options];
+        day.accommodationOptions = options;
+      }
     }
     day.sleepProposal = day.recommendations?.find(item => item.type === 'accommodation') || null;
   }

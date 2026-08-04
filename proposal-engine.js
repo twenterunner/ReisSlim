@@ -1,4 +1,5 @@
 import { rankDestinationGroups } from './destination-engine.js';
+import { preferenceBonus } from './preference-engine.js';
 
 const clamp01 = value => Math.max(0, Math.min(1, value));
 const band = (value, size) => Math.floor(Number(value || 0) / size);
@@ -31,7 +32,7 @@ function primaryStyle(item, trip) {
 function focusBonus(item, focus) {
   if (focus === 'closer') return Math.max(0, 12 - item.distanceKm / 90);
   if (focus === 'cheaper') return Math.max(0, (100 - item.dimensions.budget) * -.04 + 6);
-  if (focus === 'surprising') return (item.crowds || 5) * .45 + (item.id === 'slovenia' || item.id === 'dolomites' ? -3 : 2);
+  if (focus === 'surprising') return (item.crowds || 5) * .45 + (item.evidence?.anchors ? Math.min(4, item.evidence.anchors / 10) : 0);
   if (focus === 'family') return (item.dimensions.family || item.family * 10 || 50) * .06;
   if (focus === 'scenic') return (item.dimensions.scenery || 50) * .05 + (item.dimensions.motorcycle || 50) * .02;
   return 0;
@@ -46,10 +47,11 @@ function explainTradeoff(item) {
   return 'Geen harde overschrijding; prijzen en beschikbaarheid blijven wel indicatief.';
 }
 
-function proposalFromDestination(item, trip, focus) {
+function proposalFromDestination(item, trip, focus, learnedProfile = null) {
   const [label, labelReason] = primaryStyle(item, trip);
+  const learned = preferenceBonus(item, learnedProfile);
   const bases = item.bases?.length || 1;
-  const recommendedBases = Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2));
+  const recommendedBases = trip.routeTopology === 'open-jaw' ? Math.min(2, bases) : Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2));
   return {
     ...item,
     proposalId: item.id,
@@ -57,13 +59,20 @@ function proposalFromDestination(item, trip, focus) {
     proposalLabel: label,
     labelReason,
     focusLabel: focusProfiles[focus]?.label || focusProfiles.balanced.label,
-    portfolioScore: item.score + focusBonus(item, focus),
+    portfolioScore: item.score + focusBonus(item, focus) + learned.score,
+    learnedPreferenceReasons: learned.reasons,
     recommendedBases,
-    routeCharacter: trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
+    routeCharacter: trip.travelMode !== 'direct' ? `${trip.travelMode} met lokale ${trip.routeTopology === 'open-jaw' ? 'open-jaw route' : 'rondreis'}` : trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
     tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${item.constraintStatus.travelLegs * 2} reisetappes`,
     keyTradeoff: explainTradeoff(item),
-    evidence: [`Offline regioprofiel met ${item.bases.length} geankerde bases`, `${item.routeStops.length} corridorstops voor routeopbouw`, `Voertuigscore ${item.dimensions.transport}/100`],
-    sourceLabel: item.dynamic ? 'Live ontdekt via OpenStreetMap Overpass; route, plaatsen en weer worden na selectie afzonderlijk gevalideerd' : 'ReisSlim offline regiocatalogus; live route-, plaats- en weerdata wordt na selectie toegevoegd'
+    evidence: [
+      `${item.evidence?.anchors || 0} providerankers en ${item.evidence?.highlights || 0} highlights`,
+      `${item.bases.length} dynamisch afgeleide mogelijke uitvalsbases`,
+      `Voertuigscore ${item.dimensions.transport}/100; neutrale velden: ${(item.evidence?.neutralFields || []).join(', ') || 'geen'}`
+    ],
+    sourceLabel: item.provider?.confidence
+      ? `Dynamisch ontdekt via ${item.discoverySource}; vertrouwen ${item.provider.confidence}, ${item.discoveryCache?.cached ? `exacte cache van ${Math.round(item.discoveryCache.ageMs / 3600000)} uur oud` : `opgehaald ${item.provider.fetchedAt || item.discoveredAt}`}`
+      : 'Opnieuw opgebouwd uit eerder opgeslagen canoniek providerbewijs'
   };
 }
 
@@ -103,9 +112,10 @@ export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = []
   return selected;
 }
 
-export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'balanced', excludedIds = [] } = {}) {
+export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'balanced', excludedIds = [], preferenceProfile = null } = {}) {
   const ranking = rankDestinationGroups(trip, catalog);
-  const candidates = [...ranking.exact, ...ranking.stretched].map(item => proposalFromDestination(item, trip, focus));
+  const requestedMismatch = ranking.rejected.find(item => item.intentMatch) || null;
+  const candidates = [...ranking.exact, ...ranking.stretched].map(item => proposalFromDestination(item, trip, focus, preferenceProfile));
   const visible = selectDiversePortfolio(candidates, { limit: Math.min(12, limit), excludedIds });
   const exact = visible.filter(item => item.category === 'exact');
   const stretched = visible.filter(item => item.category === 'stretch').slice(0, 2);
@@ -122,12 +132,12 @@ export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'bala
     stretched: accepted.filter(item => item.category === 'stretch'),
     visible: accepted,
     candidates,
-    shortage,
+    shortage, requestedMismatch,
     focus,
     focusOptions: focusProfiles
   };
 }
 
-export function getMoreProposals(trip, catalog, shownIds, { limit = 4, focus = 'balanced' } = {}) {
-  return buildProposalPortfolio(trip, catalog, { limit, focus, excludedIds: shownIds }).visible;
+export function getMoreProposals(trip, catalog, shownIds, { limit = 4, focus = 'balanced', preferenceProfile = null } = {}) {
+  return buildProposalPortfolio(trip, catalog, { limit, focus, excludedIds: shownIds, preferenceProfile }).visible;
 }

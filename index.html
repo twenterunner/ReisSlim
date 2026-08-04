@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
-  <title>ReisSlim – slimme roadtripplanner</title>
+  <title>ReisSlim – intelligente wereldreisplanner</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=900">
+  <link rel="stylesheet" href="styles.css?v=1100">
 </head>
 <body>
   <header class="topbar">
     <button id="brandBtn" class="brand" type="button" aria-label="Naar dashboard">
-      <span class="brand-mark">R</span><span><strong>ReisSlim</strong><small>Roadtripplanner</small></span>
+      <span class="brand-mark">R</span><span><strong>ReisSlim</strong><small>Global travel assistant</small></span>
     </button>
     <button id="newTripBtn" class="icon-button" type="button">＋ Nieuwe reis</button>
   </header>
@@ -24,7 +24,7 @@
         <div>
           <p class="eyebrow">Jouw reizen</p>
           <h1>Waar wil je naartoe?</h1>
-          <p>Plan een realistische roadtrip met een passende bestemming, dagindeling, budget en GPX-export.</p>
+          <p>Plan een realistische roadtrip, fly-drive, fly-ride of fly-camper met route, verblijf, readiness, budget en GPX.</p>
         </div>
         <button id="startPlanningBtn" type="button">Start een reis</button>
       </div>
@@ -47,11 +47,9 @@
       </section>
 
       <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">Inspiratie</p><h2>Populaire richtingen</h2></div></div>
+        <div class="section-heading"><div><p class="eyebrow">Wereldwijd</p><h2>Geen vaste bestemmingslijst</h2></div></div>
         <div class="inspiration-grid">
-          <button class="inspiration-card" data-inspire="slovenia" type="button"><span>🏔️</span><strong>Slovenië</strong><small>Meren, bergen en goede waarde</small></button>
-          <button class="inspiration-card" data-inspire="dolomites" type="button"><span>🏍️</span><strong>Dolomieten</strong><small>Bochten, passen en Italiaans eten</small></button>
-          <button class="inspiration-card" data-inspire="blackforest" type="button"><span>🌲</span><strong>Zwarte Woud</strong><small>Dichtbij en gezinsvriendelijk</small></button>
+          <button class="inspiration-card" data-inspire="" type="button"><span>🌍</span><strong>Voer elke bestemming in</strong><small>Land, regio, stad, eiland of natuurgebied</small></button>
         </div>
       </section>
     </section>
@@ -65,15 +63,19 @@
       <section class="panel" id="intakeSection">
         <form id="tripForm">
           <div class="form-grid">
-            <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie Slovenië"></label>
-            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Kies bij voorkeur een plaats uit de offline catalogus voor consistente kaart- en GPX-punten.</small></label>
+            <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie 2027"></label>
+            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Vrije invoer; live geocoding wordt lokaal gecachet.</small><button id="useLocationBtn" class="secondary inline-control" type="button">Gebruik mijn huidige locatie</button></label>
             <datalist id="originOptions"><option>Saasveld</option><option>Amsterdam</option><option>Rotterdam</option><option>Utrecht</option><option>Eindhoven</option><option>Groningen</option><option>Maastricht</option><option>Zwolle</option><option>Enschede</option><option>Hengelo</option><option>Almelo</option><option>Arnhem</option><option>Nijmegen</option></datalist>
+            <label>Gewenste bestemming of richting<input id="destinationQuery" placeholder="Leeg = ReisSlim ontdekt wereldwijd"><small>Bijvoorbeeld Namibië, kust, Scandinavië of “verras me”. Geen vaste regiolijst.</small></label>
             <label>Startdatum<input id="startDate" type="date" required></label>
-            <label>Aantal dagen<input id="days" type="number" min="3" max="30" value="10" required></label>
+            <label>Aantal dagen<input id="days" type="number" min="3" max="60" value="10" required></label>
             <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
             <label>Volwassenen<input id="adults" type="number" min="1" max="8" value="2" required></label>
             <label>Kinderen<input id="children" type="number" min="0" max="8" value="2" required></label>
-            <label>Vervoer<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="motorhome">Camper / motorhome</option><option value="caravan">Auto met caravan</option></select></label>
+            <label>Reisvorm<select id="travelMode"><option value="direct">Roadtrip vanaf huis</option><option value="fly-drive">Fly-drive</option><option value="fly-ride">Fly-ride</option><option value="fly-camper">Fly-camper</option><option value="rail-ferry">Trein / ferry + roadtrip</option></select></label>
+            <label>Voertuig ter plaatse<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="motorhome">Camper / motorhome</option><option value="caravan">Auto met caravan</option></select></label>
+            <label>Routevorm<select id="routeTopology"><option value="loop">Verkennende lus (andere terugweg)</option><option value="out-and-back">Zelfde corridor heen/terug</option><option value="open-jaw">Open-jaw / one-way</option></select></label>
+            <label>Reistempo<select id="tripPace"><option value="relaxed">Rustig</option><option value="balanced" selected>Gebalanceerd</option><option value="active">Actief</option></select></label>
             <label>Max. totale reistijd per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required><small>Inclusief geplande pauzes, brandstof en aankomstbuffer.</small></label>
             <div id="vehicleProfilePanel" class="vehicle-profile-panel wide">
               <div><p class="eyebrow">Voertuigprofiel</p><strong id="vehicleProfileTitle">Auto</strong><small id="vehicleProfileSummary"></small></div>
@@ -84,14 +86,16 @@
               <label class="vehicle-dimension-field">Totale lengte (m)<input id="vehicleLengthM" type="number" min="4" max="20" step="0.1" value="7.2"></label>
               <label class="vehicle-dimension-field">Totaalgewicht (kg)<input id="vehicleWeightKg" type="number" min="1500" max="20000" step="50" value="3500"></label>
             </div>
-            <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
+            <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="0" max="20" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
             <div class="constraint-options wide">
               <label class="check-option"><input id="strictBudget" type="checkbox" checked><span><strong>Budget is een harde grens</strong><small>Uit: het budget wordt een zachte voorkeur en afwijkingen worden expliciet gemarkeerd.</small></span></label>
               <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong><small>Uit: langere rijdagen mogen alleen als duidelijk compromis worden getoond.</small></span></label>
               <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong><small>Uit: extra wissels tellen als zachte afweging.</small></span></label>
               <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Maximaal twee stretch-ideeën tonen</strong><small>Alleen een kleine budget-, reistijd- of wisselafwijking; nooit voertuigveiligheid, vertrek of terugkeer.</small></span></label>
-              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer proberen</strong><small>Gebruikt OpenStreetMap-, route- en weerdata met automatische offline fallback.</small></span></label>
+              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Dynamische ontdekking en live data</strong><small>Gebruikt actuele providerdata en alleen een exact passende cache; nooit een verborgen bestemmingscatalogus.</small></span></label>
+              <label class="check-option"><input id="remoteTravel" type="checkbox"><span><strong>Afgelegen / expeditieroute</strong><small>Voegt strengere controles toe voor brandstof, water, communicatie, permits en evacuatie.</small></span></label>
+              <label class="check-option"><input id="privateMode" type="checkbox"><span><strong>Privémodus</strong><small>Leert niet van bewaren, kiezen of afwijzen. Bestaande lokale voorkeuren blijven onaangeroerd.</small></span></label>
             </div>
             <details class="integration-settings wide"><summary>Optionele live route voor camper en caravan</summary><label>OpenRouteService API-sleutel<input id="orsApiKey" type="password" autocomplete="off" placeholder="Alleen lokaal op dit apparaat"><small>Wordt apart in je browser opgeslagen en nooit opgenomen in reisexport of GitHub-code.</small></label></details>
           </div>
@@ -112,8 +116,11 @@
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
+        <div id="planImages" class="inspiration-grid"></div>
         <div id="planWarnings" aria-live="polite"></div>
         <div id="weatherSummary" class="weather-summary"></div>
+        <section class="readiness-card"><div class="section-heading"><div><p class="eyebrow">Travel Readiness</p><h2>Wat moet nog bevestigd worden?</h2></div><strong id="readinessScore">—</strong></div><p id="readinessDisclaimer" class="muted"></p><div id="readinessList"></div></section>
+        <section class="assistant-card"><p class="eyebrow">ReisSlim Assistant</p><h2>Pas je reis aan in gewone taal</h2><div class="assistant-input"><input id="assistantMessage" placeholder="Bijvoorbeeld: maak de reis rustiger en met minder wissels"><button id="assistantPreviewBtn" type="button">Bekijk wijziging</button></div><div id="assistantPreview" aria-live="polite"></div><div class="actions compact"><button id="assistantApplyBtn" class="hidden" type="button">Bevestig wijziging</button><button id="assistantCancelBtn" class="secondary hidden" type="button">Annuleer</button></div></section>
         <p id="gpxNotice" class="trust-notice"></p>
         <div class="itinerary-optimizer-grid">
           <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
@@ -155,19 +162,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.9.0 · Build 900 · Dynamic portfolio intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.1.0 · Build 1100 · Zero-catalogue travel intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="importmap">
-    {"imports":{
-      "./config.js":"./config.js?v=900","./destinations.js":"./destinations.js?v=900","./destination-provider.js":"./destination-provider.js?v=900","./trip-model.js":"./trip-model.js?v=900",
-      "./route-engine.js":"./route-engine.js?v=900","./storage.js":"./storage.js?v=900","./destination-engine.js":"./destination-engine.js?v=900",
-      "./constraint-engine.js":"./constraint-engine.js?v=900","./plan-solver.js":"./plan-solver.js?v=900","./itinerary-engine.js":"./itinerary-engine.js?v=900",
-      "./itinerary-validator.js":"./itinerary-validator.js?v=900","./budget-engine.js":"./budget-engine.js?v=900","./trip-quality-engine.js":"./trip-quality-engine.js?v=900",
-      "./trip-optimizer.js":"./trip-optimizer.js?v=900","./proposal-engine.js":"./proposal-engine.js?v=900","./itinerary-variants.js":"./itinerary-variants.js?v=900","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=900","./recommendation-engine.js":"./recommendation-engine.js?v=900",
-      "./routing-provider.js":"./routing-provider.js?v=900","./place-provider.js":"./place-provider.js?v=900","./map-view.js":"./map-view.js?v=900",
-      "./gpx-generator.js":"./gpx-generator.js?v=900","./ui-renderer.js":"./ui-renderer.js?v=900"
-    }}
-  </script>
-  <script type="module" src="app.js?v=900"></script>
+  <script type="module" src="app.js?v=1100"></script>
 </body>
 </html>

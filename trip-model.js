@@ -3,9 +3,9 @@ import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence
 
 const FIELD_IDS = [
   'tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children',
-  'transport', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
+  'transport', 'travelMode', 'routeTopology', 'tripPace', 'destinationQuery', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
   'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg',
-  'maxDrive', 'maxChanges', 'comfort', 'strictBudget', 'strictDrive', 'strictChanges', 'allowStretch', 'liveData', 'notes'
+  'maxDrive', 'maxChanges', 'comfort', 'strictBudget', 'strictDrive', 'strictChanges', 'allowStretch', 'liveData', 'remoteTravel', 'privateMode', 'notes'
 ];
 
 export function uniqueId() {
@@ -31,7 +31,8 @@ export function normalizeTrip(input = {}) {
     ? input.preferences.filter(id => preferenceDefinitions.some(([known]) => known === id))
     : [];
   const weights = Object.fromEntries(preferences.map(id => [id, Math.max(1, Math.min(3, Number(input.preferenceWeights?.[id]) || 2))]));
-  const transport = transportId(input.transport);
+  const travelMode = ['direct', 'fly-drive', 'fly-ride', 'fly-camper', 'rail-ferry'].includes(input.travelMode) ? input.travelMode : 'direct';
+  const transport = transportId({ 'fly-drive': 'car', 'fly-ride': 'motorcycle', 'fly-camper': 'motorhome' }[travelMode] || input.transport);
   const spec = vehicleSpec({ ...input, transport });
   return {
     id: input.id || uniqueId(),
@@ -44,6 +45,11 @@ export function normalizeTrip(input = {}) {
     adults: Number(input.adults),
     children: Number(input.children || 0),
     transport,
+    travelMode,
+    routeTopology: ['loop', 'out-and-back', 'open-jaw'].includes(input.routeTopology) ? input.routeTopology : 'loop',
+    tripPace: ['relaxed', 'balanced', 'active'].includes(input.tripPace) ? input.tripPace : 'balanced',
+    destinationQuery: String(input.destinationQuery || '').trim().slice(0, 100),
+    destinationPoint: validCoordinate(input.destinationPoint) ? { lat: Number(input.destinationPoint.lat), lon: Number(input.destinationPoint.lon), name: String(input.destinationPoint.name || input.destinationQuery || '').trim() } : null,
     routeStyle: spec.routeStyle,
     fuelRangeKm: spec.fuelRangeKm,
     vehicleMaxSpeedKmh: spec.maxSpeedKmh,
@@ -58,6 +64,8 @@ export function normalizeTrip(input = {}) {
     strictChanges: input.strictChanges !== false && input.strictChanges !== 'false',
     allowStretch: input.allowStretch !== false && input.allowStretch !== 'false',
     liveData: input.liveData !== false && input.liveData !== 'false',
+    remoteTravel: input.remoteTravel === true || input.remoteTravel === 'true',
+    privateMode: input.privateMode === true || input.privateMode === 'true',
     notes: String(input.notes || '').trim().slice(0, 500),
     preferences,
     preferenceWeights: weights,
@@ -69,12 +77,12 @@ export function validateTripInput(trip) {
   const errors = [];
   if (!trip.origin) errors.push('Vul een vertrekplaats in.');
   if (!trip.startDate || Number.isNaN(new Date(`${trip.startDate}T12:00:00`).getTime())) errors.push('Kies een geldige startdatum.');
-  if (!Number.isInteger(trip.days) || trip.days < 3 || trip.days > 30) errors.push('Kies 3 tot 30 reisdagen.');
+  if (!Number.isInteger(trip.days) || trip.days < 3 || trip.days > 60) errors.push('Kies 3 tot 60 reisdagen.');
   if (!Number.isFinite(trip.budget) || trip.budget < 500) errors.push('Het budget moet minimaal €500 zijn.');
   if (!Number.isInteger(trip.adults) || trip.adults < 1 || trip.adults > 8) errors.push('Kies 1 tot 8 volwassenen.');
   if (!Number.isInteger(trip.children) || trip.children < 0 || trip.children > 8) errors.push('Kies 0 tot 8 kinderen.');
   if (!Number.isFinite(trip.maxDrive) || trip.maxDrive < 2 || trip.maxDrive > 10) errors.push('Kies 2 tot 10 uur maximale rijtijd per dag.');
-  if (!Number.isInteger(trip.maxChanges) || trip.maxChanges < 1 || trip.maxChanges > 10) errors.push('Kies 1 tot 10 accommodatiewissels.');
+  if (!Number.isInteger(trip.maxChanges) || trip.maxChanges < 0 || trip.maxChanges > 20) errors.push('Kies 0 tot 20 accommodatiewissels.');
   if (!Number.isFinite(trip.fuelRangeKm) || trip.fuelRangeKm < 100 || trip.fuelRangeKm > 1500) errors.push('Kies een actieradius van 100 tot 1.500 kilometer.');
   const profile = vehicleProfile(trip);
   if (profile.supportsDimensions) {
@@ -99,6 +107,7 @@ export function readTripForm(existing = null, root = document) {
     id: existingTrip?.id || existing || undefined,
     ...values,
     originPoint: existingTrip?.origin === values.origin ? existingTrip.originPoint : null,
+    destinationPoint: existingTrip?.destinationQuery === values.destinationQuery ? existingTrip.destinationPoint : null,
     preferences,
     preferenceWeights
   });

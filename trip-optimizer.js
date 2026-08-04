@@ -21,7 +21,7 @@ function actionCatalogue(trip, destination, plan, locks = {}) {
   const localDistance = stayDays.reduce((sum, day) => sum + Number(day.distanceKm || 0), 0);
   const actions = [
     {
-      id: 'consolidate', title: 'Uitvalsbases consolideren', lock: 'accommodation', applicable: plan.days.some(day => day.kind === 'transfer'),
+      id: 'consolidate', title: 'Uitvalsbases consolideren', lock: 'accommodation', applicable: trip.travelMode === 'direct' && plan.days.some(day => day.kind === 'transfer'),
       description: 'Verwijdert een lokale accommodatiewissel en maakt er een dagtrip vanaf de bestaande basis van.'
     },
     {
@@ -75,7 +75,7 @@ function applyAction(plan, actionId, trip, destination) {
     next.optimizationEvidence.restBuffers = Number(next.optimizationEvidence.restBuffers || 0) + 1;
   }
   if (actionId === 'local') {
-    for (const day of next.days.filter(item => ['stay', 'flex', 'transfer'].includes(item.kind))) {
+    for (const day of next.days.filter(item => ['stay', 'flex'].includes(item.kind))) {
       day.distanceKm = Math.round(Number(day.distanceKm || 0) * .72);
       day.roadHours = Number((Number(day.roadHours || day.driveHours || 0) * .72).toFixed(1));
       day.driveHours = day.roadHours; day.elapsedHours = day.roadHours;
