@@ -1,20 +1,13 @@
-# ReisSlim v0.2.0 — Stability Sprint
+# ReisSlim v0.2.1 Stable (Build 201)
 
-Dutch road-trip planning proof of principle, designed for GitHub Pages.
+Hotfix release for GitHub Pages/mobile deployment.
 
-## Changes in v0.2.0 (Build 200)
+## Fixes
+- Replaced fragile multi-module startup with one self-contained `app.js`.
+- Added visible error reporting when proposal generation fails.
+- Added UUID fallback for browsers without `crypto.randomUUID()`.
+- Updated service-worker cache strategy and cache version.
+- Preserved autosave, destination ranking, itinerary, budget, map, JSON and GPX exports.
 
-- Fixed loss/reset of entered form values.
-- Added automatic draft saving for every field and preference.
-- Restores unfinished input after refresh or browser restart.
-- Uses explicit DOM references instead of browser-created global variables.
-- Added validation feedback before destination generation.
-- Added local-storage migration from the v0.1 draft key.
-- Updated service-worker cache and release version.
-- Existing destination ranking, itinerary, budget, map, JSON and GPX functions remain available.
-
-## Deploy on GitHub Pages
-
-Upload every file in this folder to the repository root. In **Settings → Pages**, select **Deploy from a branch**, `main`, and `/(root)`.
-
-After replacing an older version, refresh the page twice or close and reopen the installed PWA so the updated service worker becomes active.
+## Deployment
+Upload every file in this package to the root of the GitHub repository and replace existing files. Wait for GitHub Pages to redeploy, then close all open ReisSlim tabs and reopen the site. If installed as a PWA, close it fully and open it again.
