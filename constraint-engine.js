@@ -67,24 +67,28 @@ export function evaluateDestinationConstraints(trip, { route, relaxedRoute = nul
     ));
   }
 
-  const exact = violations.length === 0;
-  const stretch = !exact && trip.allowStretch !== false && violations.length === 1 && violations[0].stretchable;
+  const isHard = issue => issue.key === 'budget' ? trip.strictBudget !== false : issue.key === 'maxChanges' ? trip.strictChanges !== false : ['maxDrive', 'days'].includes(issue.key) ? trip.strictDrive !== false : true;
+  const softConstraints = violations.filter(issue => !isHard(issue));
+  const hardViolations = violations.filter(isHard);
+  const exact = hardViolations.length === 0;
+  const stretch = !exact && trip.allowStretch !== false && hardViolations.length === 1 && hardViolations[0].stretchable;
   const category = exact ? 'exact' : stretch ? 'stretch' : 'rejected';
   return {
     category,
     exact,
     stretch,
     selectable: exact || stretch,
-    violations,
+    violations: hardViolations,
+    softConstraints,
     travelLegs,
     normalTravelLegs: route.requiredLegs,
     minimumDays,
     normalMinimumDays,
     minimumChanges,
-    stretchPenalty: violations.reduce((sum, item) => sum + item.severity, 0),
+    stretchPenalty: hardViolations.reduce((sum, item) => sum + item.severity, 0),
     summary: exact
-      ? 'Past binnen budget, reisduur, dagelijkse reistijd en accommodatiewissels.'
-      : violations.map(item => item.detail).join(' ')
+      ? softConstraints.length ? `Harde voorwaarden gehaald; ${softConstraints.length} zachte voorkeur vraagt aandacht.` : 'Past binnen budget, reisduur, dagelijkse reistijd en accommodatiewissels.'
+      : hardViolations.map(item => item.detail).join(' ')
   };
 }
 
@@ -123,17 +127,21 @@ export function evaluatePlanConstraints(trip, plan, budget, { allowStretch = fal
     ));
   }
 
-  const exact = violations.length === 0;
-  const stretch = !exact && allowStretch && violations.length === 1 && violations[0].stretchable;
+  const isHard = issue => issue.key === 'budget' ? trip.strictBudget !== false : issue.key === 'maxChanges' ? trip.strictChanges !== false : issue.key === 'maxDrive' ? trip.strictDrive !== false : true;
+  const softConstraints = violations.filter(issue => !isHard(issue));
+  const hardViolations = violations.filter(isHard);
+  const exact = hardViolations.length === 0;
+  const stretch = !exact && allowStretch && hardViolations.length === 1 && hardViolations[0].stretchable;
   return {
     category: exact ? 'exact' : stretch ? 'stretch' : 'rejected',
     exact,
     stretch,
     feasible: exact,
     selectable: exact || stretch,
-    violations,
+    violations: hardViolations,
+    softConstraints,
     maxElapsed,
-    summary: exact ? 'Alle harde reisvoorwaarden worden gerespecteerd.' : violations.map(item => item.detail).join(' ')
+    summary: exact ? softConstraints.length ? `Alle harde voorwaarden worden gerespecteerd; ${softConstraints.length} zachte voorkeur vraagt aandacht.` : 'Alle harde reisvoorwaarden worden gerespecteerd.' : hardViolations.map(item => item.detail).join(' ')
   };
 }
 

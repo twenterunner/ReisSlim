@@ -1,50 +1,62 @@
-import { clamp, roundScore } from './config.js';
+import { clamp } from './config.js';
 
 const weightedAverage = (dimensions, weights) => Object.entries(weights)
   .reduce((sum, [key, weight]) => sum + dimensions[key] * weight, 0)
   / Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+const round = value => Math.round(clamp(value));
 
 export function calculateTripQuality(trip, destination, plan, budget) {
-  const travelDays = plan.days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind)).length;
-  const stayDays = plan.days.length - travelDays;
-  const excessive = plan.days.filter(day => day.exceedsDailyLimit).length;
-  const flexible = plan.days.some(day => day.kind === 'flex');
-  const variety = new Set(plan.days.map(day => day.activityType).filter(Boolean)).size;
+  const days = plan.days || [];
+  const travelDays = days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind)).length;
+  const stayDays = days.length - travelDays;
+  const excessive = days.filter(day => day.exceedsDailyLimit || Number(day.elapsedHours ?? day.driveHours ?? 0) > trip.maxDrive + .05).length;
+  const maxElapsed = Math.max(0, ...days.map(day => Number(day.elapsedHours ?? day.driveHours ?? 0)));
+  const flexDays = days.filter(day => day.kind === 'flex').length;
+  const activityTypes = new Set(days.map(day => day.activityType).filter(type => type && type !== 'rust'));
   const budgetRatio = budget.total / Math.max(1, trip.budget);
-  const recommendationCoverage = plan.days.filter(day => day.recommendations?.length).length / Math.max(1, plan.days.length);
-  const dimensions = {
-    driving: roundScore(100 - excessive * 30 - Math.max(0, travelDays / trip.days - .45) * 100),
-    budget: roundScore(100 - Math.max(0, budgetRatio - .9) * 160),
-    relaxation: roundScore(90 - Math.max(0, plan.accommodationChanges - trip.maxChanges) * 15 + (flexible ? 10 : 0)),
-    family: roundScore(trip.children ? destination.family * 10 - excessive * 15 : 80),
-    adventure: roundScore((destination.dimensions?.scenery ?? 60) * .55 + (destination.dimensions?.walking ?? 60) * .25 + (destination.dimensions?.swimming ?? 60) * .2),
-    weather: roundScore(destination.weather * 10 - plan.days.filter(day => !day.rainAlternative).length * 10),
-    variety: roundScore(45 + variety * 15),
-    crowds: roundScore(destination.crowds * 10),
-    realism: roundScore((plan.days.length === trip.days ? 30 : 0) + (plan.feasible ? 35 : 0) + (plan.routeMetrics.originKnown ? 15 : 5) + recommendationCoverage * 10 + (plan.routing?.live ? 10 : 5))
+  const recommendationCoverage = days.filter(day => day.recommendations?.length).length / Math.max(1, days.length);
+  const namedPlaces = (plan.recommendations || []).filter(item => item.live || item.verified).length;
+  const rainCoverage = days.filter(day => !['outward', 'return'].includes(day.kind) && day.rainAlternative).length / Math.max(1, days.filter(day => !['outward', 'return'].includes(day.kind)).length);
+  const localDistance = days.filter(day => ['stay', 'flex', 'transfer'].includes(day.kind)).reduce((sum, day) => sum + Number(day.distanceKm || 0), 0);
+  const changeExcess = Math.max(0, plan.accommodationChanges - trip.maxChanges);
+  const driveUtilisation = maxElapsed / Math.max(1, trip.maxDrive);
+  const rawDimensions = {
+    driving: clamp(96 - excessive * 34 - Math.max(0, driveUtilisation - .88) * 55 - Math.max(0, travelDays / Math.max(1, trip.days) - .45) * 75 - Math.max(0, localDistance / Math.max(1, trip.days) - 45) * .18),
+    budget: clamp(98 - Math.max(0, budgetRatio - .82) * 135 - (budget.conservativeTotal > trip.budget ? 6 : 0)),
+    relaxation: clamp(76 + Math.min(14, flexDays * 8) - changeExcess * 22 - Math.max(0, travelDays - stayDays) * 4 + (plan.optimizationEvidence?.restBuffers || 0) * 4),
+    family: clamp(trip.children ? (destination.family || 5) * 9.5 - excessive * 18 + flexDays * 3 : 80),
+    adventure: clamp((destination.dimensions?.scenery ?? 60) * .55 + (destination.dimensions?.walking ?? 60) * .25 + (destination.dimensions?.swimming ?? 60) * .2),
+    weather: clamp((destination.weather || 5) * 8 + rainCoverage * 20 + (plan.optimizationEvidence?.weatherChecked ? 6 : 0)),
+    variety: clamp(42 + activityTypes.size * 14 + Math.min(10, flexDays * 3)),
+    crowds: clamp((destination.crowds || 5) * 10),
+    realism: clamp((days.length === trip.days ? 28 : 0) + (plan.feasible ? 27 : 5) + (plan.routeMetrics?.originKnown ? 13 : 5) + recommendationCoverage * 12 + (plan.routing?.live ? 12 : 6) + Math.min(5, namedPlaces))
   };
-  const weights = { driving: 1.3, budget: 1.1, relaxation: 1, family: trip.children ? 1 : .4, adventure: .8, weather: .8, variety: .7, crowds: .5, realism: 1.4 };
-  const calculatedOverall = roundScore(weightedAverage(dimensions, weights));
-  const overall = plan.constraintStatus?.category === 'rejected'
-    ? Math.min(55, calculatedOverall)
-    : plan.constraintStatus?.category === 'stretch' ? Math.min(70, calculatedOverall) : calculatedOverall;
+  const weights = { driving: 1.35, budget: 1.15, relaxation: 1.05, family: trip.children ? 1 : .4, adventure: .75, weather: .85, variety: .7, crowds: .45, realism: 1.45 };
+  let rawOverall = weightedAverage(rawDimensions, weights);
+  if (plan.constraintStatus?.category === 'rejected') rawOverall = Math.min(55, rawOverall);
+  else if (plan.constraintStatus?.category === 'stretch') rawOverall = Math.min(70, rawOverall);
+  const dimensions = Object.fromEntries(Object.entries(rawDimensions).map(([key, value]) => [key, round(value)]));
   const deductions = [];
   if (excessive) deductions.push(`${excessive} rijdag${excessive === 1 ? '' : 'en'} boven de ingestelde limiet.`);
   if (budget.total > trip.budget) deductions.push(`Indicatieve begroting €${budget.total - trip.budget} boven budget.`);
-  if (plan.accommodationChanges > trip.maxChanges) deductions.push('Meer accommodatiewissels dan gewenst.');
-  if (!plan.routeMetrics.originKnown) deductions.push('Vertrekcoördinaten ontbreken in de offline catalogus.');
+  if (budget.conservativeTotal > trip.budget && budget.total <= trip.budget) deductions.push('De voorzichtige bovengrens ligt boven budget; houd extra reserve aan.');
+  if (changeExcess) deductions.push('Meer accommodatiewissels dan gewenst.');
+  if (!plan.routeMetrics?.originKnown) deductions.push('Vertrekcoördinaten ontbreken in de offline catalogus.');
   if (!plan.routing?.live) deductions.push('De route gebruikt nog een offline corridorraming in plaats van live wegdata.');
-  if (!flexible && stayDays >= 3) deductions.push('Geen expliciete flexibele rustdag.');
+  if (!flexDays && stayDays >= 3) deductions.push('Geen expliciete flexibele rustdag.');
+  if (rainCoverage < 1) deductions.push('Niet iedere verblijfsdag heeft een concreet regenalternatief.');
   const recommendations = [];
   if (excessive) recommendations.push({ key: 'driving', text: `Voeg minimaal ${Math.max(1, plan.minimumDays - trip.days)} reisdag(en) toe of kies een dichterbij gelegen bestemming.`, impact: Math.min(30, excessive * 10) });
-  if (!flexible && stayDays >= 3) recommendations.push({ key: 'relaxation', text: 'Maak één verblijfsdag flexibel en plan daar geen verplichte hoofdactiviteit.', impact: 5 });
-  if (plan.accommodationChanges > trip.maxChanges) recommendations.push({ key: 'changes', text: 'Gebruik één bestemmingbasis en maak andere plaatsen dagtrips.', impact: 10 });
-  if (variety < 3) recommendations.push({ key: 'variety', text: 'Wissel natuur, cultuur, water en rust bewuster af.', impact: 5 });
-  if (budget.total > trip.budget) recommendations.push({ key: 'budget', text: 'Verlaag accommodatiecomfort of restaurantaandeel; verhoog het budget niet automatisch.', impact: 10 });
+  if (!flexDays && stayDays >= 3) recommendations.push({ key: 'relaxation', text: 'Maak één verblijfsdag flexibel en plan daar geen verplichte hoofdactiviteit.', impact: 8 });
+  if (changeExcess) recommendations.push({ key: 'changes', text: 'Gebruik één bestemmingbasis en maak andere plaatsen dagtrips.', impact: 12 });
+  if (activityTypes.size < 3) recommendations.push({ key: 'variety', text: 'Wissel natuur, cultuur, water en rust bewuster af.', impact: 10 });
+  if (budget.total > trip.budget || budget.conservativeTotal > trip.budget) recommendations.push({ key: 'budget', text: 'Kies aantoonbaar goedkopere verblijven en minder betaalde activiteiten; verhoog het budget niet automatisch.', impact: 12 });
+  if (rainCoverage < 1) recommendations.push({ key: 'weather', text: 'Koppel iedere buitenactiviteit aan een specifieke binnenoptie in dezelfde regio.', impact: 10 });
   if (!recommendations.length) recommendations.push({ key: 'general', text: 'Het plan is evenwichtig; controleer vlak voor vertrek live omstandigheden en prijzen.', impact: 0 });
   return {
-    overall: clamp(overall), dimensions, deductions,
+    overall: round(rawOverall), rawOverall, dimensions, rawDimensions, deductions,
     recommendations: recommendations.slice(0, 5),
-    disclaimer: 'Planning-quality indicator op basis van transparante vuistregels; geen wetenschappelijk gevalideerde score.'
+    evidence: { excessiveDays: excessive, maxElapsed, flexDays, activityTypes: activityTypes.size, rainCoverage, localDistanceKm: Math.round(localDistance), budgetRatio },
+    disclaimer: 'Planning-quality indicator op basis van transparante, deterministische vuistregels; geen wetenschappelijk gevalideerde score.'
   };
 }

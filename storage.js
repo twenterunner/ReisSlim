@@ -2,9 +2,9 @@ import { ENGINE_VERSION, STORAGE_SCHEMA_VERSION } from './config.js';
 import { normalizeTrip } from './trip-model.js';
 
 export const STORAGE_KEYS = {
-  current: 'reisslim.current.v5', trips: 'reisslim.trips.v5',
-  legacyCurrent: ['reisslim.current.v4', 'reisslim.current.v3', 'reisslim.current.v2', 'reisslim.current'],
-  legacyTrips: ['reisslim.trips.v4', 'reisslim.trips.v3', 'reisslim.trips.v2']
+  current: 'reisslim.current.v6', trips: 'reisslim.trips.v6',
+  legacyCurrent: ['reisslim.current.v5', 'reisslim.current.v4', 'reisslim.current.v3', 'reisslim.current.v2', 'reisslim.current'],
+  legacyTrips: ['reisslim.trips.v5', 'reisslim.trips.v4', 'reisslim.trips.v3', 'reisslim.trips.v2']
 };
 
 function safeParse(value, fallback) {
@@ -19,7 +19,11 @@ export function migrateState(input) {
     engineVersion: ENGINE_VERSION,
     trip,
     destinationId: input.destinationId || input.destination?.id || null,
-    compareIds: Array.isArray(input.compareIds) ? input.compareIds.slice(0, 3) : [],
+    destinationProfile: input.destinationProfile?.dynamic ? input.destinationProfile : null,
+    compareIds: Array.isArray(input.compareIds) ? input.compareIds.slice(0, 4) : [],
+    savedProposalIds: Array.isArray(input.savedProposalIds) ? input.savedProposalIds : [],
+    dismissedIds: Array.isArray(input.dismissedIds) ? input.dismissedIds : [],
+    selectedVariantId: input.selectedVariantId || null,
     optimized: Boolean(input.optimized),
     needsRebuild: Number(input.engineVersion) !== ENGINE_VERSION || !input.plan,
     savedAt: input.savedAt || new Date().toISOString()

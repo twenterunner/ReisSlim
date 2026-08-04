@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=800">
+  <link rel="stylesheet" href="styles.css?v=900">
 </head>
 <body>
   <header class="topbar">
@@ -87,6 +87,9 @@
             <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="1" max="10" value="5" required><small>Inclusief noodzakelijke overnachtingen onderweg.</small></label>
             <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
             <div class="constraint-options wide">
+              <label class="check-option"><input id="strictBudget" type="checkbox" checked><span><strong>Budget is een harde grens</strong><small>Uit: het budget wordt een zachte voorkeur en afwijkingen worden expliciet gemarkeerd.</small></span></label>
+              <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong><small>Uit: langere rijdagen mogen alleen als duidelijk compromis worden getoond.</small></span></label>
+              <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong><small>Uit: extra wissels tellen als zachte afweging.</small></span></label>
               <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Maximaal twee stretch-ideeën tonen</strong><small>Alleen een kleine budget-, reistijd- of wisselafwijking; nooit voertuigveiligheid, vertrek of terugkeer.</small></span></label>
               <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer proberen</strong><small>Gebruikt OpenStreetMap-, route- en weerdata met automatische offline fallback.</small></span></label>
             </div>
@@ -100,11 +103,12 @@
       </section>
 
       <section id="resultsSection" class="hidden">
-        <section class="panel"><div class="section-heading"><div><p class="eyebrow">Stap 1</p><h2>Beste bestemmingen</h2></div><span id="resultCount" class="badge"></span></div><div id="destinationCards" class="card-grid"></div></section><section id="compareSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Vergelijking</p><h2>Vergelijk geselecteerde bestemmingen</h2></div><button id="clearCompareBtn" class="secondary" type="button">Wis selectie</button></div><div id="comparisonTable" class="comparison-wrap"></div></section>
+        <section class="panel"><div class="section-heading"><div><p class="eyebrow">Stap 1</p><h2>Een diverse reisportfolio</h2></div><span id="resultCount" class="badge"></span></div><div class="portfolio-toolbar"><label>Focus<select id="proposalFocus"><option value="balanced">Beste mix</option><option value="closer">Dichterbij</option><option value="cheaper">Voordeliger</option><option value="surprising">Meer verrassend</option><option value="family">Gezinsvriendelijk</option><option value="scenic">Mooiste route</option></select></label><button id="moreProposalsBtn" class="secondary" type="button">Toon meer reisopties</button></div><div id="portfolioNotice" class="portfolio-notice" aria-live="polite"></div><div id="destinationCards" class="card-grid"></div></section><section id="compareSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Vergelijking</p><h2>Vergelijk maximaal vier reisconcepten</h2></div><button id="clearCompareBtn" class="secondary" type="button">Wis selectie</button></div><div id="comparisonTable" class="comparison-wrap"></div></section>
       </section>
     </section>
 
     <section id="itineraryView" class="app-view">
+      <section id="variantSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Stap 2</p><h1>Kies de opbouw van je reis</h1><p class="muted">Vergelijk tempo, kosten, rijbelasting en wissels voordat het detailplan wordt gemaakt.</p></div></div><div id="variantCards" class="variant-grid"></div></section>
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
@@ -121,7 +125,12 @@
             <div id="qualityDeductions" class="deduction-box"></div>
             <div class="recommendation-box"><h3>Topaanbevelingen</h3><ol id="qualityRecommendations"></ol></div>
             <div id="optimizationSummary" class="optimization-summary" aria-live="polite"></div>
-            <button id="improveTripBtn" type="button" class="improve-button">Verbeter mijn reis</button>
+            <label>Optimalisatiemodus<select id="optimizationMode"><option value="balanced">Gebalanceerd</option><option value="relaxed">Meer rust</option><option value="value">Lagere kosten</option><option value="active">Meer beleven</option></select></label>
+            <div class="optimizer-locks"><strong>Vergrendel</strong><label><input type="checkbox" data-optimizer-lock="route"> Route</label><label><input type="checkbox" data-optimizer-lock="accommodation"> Verblijven</label><label><input type="checkbox" data-optimizer-lock="activities"> Activiteiten</label><label><input type="checkbox" data-optimizer-lock="budget"> Budgetkeuzes</label></div>
+            <div id="optimizationPreview" class="optimization-preview"></div>
+            <button id="improveTripBtn" type="button" class="improve-button">Bekijk verbeteringen</button>
+            <button id="applyOptimizationBtn" type="button" class="improve-button hidden">Pas geselecteerde verbeteringen toe</button>
+            <button id="rejectOptimizationBtn" type="button" class="secondary improve-button hidden">Sluit voorstel</button>
             <button id="undoOptimizeBtn" type="button" class="secondary improve-button hidden">Maak verbetering ongedaan</button>
           </aside>
         </div>
@@ -146,19 +155,19 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v0.8.0 · Build 800 · Constraint-first intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v0.9.0 · Build 900 · Dynamic portfolio intelligence</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="importmap">
     {"imports":{
-      "./config.js":"./config.js?v=800","./destinations.js":"./destinations.js?v=800","./trip-model.js":"./trip-model.js?v=800",
-      "./route-engine.js":"./route-engine.js?v=800","./storage.js":"./storage.js?v=800","./destination-engine.js":"./destination-engine.js?v=800",
-      "./constraint-engine.js":"./constraint-engine.js?v=800","./plan-solver.js":"./plan-solver.js?v=800","./itinerary-engine.js":"./itinerary-engine.js?v=800",
-      "./itinerary-validator.js":"./itinerary-validator.js?v=800","./budget-engine.js":"./budget-engine.js?v=800","./trip-quality-engine.js":"./trip-quality-engine.js?v=800",
-      "./trip-optimizer.js":"./trip-optimizer.js?v=800","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=800","./recommendation-engine.js":"./recommendation-engine.js?v=800",
-      "./routing-provider.js":"./routing-provider.js?v=800","./place-provider.js":"./place-provider.js?v=800","./map-view.js":"./map-view.js?v=800",
-      "./gpx-generator.js":"./gpx-generator.js?v=800","./ui-renderer.js":"./ui-renderer.js?v=800"
+      "./config.js":"./config.js?v=900","./destinations.js":"./destinations.js?v=900","./destination-provider.js":"./destination-provider.js?v=900","./trip-model.js":"./trip-model.js?v=900",
+      "./route-engine.js":"./route-engine.js?v=900","./storage.js":"./storage.js?v=900","./destination-engine.js":"./destination-engine.js?v=900",
+      "./constraint-engine.js":"./constraint-engine.js?v=900","./plan-solver.js":"./plan-solver.js?v=900","./itinerary-engine.js":"./itinerary-engine.js?v=900",
+      "./itinerary-validator.js":"./itinerary-validator.js?v=900","./budget-engine.js":"./budget-engine.js?v=900","./trip-quality-engine.js":"./trip-quality-engine.js?v=900",
+      "./trip-optimizer.js":"./trip-optimizer.js?v=900","./proposal-engine.js":"./proposal-engine.js?v=900","./itinerary-variants.js":"./itinerary-variants.js?v=900","./vehicle-intelligence.js":"./vehicle-intelligence.js?v=900","./recommendation-engine.js":"./recommendation-engine.js?v=900",
+      "./routing-provider.js":"./routing-provider.js?v=900","./place-provider.js":"./place-provider.js?v=900","./map-view.js":"./map-view.js?v=900",
+      "./gpx-generator.js":"./gpx-generator.js?v=900","./ui-renderer.js":"./ui-renderer.js?v=900"
     }}
   </script>
-  <script type="module" src="app.js?v=800"></script>
+  <script type="module" src="app.js?v=900"></script>
 </body>
 </html>

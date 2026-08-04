@@ -19,12 +19,13 @@ export function buildBudget(trip, destination, itinerary = null) {
     ?? trip.days * 45;
   const totalDistanceKm = route.oneWayDistanceKm * 2 + localDistanceKm;
   const accommodationUnits = ['motorhome', 'caravan'].includes(transport) ? 1 : rooms;
-  const accommodation = roundMoney(nights * destination.nightMid * accommodationUnits * comfort * profile.accommodationFactor);
+  const strategy = itinerary?.costStrategy || {};
+  const accommodation = roundMoney(nights * destination.nightMid * accommodationUnits * comfort * profile.accommodationFactor * (strategy.accommodationFactor || 1));
   const fuel = roundMoney(totalDistanceKm / 100 * profile.consumption * budgetAssumptions.fuelPricePerLitre);
   const parking = roundMoney(Math.max(0, trip.days - 2) * profile.parkingDaily);
   const groceries = roundMoney(trip.days * equivalents * budgetAssumptions.groceriesPerEquivalentDay * (1 - restaurantShare));
-  const restaurants = roundMoney(trip.days * equivalents * budgetAssumptions.restaurantPerEquivalentDay * restaurantShare);
-  const activities = roundMoney(trip.days * destination.activityDaily * (equivalents / 3.2));
+  const restaurants = roundMoney(trip.days * equivalents * budgetAssumptions.restaurantPerEquivalentDay * restaurantShare * (strategy.restaurantFactor || 1));
+  const activities = roundMoney(trip.days * destination.activityDaily * (equivalents / 3.2) * (strategy.activityFactor || 1));
   const tolls = roundMoney(destination.toll * profile.tollFactor);
   const subtotal = accommodation + fuel + tolls + parking + groceries + restaurants + activities;
   const contingency = roundMoney(Math.max(budgetAssumptions.minimumContingency, subtotal * budgetAssumptions.contingencyRate));

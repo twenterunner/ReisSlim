@@ -8,7 +8,7 @@
   "orientation": "any",
   "background_color": "#f4f6f5",
   "theme_color": "#123f3a",
-  "description": "Constraint-first roadtripplanner met voertuigroute, slaapplaatsen, stops, activiteiten, budget, kaart en GPX-export.",
+  "description": "Dynamische constraint-first roadtripplanner met diverse voorstellen, voertuigroute, slaapplaatsen, stops, activiteiten, budget, kaart en GPX-export.",
   "categories": ["travel", "navigation", "lifestyle"],
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }

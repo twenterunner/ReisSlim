@@ -5,7 +5,7 @@ const FIELD_IDS = [
   'tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children',
   'transport', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
   'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg',
-  'maxDrive', 'maxChanges', 'comfort', 'allowStretch', 'liveData', 'notes'
+  'maxDrive', 'maxChanges', 'comfort', 'strictBudget', 'strictDrive', 'strictChanges', 'allowStretch', 'liveData', 'notes'
 ];
 
 export function uniqueId() {
@@ -53,6 +53,9 @@ export function normalizeTrip(input = {}) {
     maxDrive: Number(input.maxDrive),
     maxChanges: Number(input.maxChanges),
     comfort: ['budget', 'mid', 'comfort'].includes(input.comfort) ? input.comfort : 'mid',
+    strictBudget: input.strictBudget !== false && input.strictBudget !== 'false',
+    strictDrive: input.strictDrive !== false && input.strictDrive !== 'false',
+    strictChanges: input.strictChanges !== false && input.strictChanges !== 'false',
     allowStretch: input.allowStretch !== false && input.allowStretch !== 'false',
     liveData: input.liveData !== false && input.liveData !== 'false',
     notes: String(input.notes || '').trim().slice(0, 500),
