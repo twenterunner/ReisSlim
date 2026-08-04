@@ -29,7 +29,7 @@
       <div class="status-card">
         <span>Opslag</span>
         <strong>Lokaal op dit apparaat</strong>
-        <small>Geen account nodig</small>
+        <small id="autosaveStatus" aria-live="polite">Automatisch opslaan actief</small>
       </div>
     </section>
 
@@ -68,6 +68,8 @@
         <label class="full-width">Extra wensen
           <textarea id="notes" rows="3" placeholder="Bijvoorbeeld: verwarmd zwembad, weinig steden, mooie motorwegen, maximaal twee hotels..."></textarea>
         </label>
+
+        <p id="formError" class="form-error hidden" role="alert"></p>
 
         <div class="actions">
           <button type="submit">Maak reisvoorstellen</button>
@@ -115,7 +117,7 @@
   </main>
 
   <footer>
-    <p>ReisSlim v0.1.0 · Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p>
+    <p><span id="versionLabel">ReisSlim v0.2.0 · Build 200 · Stable</span><br>Indicatieve planningstool · Controleer prijzen, beschikbaarheid, openingstijden en reisadviezen altijd bij de bron.</p>
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

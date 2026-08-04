@@ -1,40 +1,20 @@
-# ReisSlim v0.1.0
+# ReisSlim v0.2.0 — Stability Sprint
 
-GitHub Pages proof of principle voor een Nederlandse roadtripplanner.
+Dutch road-trip planning proof of principle, designed for GitHub Pages.
 
-## Functies
-- Nederlandse reisintake
-- Transparante bestemmingsscore
-- Zes voorbeeldregio's
-- Dagplanning
-- Budgetberekening
-- Leaflet/OpenStreetMap-kaart
-- GPX- en JSON-export
-- Lokale opslag
-- PWA/service worker
+## Changes in v0.2.0 (Build 200)
 
-## Publiceren op GitHub Pages
-1. Maak een nieuwe repository.
-2. Upload alle bestanden en mappen uit deze map naar de root van de repository.
-3. Open **Settings → Pages**.
-4. Kies **Deploy from a branch**, branch **main**, folder **/(root)**.
-5. Open de gepubliceerde URL.
+- Fixed loss/reset of entered form values.
+- Added automatic draft saving for every field and preference.
+- Restores unfinished input after refresh or browser restart.
+- Uses explicit DOM references instead of browser-created global variables.
+- Added validation feedback before destination generation.
+- Added local-storage migration from the v0.1 draft key.
+- Updated service-worker cache and release version.
+- Existing destination ranking, itinerary, budget, map, JSON and GPX functions remain available.
 
-## Lokaal testen
-ES modules werken het betrouwbaarst via een lokale webserver:
+## Deploy on GitHub Pages
 
-```bash
-python -m http.server 8000
-```
+Upload every file in this folder to the repository root. In **Settings → Pages**, select **Deploy from a branch**, `main`, and `/(root)`.
 
-Open daarna `http://localhost:8000`.
-
-## Belangrijke beperkingen
-- Bestemmingsgegevens en kosten zijn indicatief.
-- De kaartlijn verbindt reispunten en is nog geen echte routeberekening over wegen.
-- GPX bevat een eenvoudige track en waypoints.
-- Er zijn nog geen live prijzen, beschikbaarheid, verkeer, weer of AI-calls.
-- Voeg nooit geheime API-sleutels toe aan browsercode of een openbare GitHub-repository.
-
-## Logische volgende stap
-Voeg een kleine serverless backend toe voor echte routeberekening, weerdata en AI-planning, terwijl deze front-end en datamodellen behouden blijven.
+After replacing an older version, refresh the page twice or close and reopen the installed PWA so the updated service worker becomes active.
