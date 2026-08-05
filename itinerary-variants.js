@@ -6,12 +6,18 @@ import { applyDaySchedules } from './plan-solver.js';
 import { calculateTripQuality } from './trip-quality-engine.js';
 
 const definitions = Object.freeze([
-  { id: 'relaxed', label: 'Rustig', summary: 'Eén vaste basis waar mogelijk, extra herstelruimte en weinig lokale kilometers.', baseLimit: 1, activityFactor: .82, localFactor: .7 },
-  { id: 'balanced', label: 'Gebalanceerd', summary: 'Een evenwichtige mix van route, activiteiten, rust en accommodatie.', baseLimit: 2, activityFactor: 1, localFactor: 1 },
-  { id: 'active', label: 'Actief', summary: 'Meer afwisseling en buitenactiviteiten, met een hoger tempo en iets meer lokale kilometers.', baseLimit: 3, activityFactor: 1.12, localFactor: 1.28 }
+  { id: 'relaxed', label: 'Rustig', summary: 'Eén vaste basis waar mogelijk, extra herstelruimte en weinig lokale kilometers.', daysPerBase: 5, activityFactor: .82, localFactor: .7 },
+  { id: 'balanced', label: 'Gebalanceerd', summary: 'Een evenwichtige mix van route, activiteiten, rust en accommodatie.', daysPerBase: 3.5, activityFactor: 1, localFactor: 1 },
+  { id: 'active', label: 'Actief', summary: 'Meer afwisseling en buitenactiviteiten, met een hoger tempo en iets meer lokale kilometers.', daysPerBase: 2.75, activityFactor: 1.12, localFactor: 1.28 }
 ]);
 
 const clone = value => JSON.parse(JSON.stringify(value));
+
+function baseLimitFor(trip, definition, available) {
+  const durationTarget = Math.max(1, Math.ceil(Number(trip.days || 3) / definition.daysPerBase));
+  const changeLimit = Math.max(1, Number(trip.maxChanges || 0) + 1);
+  return Math.max(1, Math.min(available, changeLimit, durationTarget));
+}
 
 function adaptPlan(plan, definition) {
   const next = clone(plan);
@@ -22,8 +28,9 @@ function adaptPlan(plan, definition) {
     day.driveHours = day.roadHours;
     day.elapsedHours = day.roadHours;
     if (definition.id === 'relaxed' && day.kind === 'stay' && day.day % 3 === 0) {
-      day.kind = 'flex'; day.typeLabel = 'Flexibele rustdag'; day.activityType = 'rust';
-      day.primaryPlan = 'Houd deze dag licht: uitslapen, boodschappen en hoogstens één korte activiteit dichtbij.';
+      day.typeLabel = 'Rustige verblijfsdag';
+      day.relaxedExecution = true;
+      day.primaryPlan = `Rustige uitvoering met extra marge: ${day.primaryPlan}`;
     }
   }
   next.variantId = definition.id;
@@ -38,7 +45,7 @@ export function buildItineraryVariant(trip, destination, variantId = 'balanced')
   if (gatewayHighlight?.overnightPoint && !availableBases.some(base => base.name === gatewayHighlight.baseName)) {
     availableBases.unshift({ name: gatewayHighlight.baseName, ...gatewayHighlight.overnightPoint });
   }
-  const selectedBases = availableBases.slice(0, Math.max(1, Math.min(definition.baseLimit, availableBases.length)));
+  const selectedBases = availableBases.slice(0, baseLimitFor(trip, definition, availableBases.length));
   const selectedNames = new Set(selectedBases.map(base => base.name));
   const variantDestination = {
     ...destination,

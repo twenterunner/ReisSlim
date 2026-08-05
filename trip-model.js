@@ -4,7 +4,7 @@ import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence
 const FIELD_IDS = [
   'tripName', 'origin', 'startDate', 'days', 'budget', 'adults', 'children',
   'transport', 'travelMode', 'routeTopology', 'tripPace', 'destinationQuery', 'routeStyle', 'fuelRangeKm', 'vehicleMaxSpeedKmh',
-  'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg',
+  'vehicleHeightM', 'vehicleLengthM', 'vehicleWeightKg', 'roadSurfacePolicy',
   'maxDrive', 'maxChanges', 'comfort', 'strictBudget', 'strictDrive', 'strictChanges', 'allowStretch', 'liveData', 'remoteTravel', 'privateMode', 'notes'
 ];
 
@@ -56,6 +56,9 @@ export function normalizeTrip(input = {}) {
     vehicleHeightM: spec.heightM,
     vehicleLengthM: spec.lengthM,
     vehicleWeightKg: spec.weightKg,
+    roadSurfacePolicy: input.roadSurfacePolicy === 'paved-only' ? 'paved-only' : 'any',
+    unacceptableRoadSurfaces: [...new Set((Array.isArray(input.unacceptableRoadSurfaces) ? input.unacceptableRoadSurfaces : [])
+      .map(value => String(value || '').trim().toLowerCase()).filter(Boolean))],
     maxDrive: Number(input.maxDrive),
     maxChanges: Number(input.maxChanges),
     comfort: ['budget', 'mid', 'comfort'].includes(input.comfort) ? input.comfort : 'mid',
@@ -71,6 +74,46 @@ export function normalizeTrip(input = {}) {
     preferenceWeights: weights,
     updatedAt: input.updatedAt || new Date().toISOString()
   };
+}
+
+export function materialTripFingerprint(trip = {}) {
+  return JSON.stringify({
+    origin: trip.origin,
+    originCountryCode: trip.originCountryCode,
+    originPoint: trip.originPoint,
+    destinationQuery: trip.destinationQuery,
+    destinationPoint: trip.destinationPoint,
+    startDate: trip.startDate,
+    days: trip.days,
+    budget: trip.budget,
+    adults: trip.adults,
+    children: trip.children,
+    travelMode: trip.travelMode,
+    transport: trip.transport,
+    routeTopology: trip.routeTopology,
+    tripPace: trip.tripPace,
+    routeStyle: trip.routeStyle,
+    fuelRangeKm: trip.fuelRangeKm,
+    vehicleMaxSpeedKmh: trip.vehicleMaxSpeedKmh,
+    vehicleHeightM: trip.vehicleHeightM,
+    vehicleLengthM: trip.vehicleLengthM,
+    vehicleWeightKg: trip.vehicleWeightKg,
+    roadSurfacePolicy: trip.roadSurfacePolicy,
+    unacceptableRoadSurfaces: trip.unacceptableRoadSurfaces,
+    maxDrive: trip.maxDrive,
+    maxChanges: trip.maxChanges,
+    comfort: trip.comfort,
+    strictBudget: trip.strictBudget,
+    strictDrive: trip.strictDrive,
+    strictChanges: trip.strictChanges,
+    allowStretch: trip.allowStretch,
+    liveData: trip.liveData,
+    remoteTravel: trip.remoteTravel,
+    privateMode: trip.privateMode,
+    notes: trip.notes,
+    preferences: trip.preferences,
+    preferenceWeights: trip.preferenceWeights
+  });
 }
 
 export function validateTripInput(trip) {
@@ -108,6 +151,8 @@ export function readTripForm(existing = null, root = document) {
     ...values,
     originPoint: existingTrip?.origin === values.origin ? existingTrip.originPoint : null,
     destinationPoint: existingTrip?.destinationQuery === values.destinationQuery ? existingTrip.destinationPoint : null,
+    originCountryCode: existingTrip?.origin === values.origin ? existingTrip.originCountryCode : null,
+    unacceptableRoadSurfaces: existingTrip?.unacceptableRoadSurfaces,
     preferences,
     preferenceWeights
   });

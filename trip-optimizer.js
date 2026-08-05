@@ -231,13 +231,56 @@ function applyAction(input, actionId, trip, destination) {
   }
   if (actionId === 'deduplicate-pois') {
     const seen = new Set();
+    const candidateHighlights = (destination.highlights || [])
+      .filter(item => item?.name && item?.providerId && item?.sourceUrl)
+      .slice().sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0)
+        || String(left.name).localeCompare(String(right.name), 'en'));
+    const candidateRecommendations = (destination.catalogueRecommendations || destination.recommendations || [])
+      .filter(item => item?.name && item?.providerId && item?.sourceUrl);
+    const usedProviderIds = new Set(next.days.flatMap(day => day.recommendations || [])
+      .map(item => String(item.providerId || '')).filter(Boolean));
     for (const day of next.days) {
-      day.recommendations = (day.recommendations || []).filter(item => {
-        if (!['activity', 'poi', 'attraction', 'restaurant'].includes(item.type)) return true;
+      day.recommendations = (day.recommendations || []).flatMap(item => {
+        if (!['activity', 'poi', 'attraction', 'restaurant'].includes(item.type)) return [item];
         const key = `${normalize(item.type)}:${normalize(item.name)}`;
-        if (!key.endsWith(':') && seen.has(key)) return false;
+        if (!key.endsWith(':') && seen.has(key)) {
+          const sameTypeCandidates = item.type === 'restaurant'
+            ? candidateRecommendations.filter(candidate => candidate.type === 'restaurant')
+            : candidateHighlights;
+          const replacement = sameTypeCandidates.find(candidate => {
+            const providerId = String(candidate.providerId || '');
+            return providerId && !usedProviderIds.has(providerId)
+              && normalize(candidate.name) !== normalize(item.name)
+              && (!candidate.associatedBase || normalize(candidate.associatedBase) === normalize(day.overnight)
+                || !sameTypeCandidates.some(other => normalize(other.associatedBase) === normalize(day.overnight)
+                  && !usedProviderIds.has(String(other.providerId || ''))));
+          });
+          if (!replacement) return [];
+          usedProviderIds.add(String(replacement.providerId));
+          const replacementItem = {
+            ...item,
+            id: replacement.id || `optimizer-${replacement.providerId}`,
+            providerId: replacement.providerId,
+            name: replacement.name,
+            point: clone(replacement.point || item.point),
+            sourceUrl: replacement.sourceUrl,
+            url: replacement.sourceUrl,
+            source: replacement.provider || destination.provider?.name || item.source,
+            confidence: replacement.confidence || item.confidence,
+            genericFallback: false,
+            associatedBase: day.overnight,
+            reason: `Vervangt een dubbele aanbeveling door het afzonderlijke bronanker ${replacement.name}; actuele toegang blijft ongeverifieerd.`
+          };
+          const replacementKey = `${normalize(replacementItem.type)}:${normalize(replacementItem.name)}`;
+          seen.add(replacementKey);
+          if (item.type !== 'restaurant') {
+            day.activityId = replacement.id || replacement.providerId;
+            day.primaryPlan = replacement.activity || `Bezoek ${replacement.name}; controleer actuele toegang bij de bron.`;
+          }
+          return [replacementItem];
+        }
         seen.add(key);
-        return true;
+        return [item];
       });
       day.sleepProposal = day.recommendations.find(item => item.type === 'accommodation') || null;
     }
@@ -322,13 +365,26 @@ function applyActions(trip, destination, plan, actionIds, catalogue = null) {
 }
 
 export function applyOptimizationProposal(trip, destination, plan, actionIds) {
-  const catalogue = actionCatalogue(trip, destination, canonicalizePlan(trip, destination, plan));
-  const applied = applyActions(trip, destination, plan, actionIds, catalogue);
-  const result = evaluate(trip, destination, applied.plan);
-  result.plan.optimized = applied.changes.length > 0;
-  result.plan.appliedOptimizationIds = applied.changes.map(change => change.actionId);
-  result.changes = applied.changes;
-  return result;
+  let current = evaluate(trip, destination, plan);
+  const catalogue = actionCatalogue(trip, destination, current.plan);
+  const acceptedChanges = [];
+  for (const id of actionIds || []) {
+    const action = catalogue.find(item => item.id === id);
+    if (!action) continue;
+    const applied = applyActions(trip, destination, current.plan, [id], [action]);
+    if (!applied.changes.length) continue;
+    const candidate = evaluate(trip, destination, applied.plan);
+    if (!candidate.constraintStatus.selectable) continue;
+    if (current.quality.passes && !candidate.quality.passes) continue;
+    const delta = improvement(current, candidate);
+    if (!delta.meaningful) continue;
+    acceptedChanges.push(applied.changes[0]);
+    current = candidate;
+  }
+  current.plan.optimized = acceptedChanges.length > 0;
+  current.plan.appliedOptimizationIds = acceptedChanges.map(change => change.actionId);
+  current.changes = acceptedChanges;
+  return current;
 }
 
 export function proposeOptimizations(trip, destination, plan, { mode = 'balanced', locks = {} } = {}) {

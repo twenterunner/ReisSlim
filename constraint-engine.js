@@ -114,6 +114,59 @@ export function evaluatePlanConstraints(trip, plan, budget, { allowStretch = fal
       excess / Math.max(1, trip.maxDrive)
     ));
   }
+  const planDays = plan?.days || [];
+  const vehicleDays = planDays.filter(day => day.vehicleProhibited);
+  if (vehicleDays.length) {
+    violations.push(violation(
+      'vehicleCompatibility', 'Voertuigtoegang', vehicleDays.map(day => day.day), trip.transport,
+      `De bron sluit het gekozen voertuig expliciet uit op dag${vehicleDays.length === 1 ? '' : 'en'} ${vehicleDays.map(day => day.day).join(', ')}.`,
+      'Kies een andere corridor, een ander voertuig of verwijder deze etappe.'
+    ));
+  }
+  const surfaceDays = planDays.filter(day => day.surfaceConflict);
+  if (surfaceDays.length) {
+    violations.push(violation(
+      'roadSurface', 'Wegoppervlak', surfaceDays.map(day => day.day), trip.roadSurfacePolicy || 'any',
+      `Het aangetoonde wegoppervlak botst met het voertuig- of oppervlakteprofiel op dag${surfaceDays.length === 1 ? '' : 'en'} ${surfaceDays.map(day => day.day).join(', ')}.`,
+      'Kies een compatibele verharde corridor of verruim bewust de oppervlaktekeuze.'
+    ));
+  }
+  const fuelDays = planDays.filter(day => day.fuelRangeExceeded);
+  if (fuelDays.length) {
+    const largestGap = Math.max(...fuelDays.map(day => Number(day.fuelServiceSpacingKm) || 0));
+    violations.push(violation(
+      'fuelRange', 'Actieradius', largestGap, trip.fuelRangeKm,
+      `De grootste aangetoonde afstand tussen brandstof- of servicepunten is ${Math.round(largestGap)} km; de ingestelde actieradius is ${Math.round(trip.fuelRangeKm)} km.`,
+      'Kies een corridor met voldoende brandstofdekking of een voertuig met grotere actieradius.'
+    ));
+  }
+  const unexplainedIncompatibility = planDays.filter(day => day.vehicleCompatible === false
+    && !day.vehicleProhibited && !day.surfaceConflict && !day.fuelRangeExceeded);
+  if (unexplainedIncompatibility.length) {
+    violations.push(violation(
+      'vehicleCompatibility', 'Voertuigtoegang', unexplainedIncompatibility.map(day => day.day), trip.transport,
+      `De route is niet compatibel met het gekozen voertuig op dag${unexplainedIncompatibility.length === 1 ? '' : 'en'} ${unexplainedIncompatibility.map(day => day.day).join(', ')}.`,
+      'Kies een voertuigcompatibele corridor.'
+    ));
+  }
+  const routeFeasibility = plan?.routeFeasibility;
+  if (routeFeasibility?.status === 'incomplete') {
+    violations.push(violation(
+      'routeConnectivity', 'Routeconnectiviteit', routeFeasibility.incompleteRoadDays, 0,
+      routeFeasibility.summary || 'Een of meer noodzakelijke weg- of ferryverbindingen missen expliciete evidence.',
+      'Kies een concept met verbonden cataloguscorridors, voeg expliciete ferry- of vaste-verbindingsevidence toe, of verrijk de route live.',
+      false,
+      Math.max(1, Number(routeFeasibility.incompleteRoadDays) || 1)
+    ));
+  } else if (routeFeasibility?.status === 'estimated') {
+    violations.push(violation(
+      'routeEvidence', 'Route-evidence', routeFeasibility.estimatedRoadDays, 0,
+      routeFeasibility.summary || 'Een of meer wegverbindingen zijn alleen geodetisch of synthetisch geraamd.',
+      'Bevestig deze etappes met live weg- of ferryrouting voordat je boekt of vertrekt.',
+      true,
+      Math.max(.1, Number(routeFeasibility.estimatedRoadDays) / Math.max(1, Number(routeFeasibility.assessedRoadDays)))
+    ));
+  }
   const budgetIssue = budgetViolation(trip, budget?.total || 0);
   if (budgetIssue) violations.push(budgetIssue);
   if ((plan?.accommodationChanges || 0) > trip.maxChanges) {

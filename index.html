@@ -7,8 +7,8 @@
   <title>ReisSlim – intelligente wereldreisplanner</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://unpkg.com">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1200">
+  <link rel="stylesheet" href="leaflet.css?v=1.9.4">
+  <link rel="stylesheet" href="styles.css?v=1300">
 </head>
 <body>
   <header class="topbar">
@@ -47,7 +47,7 @@
       </section>
 
       <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">Wereldwijd</p><h2>Geen vaste bestemmingslijst</h2></div></div>
+        <div class="section-heading"><div><p class="eyebrow">Touringcatalogus</p><h2>Betrouwbare landenkennis, slim gecombineerd</h2></div></div>
         <div class="inspiration-grid">
           <button class="inspiration-card" data-inspire="" type="button"><span>🌍</span><strong>Voer elke bestemming in</strong><small>Land, regio, stad, eiland of natuurgebied</small></button>
         </div>
@@ -64,9 +64,9 @@
         <form id="tripForm">
           <div class="form-grid">
             <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Zomervakantie 2027"></label>
-            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Vrije invoer; live geocoding wordt lokaal gecachet.</small><button id="useLocationBtn" class="secondary inline-control" type="button">Gebruik mijn huidige locatie</button></label>
+            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Vrije invoer; bekende vertrekplaatsen werken offline en optionele geocoding wordt lokaal gecachet.</small><button id="useLocationBtn" class="secondary inline-control" type="button">Gebruik mijn huidige locatie</button></label>
             <datalist id="originOptions"><option>Saasveld</option><option>Amsterdam</option><option>Rotterdam</option><option>Utrecht</option><option>Eindhoven</option><option>Groningen</option><option>Maastricht</option><option>Zwolle</option><option>Enschede</option><option>Hengelo</option><option>Almelo</option><option>Arnhem</option><option>Nijmegen</option></datalist>
-            <label>Gewenste bestemming of richting<input id="destinationQuery" placeholder="Leeg = ReisSlim ontdekt wereldwijd"><small>Bijvoorbeeld Namibië, kust, Scandinavië of “verras me”. Geen vaste regiolijst.</small></label>
+            <label>Gewenste bestemming of richting<input id="destinationQuery" placeholder="Bijvoorbeeld Zuid-Afrika, Namibië, Frankrijk of Alpen"><small>De ingebouwde touringcatalogus dekt Zuid-Afrika, Namibië en Europa. Leeg gebruikt het catalogusland rond je vertrekpunt.</small></label>
             <label>Startdatum<input id="startDate" type="date" required></label>
             <label>Aantal dagen<input id="days" type="number" min="3" max="60" value="10" required></label>
             <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
@@ -81,6 +81,7 @@
               <div><p class="eyebrow">Voertuigprofiel</p><strong id="vehicleProfileTitle">Auto</strong><small id="vehicleProfileSummary"></small></div>
               <label>Routestijl<select id="routeStyle"><option value="balanced">Gebalanceerd</option><option value="fastest">Snelste</option><option value="scenic">Toeristisch</option></select></label>
               <label>Actieradius (km)<input id="fuelRangeKm" type="number" min="100" max="1500" step="10" value="650" required></label>
+              <label>Toegestaan wegoppervlak<select id="roadSurfacePolicy"><option value="any">Alle ondersteunde oppervlakken</option><option value="paved-only">Alleen verhard</option></select></label>
               <label class="vehicle-dimension-field">Maximumsnelheid (km/u)<input id="vehicleMaxSpeedKmh" type="number" min="60" max="130" step="5" value="100"></label>
               <label class="vehicle-dimension-field">Totale hoogte (m)<input id="vehicleHeightM" type="number" min="1.8" max="4.5" step="0.05" value="3.1"></label>
               <label class="vehicle-dimension-field">Totale lengte (m)<input id="vehicleLengthM" type="number" min="4" max="20" step="0.1" value="7.2"></label>
@@ -93,7 +94,7 @@
               <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong><small>Uit: langere rijdagen mogen alleen als duidelijk compromis worden getoond.</small></span></label>
               <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong><small>Uit: extra wissels tellen als zachte afweging.</small></span></label>
               <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Maximaal twee stretch-ideeën tonen</strong><small>Alleen een kleine budget-, reistijd- of wisselafwijking; nooit voertuigveiligheid, vertrek of terugkeer.</small></span></label>
-              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Dynamische ontdekking en live data</strong><small>Gebruikt actuele providerdata en alleen een exact passende cache; nooit een verborgen bestemmingscatalogus.</small></span></label>
+              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Optionele live verrijking</strong><small>De catalogus maakt het plan offline. Live bronnen kunnen daarna routegeometrie, weer, beelden en plaatsdetails aanvullen.</small></span></label>
               <label class="check-option"><input id="remoteTravel" type="checkbox"><span><strong>Afgelegen / expeditieroute</strong><small>Voegt strengere controles toe voor brandstof, water, communicatie, permits en evacuatie.</small></span></label>
               <label class="check-option"><input id="privateMode" type="checkbox"><span><strong>Privémodus</strong><small>Leert niet van bewaren, kiezen of afwijzen. Bestaande lokale voorkeuren blijven onaangeroerd.</small></span></label>
             </div>
@@ -162,8 +163,8 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.2.0 · Build 1200 · Route intelligence and structural optimization</span><br>Planning- en beslissingsondersteuning · Live plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer officiële informatie altijd bij de bron. © OpenStreetMap-bijdragers, ODbL.</p></footer>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="app.js?v=1200"></script>
+  <footer><p><span id="versionLabel">ReisSlim v1.3.0 · Build 1300 · Curated touring knowledge base</span><br>Planning- en beslissingsondersteuning · Genoemde plaatsen zijn geen beschikbaarheids- of prijsgarantie. Controleer actuele informatie altijd bij de bron. <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap-bijdragers · ODbL</a> · <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames · CC BY 4.0</a> · Wikidata- en Wikimedia-bijdragers.</p></footer>
+  <script src="leaflet.js?v=1.9.4"></script>
+  <script type="module" src="app.js?v=1300"></script>
 </body>
 </html>

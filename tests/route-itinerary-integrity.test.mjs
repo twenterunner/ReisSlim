@@ -43,7 +43,13 @@ test('beam route allocates scale-aware base blocks in chronological order', () =
   assert.equal(plan.days.length, trip.days);
   assert.equal(plan.routeGraph.search.strategy, 'deterministic-beam');
   assert.ok(plan.routeGraph.baseVisits.length >= 3);
-  assert.deepEqual(itineraryIntegrityIssues(plan, trip), []);
+  const issues = itineraryIntegrityIssues(plan, trip);
+  assert.equal(plan.incompleteDayCount, 2, 'days beyond distinct fixture evidence must be marked incomplete instead of fabricated');
+  assert.equal(plan.feasible, false);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0], /onvoldoende onderscheidend/i);
+  assert.ok(plan.days.filter(day => day.kind === 'flex').length <= 1, 'only one genuine recovery/logistics day is allowed');
+  assert.equal(plan.days.some(day => /herstel- en keuzedag/i.test(day.primaryPlan)), false);
   for (let index = 1; index < plan.days.length; index += 1) assert.equal(plan.days[index].from, plan.days[index - 1].overnight);
 
   const compressed = plan.days.map(day => day.overnight).filter(name => name !== trip.origin)
@@ -118,6 +124,15 @@ test('a direct European tour budgets multi-day access inside the same canonical 
   const returns = plan.days.filter(day => day.kind === 'return');
   assert.ok(outward.length > 1, 'access to the touring region should be split across feasible days');
   assert.ok(returns.length > 1, 'return access should be split across feasible days');
+  const intermediateAccess = [...outward.slice(0, -1), ...returns.slice(0, -1)];
+  assert.ok(intermediateAccess.some(day => day.overnightRole === 'catalogue-transit'),
+    'the compact catalogue locator should turn a feasible European access split into a named overnight anchor');
+  assert.ok(intermediateAccess.filter(day => day.overnightRole === 'catalogue-transit')
+    .every(day => !/Indicatieve transitstop/i.test(day.overnight)),
+  'named catalogue transit anchors must replace anonymous interpolated labels');
+  assert.ok(intermediateAccess.filter(day => day.overnightRole === 'catalogue-transit')
+    .every(day => ['gateway-capital', 'access-gateway', 'overnight-base'].includes(day.toPoint?.catalogueRole)),
+  'named transit anchors must retain evidence that they are stay-capable rather than natural highlights');
   assert.equal(plan.days.length, request.days);
   assert.ok(plan.days.every(day => day.elapsedHours <= request.maxDrive + .05));
   assert.deepEqual(itineraryIntegrityIssues(plan, request), []);

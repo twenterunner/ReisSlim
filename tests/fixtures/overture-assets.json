@@ -1,0 +1,14 @@
+[
+  {
+    "id": "00008",
+    "collection": "place",
+    "url": "https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/release/2026-06-17.0/theme=places/type=place/part-00008-fixture-c000.zstd.parquet",
+    "rowCount": 4687218,
+    "bbox": {
+      "xmin": 4.1547,
+      "ymin": -84.7383,
+      "xmax": 72.5418,
+      "ymax": 40.7527
+    }
+  }
+]

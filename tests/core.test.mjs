@@ -454,25 +454,25 @@ test('Old stored data migrates without crashing and discards stale derived plans
   assert.equal('itinerary' in migrated, false);
   const storage = new MemoryStorage(); storage.setItem('reisslim.current.v2', JSON.stringify(legacy));
   assert.doesNotThrow(() => loadDraft(storage));
-  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v9'));
+  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v10'));
 });
 
-test('Schema 8 drafts migrate to schema 9 and force a canonical plan rebuild', () => {
+test('Schema 9 drafts migrate to schema 10 and force a canonical plan rebuild', () => {
   const storage = new MemoryStorage();
-  storage.setItem('reisslim.current.v8', JSON.stringify({
-    schemaVersion: 8,
-    engineVersion: 9,
+  storage.setItem('reisslim.current.v9', JSON.stringify({
+    schemaVersion: 9,
+    engineVersion: 10,
     trip: makeTrip(),
     destinationProfile: { id: 'provider-place', dynamic: true },
     plan: { days: [{ day: 1, location: 'stale plan' }] }
   }));
   const migrated = loadDraft(storage);
-  assert.equal(migrated.schemaVersion, 9);
-  assert.equal(migrated.engineVersion, 10);
+  assert.equal(migrated.schemaVersion, 10);
+  assert.equal(migrated.engineVersion, 11);
   assert.equal(migrated.needsRebuild, true);
   assert.equal(migrated.destinationProfile.id, 'provider-place');
-  assert.ok(storage.getItem('reisslim.current.v9'));
-  assert.equal(storage.getItem('reisslim.current.v8'), null);
+  assert.ok(storage.getItem('reisslim.current.v10'));
+  assert.equal(storage.getItem('reisslim.current.v9'), null);
 });
 
 test('Global discovery is not clipped to the origin continent and supports targeted locations', () => {

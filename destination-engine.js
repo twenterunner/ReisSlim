@@ -107,6 +107,32 @@ function applyProposalQualityGate(trip, plan, quality, structure) {
   return quality;
 }
 
+function combineConstraintStatuses(trip, destinationStatus, planStatus) {
+  const uniqueIssues = issues => issues.filter((item, index, all) => all.findIndex(candidate =>
+    candidate.key === item.key && candidate.detail === item.detail) === index);
+  const violations = uniqueIssues([...(destinationStatus.violations || []), ...(planStatus.violations || [])]);
+  const softConstraints = uniqueIssues([...(destinationStatus.softConstraints || []), ...(planStatus.softConstraints || [])]);
+  const rejected = destinationStatus.category === 'rejected' || planStatus.category === 'rejected';
+  const stretch = !rejected && violations.length === 1 && violations[0].stretchable && trip.allowStretch !== false;
+  const exact = !rejected && violations.length === 0;
+  const category = exact ? 'exact' : stretch ? 'stretch' : 'rejected';
+  return {
+    ...destinationStatus,
+    ...planStatus,
+    category,
+    exact,
+    stretch,
+    feasible: exact,
+    selectable: exact || stretch,
+    violations,
+    softConstraints,
+    stretchPenalty: violations.reduce((sum, item) => sum + Number(item.severity || 0), 0),
+    summary: exact
+      ? softConstraints.length ? `Harde voorwaarden gehaald; ${softConstraints.length} zachte voorkeur vraagt aandacht.` : 'Alle harde reisvoorwaarden en de route-evidence zijn in orde.'
+      : violations.map(item => item.detail).join(' ')
+  };
+}
+
 export function scoreDestination(trip, destination) {
   const month = new Date(`${trip.startDate}T12:00:00`).getMonth() + 1;
   const route = calculateRouteMetrics(trip, destination);
@@ -149,7 +175,9 @@ export function scoreDestination(trip, destination) {
   if (destination.season?.length && season < 60) compromises.push('De reis valt buiten de voorkeursmaanden die uit providerbewijs zijn afgeleid.');
   if (!destination.season?.length) compromises.push('Seizoensgeschiktheid is onbekend en telt als neutrale prior met lager vertrouwen.');
   if (!route.originKnown) compromises.push('De vertrekplaats kon niet worden gegeocodeerd; de routebelasting heeft lager vertrouwen.');
-  const confidence = route.originKnown ? (destination.routeStops?.length >= route.requiredLegs - 1 ? 'redelijk' : 'beperkt') : 'beperkt';
+  const confidence = destination.catalogue
+    ? destination.evidenceConfidence?.label || destination.provider?.confidence || destination.confidence || 'limited'
+    : route.originKnown ? (destination.routeStops?.length >= route.requiredLegs - 1 ? 'redelijk' : 'beperkt') : 'beperkt';
   const matchLabels = preference.matches.length ? preference.matches.slice(0, 3).join(', ') : 'algemene reiswensen';
   const scoredDestination = {
     ...destination, score, dimensions, estimate: budget.total, budget, route, matches: preference.matches, intentMatch: intentScore > 0,
@@ -161,19 +189,32 @@ export function scoreDestination(trip, destination) {
   };
   const canonicalPlan = buildItinerary(trip, scoredDestination);
   const canonicalBudget = buildBudget(trip, scoredDestination, canonicalPlan);
-  const planConstraintStatus = evaluatePlanConstraints(trip, canonicalPlan, canonicalBudget, { allowStretch: constraintStatus.stretch });
-  canonicalPlan.constraintStatus = planConstraintStatus;
-  canonicalPlan.feasible = planConstraintStatus.exact;
+  const planConstraintStatus = evaluatePlanConstraints(trip, canonicalPlan, canonicalBudget, { allowStretch: trip.allowStretch !== false });
+  const combinedConstraintStatus = combineConstraintStatuses(trip, constraintStatus, planConstraintStatus);
+  canonicalPlan.constraintStatus = combinedConstraintStatus;
+  canonicalPlan.feasible = combinedConstraintStatus.exact;
+  canonicalPlan.proposalCategory = combinedConstraintStatus.category;
   const structure = planStructure(trip, scoredDestination, canonicalPlan);
   const quality = applyProposalQualityGate(trip, canonicalPlan, calculateTripQuality(trip, scoredDestination, canonicalPlan, canonicalBudget), structure);
-  const planSelectable = constraintStatus.selectable && planConstraintStatus.selectable && quality.passes;
+  const planSelectable = combinedConstraintStatus.selectable && quality.passes;
+  scoredDestination.destinationConstraintStatus = constraintStatus;
+  scoredDestination.planConstraintStatus = planConstraintStatus;
+  scoredDestination.routeFeasibility = canonicalPlan.routeFeasibility || null;
+  if (canonicalPlan.routeFeasibility?.status === 'incomplete') scoredDestination.confidence = 'low';
+  else if (canonicalPlan.routeFeasibility?.status === 'estimated' && ['reasonable', 'redelijk'].includes(scoredDestination.confidence)) scoredDestination.confidence = 'limited';
+  scoredDestination.constraintStatus = combinedConstraintStatus;
+  scoredDestination.category = combinedConstraintStatus.category;
+  scoredDestination.feasible = combinedConstraintStatus.exact;
+  scoredDestination.compromises = [...new Set([...scoredDestination.compromises, ...combinedConstraintStatus.violations.map(item => item.detail)])];
+  if (combinedConstraintStatus.stretch) {
+    scoredDestination.explanation = `Past inhoudelijk bij ${matchLabels}, maar de route bevat een expliciet begrensde onzekerheid en wordt daarom alleen als stretch-idee getoond.`;
+  }
   if (!planSelectable) {
     const qualityIssue = quality.passes ? null : planQualityViolation(quality);
-    const issues = [...constraintStatus.violations, ...planConstraintStatus.violations, ...(qualityIssue ? [qualityIssue] : [])]
+    const issues = [...combinedConstraintStatus.violations, ...(qualityIssue ? [qualityIssue] : [])]
       .filter((item, index, all) => all.findIndex(candidate => candidate.key === item.key && candidate.detail === item.detail) === index);
-    scoredDestination.destinationConstraintStatus = constraintStatus;
     scoredDestination.constraintStatus = {
-      ...constraintStatus,
+      ...combinedConstraintStatus,
       category: 'rejected', exact: false, stretch: false, selectable: false,
       violations: issues,
       summary: issues.map(item => item.detail).join(' ')
@@ -189,7 +230,7 @@ export function scoreDestination(trip, destination) {
   scoredDestination.planQuality = quality;
   scoredDestination.planQualityStatus = {
     selectable: planSelectable,
-    category: planSelectable ? (constraintStatus.stretch ? 'stretch' : 'accepted') : 'rejected',
+    category: planSelectable ? (combinedConstraintStatus.stretch ? 'stretch' : 'accepted') : 'rejected',
     reasons: quality.gate.reasons,
     score: quality.overall
   };

@@ -1,14 +1,35 @@
 {
   "name": "reisslim",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
-  "description": "Voertuigbewuste, transparante roadtripplanner voor Nederlandse reizigers.",
+  "description": "Catalogue-first, voertuigbewuste roadtripplanner voor Zuid-Afrika, Namibië en Europa.",
   "scripts": {
     "test": "node --test --test-reporter=spec",
+    "catalog:generate": "node --use-system-ca scripts/generate-catalog.mjs",
+    "catalog:locator": "node scripts/generate-catalog-locator.mjs",
+    "catalog:osm:plan": "node scripts/enrich-catalog-osm.mjs",
+    "catalog:osm:fetch": "node scripts/enrich-catalog-osm.mjs --fetch",
+    "catalog:osm:apply-cache": "node scripts/enrich-catalog-osm.mjs --cache-only --apply",
+    "catalog:overture:plan": "node --use-system-ca scripts/overture-catalog.mjs plan",
+    "catalog:overture:plan-batch": "node --use-system-ca scripts/overture-catalog.mjs plan-batch",
+    "catalog:overture:fetch": "node --use-system-ca scripts/overture-catalog.mjs fetch",
+    "catalog:overture:apply": "node scripts/overture-catalog.mjs apply",
+    "catalog:overture:bulk:plan": "node --use-system-ca scripts/enrich-catalog-overture.mjs --plan",
+    "catalog:overture:bulk:fetch": "node --use-system-ca scripts/enrich-catalog-overture.mjs --fetch",
+    "catalog:overture:bulk:apply": "node scripts/enrich-catalog-overture.mjs --apply",
+    "catalog:overture:bulk:merge": "node scripts/enrich-catalog-overture.mjs --merge",
+    "catalog:rebuild": "node --use-system-ca scripts/generate-catalog.mjs --allow-drop-osm && node scripts/enrich-catalog-overture.mjs --apply && node scripts/enrich-catalog-overture.mjs --merge && node scripts/check-catalog-release.mjs",
     "check:syntax": "node scripts/check-syntax.mjs",
+    "check:catalog": "node scripts/generate-catalog.mjs --validate-only",
+    "check:catalog:osm": "node scripts/check-osm-enrichment.mjs",
+    "check:catalog:osm:release": "node scripts/check-osm-enrichment.mjs --require-all",
+    "check:catalog:overture:release": "node scripts/check-catalog-release.mjs",
+    "catalog:quality-report": "node scripts/check-catalog-release.mjs --report=CATALOG_DATA_QUALITY.md",
+    "catalog:coverage-report": "node scripts/generate-catalog.mjs --coverage-only",
+    "check:catalog:release": "node scripts/generate-catalog.mjs --validate-only && node scripts/check-catalog-release.mjs",
     "check:pwa": "node scripts/check-pwa.mjs",
-    "check": "node scripts/check-syntax.mjs && node --test --test-reporter=spec && node scripts/check-pwa.mjs"
+    "check": "node scripts/check-syntax.mjs && node scripts/generate-catalog.mjs --validate-only && node scripts/check-catalog-release.mjs && node --test --test-reporter=spec && node scripts/check-pwa.mjs"
   },
   "engines": { "node": ">=20" }
 }

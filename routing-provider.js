@@ -1,8 +1,9 @@
 import { routingConfig, validCoordinate } from './config.js';
 import { buildRecommendations } from './recommendation-engine.js';
-import { estimateLegTiming, minimumTravelLegs, transportId, vehicleSpec } from './vehicle-intelligence.js';
+import { adjustProviderMovingHours, estimateLegTiming, minimumTravelLegs, transportId, vehicleSpec } from './vehicle-intelligence.js';
 import { applyDaySchedules } from './plan-solver.js';
 import { collectRouteSegments } from './itinerary-engine.js';
+import { assessPlanRouteFeasibility } from './route-graph-engine.js';
 
 const SETTINGS_KEY = 'reisslim.integration.v1';
 const OSRM_URL = 'https://router.project-osrm.org';
@@ -64,9 +65,12 @@ function waypointsOnGeometry(geometry, timing, transport) {
 function applyResult(trip, day, result) {
   const geometry = Array.isArray(result.geometry) ? result.geometry.filter(validCoordinate) : [];
   if (geometry.length < 2 || !Number.isFinite(result.distanceKm) || !Number.isFinite(result.roadHours)) return false;
+  const adjustedRoadHours = adjustProviderMovingHours(trip, result.roadHours, {
+    carProfile: result.timingProfile === 'car' || ['osrm', 'openrouteservice'].includes(result.provider)
+  });
   const timing = estimateLegTiming(trip, {
     distanceKm: result.distanceKm,
-    roadHours: result.roadHours,
+    roadHours: adjustedRoadHours,
     arrival: day.kind !== 'return' || day.to !== trip.origin
   });
   Object.assign(day, {
@@ -121,6 +125,7 @@ function normalizeOsrmRoute(payload) {
   if (!route) throw new Error('OSRM leverde geen route.');
   return {
     provider: 'osrm',
+    timingProfile: 'car',
     distanceKm: route.distance / 1000,
     roadHours: route.duration / 3600,
     geometry: coordinates.map(([lon, lat]) => ({ lat, lon }))
@@ -142,6 +147,7 @@ function normalizeOrsRoute(payload) {
   if (!summary) throw new Error('OpenRouteService leverde geen route.');
   return {
     provider: 'openrouteservice',
+    timingProfile: 'car',
     distanceKm: summary.distance / 1000,
     roadHours: summary.duration / 3600,
     geometry: coordinates.map(([lon, lat]) => ({ lat, lon }))
@@ -249,6 +255,10 @@ export async function enrichPlanWithLiveRouting(trip, destination, plan, options
     totalSegments: routeDays.length,
     error: applied < routeDays.length ? 'Niet alle segmenten konden live worden berekend.' : null
   };
+  if (destination?.catalogue) {
+    next.routeFeasibility = assessPlanRouteFeasibility(trip, next);
+    if (!next.routeFeasibility.normalExactEligible) next.feasible = false;
+  }
   next.routeSegments = collectRouteSegments(next);
   return next;
 }

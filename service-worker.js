@@ -1,15 +1,21 @@
-const CACHE = 'reisslim-v1.2.0-build-1200';
+const CACHE = 'reisslim-v1.3.0-build-1300';
 const ASSETS = [
-  './', './index.html', './styles.css?v=1200', './app.js?v=1200', './manifest.webmanifest', './icon.svg',
-  './config.js?v=1200', './destination-provider.js?v=1200', './geocoding-provider.js?v=1200', './discovery-bootstrap-provider.js?v=1200', './trip-model.js?v=1200', './route-engine.js?v=1200', './route-topology.js?v=1200', './route-graph-engine.js?v=1200', './storage.js?v=1200',
-  './destination-engine.js?v=1200', './proposal-engine.js?v=1200', './constraint-engine.js?v=1200', './plan-solver.js?v=1200', './itinerary-engine.js?v=1200', './itinerary-variants.js?v=1200',
-  './itinerary-validator.js?v=1200', './budget-engine.js?v=1200', './trip-quality-engine.js?v=1200', './trip-optimizer.js?v=1200', './multimodal-engine.js?v=1200', './provider-platform.js?v=1200',
-  './vehicle-intelligence.js?v=1200', './recommendation-engine.js?v=1200', './routing-provider.js?v=1200', './place-provider.js?v=1200', './travel-readiness.js?v=1200', './preference-engine.js?v=1200',
-  './assistant-engine.js?v=1200', './weather-engine.js?v=1200', './image-provider.js?v=1200', './map-view.js?v=1200', './gpx-generator.js?v=1200', './ui-renderer.js?v=1200'
+  './', './index.html', './styles.css?v=1300', './leaflet.css?v=1.9.4', './leaflet.js?v=1.9.4',
+  './leaflet-marker-icon.png', './leaflet-marker-icon-2x.png', './leaflet-marker-shadow.png',
+  './app.js?v=1300', './manifest.webmanifest', './icon.svg',
+  './config.js?v=1300', './catalog-index.js?v=1300', './catalog-locator.js?v=1300', './catalog-locator-runtime.js?v=1300', './catalog-runtime.js?v=1300', './destination-provider.js?v=1300', './geocoding-provider.js?v=1300', './discovery-bootstrap-provider.js?v=1300', './trip-model.js?v=1300', './route-engine.js?v=1300', './route-topology.js?v=1300', './route-graph-engine.js?v=1300', './storage.js?v=1300',
+  './destination-engine.js?v=1300', './proposal-engine.js?v=1300', './constraint-engine.js?v=1300', './plan-solver.js?v=1300', './itinerary-engine.js?v=1300', './itinerary-variants.js?v=1300',
+  './itinerary-validator.js?v=1300', './budget-engine.js?v=1300', './trip-quality-engine.js?v=1300', './trip-optimizer.js?v=1300', './multimodal-engine.js?v=1300', './provider-platform.js?v=1300',
+  './vehicle-intelligence.js?v=1300', './recommendation-engine.js?v=1300', './routing-provider.js?v=1300', './place-provider.js?v=1300', './travel-readiness.js?v=1300', './preference-engine.js?v=1300',
+  './assistant-engine.js?v=1300', './weather-engine.js?v=1300', './image-provider.js?v=1300', './map-view.js?v=1300', './gpx-generator.js?v=1300', './ui-renderer.js?v=1300'
 ];
+const PRECACHE_ASSETS = [...new Set(ASSETS.flatMap(asset => {
+  const [path, query] = asset.split('?');
+  return query && /\.(?:js|css)$/.test(path) ? [asset, path] : [asset];
+}))];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE_ASSETS)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -27,14 +33,19 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.webmanifest')) {
-    event.respondWith(fetch(event.request, { cache: 'no-store' }).then(response => {
-      if (response.ok) caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
+    event.respondWith(fetch(event.request, { cache: 'no-store' }).then(async response => {
+      if (!response.ok) return await caches.match(event.request) || response;
+      const cache = await caches.open(CACHE);
+      await cache.put(event.request, response.clone());
       return response;
     }).catch(() => caches.match(event.request)));
     return;
   }
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-    if (response.ok) caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(async response => {
+    if (response.ok) {
+      const cache = await caches.open(CACHE);
+      await cache.put(event.request, response.clone());
+    }
     return response;
   })));
 });

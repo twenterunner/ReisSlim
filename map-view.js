@@ -76,7 +76,7 @@ export function renderMap(plan, elementId = 'map') {
       dashArray: liveRoute ? null : multimodal ? '3 9' : segment.kind === 'stay' ? '2 5' : segment.kind === 'flex' ? '1 7' : '8 6',
       opacity: .9,
       color: segment.kind === 'return' ? colors.returnRoute : colors[segment.kind] || colors.outward
-    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : multimodal ? `Indicatief ${escapeHtml(segment.mode)}-segment; geen bevestigd schema` : 'Indicatieve corridor'}<br><small>Bron: ${escapeHtml(segment.source)} Â· vertrouwen: ${escapeHtml(segment.confidence || 'onbekend')}</small>`);
+    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : multimodal ? `Indicatief ${escapeHtml(segment.mode)}-segment; geen bevestigd schema` : 'Indicatieve corridor'}<br><small>Bron: ${escapeHtml(segment.source)} · vertrouwen: ${escapeHtml(segment.confidence || 'onbekend')}</small>`);
     routeLine.options.reisslimBaseWeight = liveRoute ? 5 : 4;
   });
 
@@ -96,13 +96,20 @@ export function renderMap(plan, elementId = 'map') {
       : item.type === 'accommodation' ? stayLayer
         : item.type === 'restaurant' ? foodLayer : activityLayer;
     bounds.push([item.lat, item.lon]);
+    const markerStatus = item.plannedWaypoint
+      ? 'canonieke geplande routepauze; exacte voorziening ter plaatse controleren'
+      : item.routeAware && item.providerId
+        ? `genoemde routevoorziening${Number.isFinite(item.routeDistanceKm) ? `; circa ${item.routeDistanceKm} km van route-anker` : ''}; opening controleren`
+        : item.genericFallback
+          ? 'categoriezoekgebied bij de basis; geen bevestigde locatie'
+          : item.live ? 'providerlocatie; opening en beschikbaarheid controleren' : 'cataloguslocatie; actuele status controleren';
     const marker = L.circleMarker([item.lat, item.lon], {
       radius: 6,
       color: colors[item.type] || colors.activity,
       fillColor: colors[item.type] || colors.activity,
       fillOpacity: .75,
       weight: 2
-    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br>${item.associatedBase ? `<small>Basis: ${escapeHtml(item.associatedBase)}</small><br>` : ''}<small>${escapeHtml(item.source)} · ${item.genericFallback ? 'categoriezoekgebied bij de basis; geen bevestigde locatie' : item.live ? 'providerlocatie; opening en beschikbaarheid controleren' : 'geplande routepauze'} · vertrouwen: ${escapeHtml(item.confidence || 'onbekend')}</small>`);
+    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br>${item.associatedBase ? `<small>Basis: ${escapeHtml(item.associatedBase)}</small><br>` : ''}<small>${escapeHtml(item.source || 'ReisSlim canonical plan')} · ${escapeHtml(markerStatus)} · vertrouwen: ${escapeHtml(item.confidence || 'onbekend')}</small>`);
     const markers = dayMarkers.get(Number(item.day)) || [];
     markers.push(marker);
     dayMarkers.set(Number(item.day), markers);

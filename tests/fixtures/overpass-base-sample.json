@@ -1,0 +1,109 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "elements": [
+    {
+      "type": "node",
+      "id": 101,
+      "lat": -22.5601,
+      "lon": 17.084,
+      "timestamp": "2026-07-01T12:00:00Z",
+      "tags": {
+        "name": "Museum Alpha",
+        "tourism": "museum",
+        "opening_hours": "Mo-Fr 09:00-17:00",
+        "website": "https://example.invalid/museum"
+      }
+    },
+    {
+      "type": "way",
+      "id": 102,
+      "timestamp": "2026-06-15T08:00:00Z",
+      "center": { "lat": -22.561, "lon": 17.086 },
+      "tags": {
+        "name": "Hotel Evidence",
+        "tourism": "hotel",
+        "parking": "surface",
+        "motorcycle": "designated",
+        "covered": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 103,
+      "lat": -22.562,
+      "lon": 17.087,
+      "timestamp": "2026-06-12T08:00:00Z",
+      "tags": {
+        "name": "Cafe Evidence",
+        "amenity": "cafe",
+        "opening_hours": "Tu-Su 08:00-16:00"
+      }
+    },
+    {
+      "type": "node",
+      "id": 104,
+      "lat": -22.57,
+      "lon": 17.09,
+      "timestamp": "2026-06-11T08:00:00Z",
+      "tags": {
+        "name": "Fuel Evidence",
+        "amenity": "fuel",
+        "motor_vehicle": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 105,
+      "lat": -22.565,
+      "lon": 17.088,
+      "timestamp": "2026-06-10T08:00:00Z",
+      "tags": {
+        "name": "Covered Bike Park",
+        "amenity": "motorcycle_parking",
+        "covered": "yes",
+        "supervised": "yes",
+        "motorcycle": "designated"
+      }
+    },
+    {
+      "type": "way",
+      "id": 201,
+      "timestamp": "2026-06-09T08:00:00Z",
+      "center": { "lat": -22.559, "lon": 17.082 },
+      "tags": {
+        "highway": "primary",
+        "surface": "asphalt",
+        "motor_vehicle": "yes",
+        "motorcycle": "yes"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 301,
+      "center": { "lat": -22.58, "lon": 17.1 },
+      "tags": {
+        "type": "route",
+        "route": "motorcycle",
+        "name": "Evidence Touring Route",
+        "ref": "ETR",
+        "network": "regional",
+        "scenic": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 999,
+      "lat": -22.56,
+      "lon": 17.083,
+      "tags": { "amenity": "restaurant" }
+    },
+    {
+      "type": "node",
+      "id": 998,
+      "lat": -22.56,
+      "lon": 17.083,
+      "tags": { "name": "Unrelated Pharmacy", "amenity": "pharmacy" }
+    }
+  ]
+}

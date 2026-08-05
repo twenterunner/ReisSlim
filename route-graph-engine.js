@@ -1,14 +1,95 @@
 import { validCoordinate } from './config.js';
 import { haversineKm } from './route-engine.js';
 import { resolveOrigin } from './trip-model.js';
-import { estimateLegTiming, minimumTravelLegs, transportId } from './vehicle-intelligence.js';
+import {
+  estimateLegTiming,
+  exceedsFuelRange,
+  hasRoughSurfaceEvidence,
+  minimumTravelLegs,
+  surfaceEvidenceValues,
+  surfacePolicyConflict,
+  transportId,
+  vehicleSuitabilityFor
+} from './vehicle-intelligence.js';
 
 const SPEED_KMH = { car: 82, motorcycle: 72, motorhome: 64, caravan: 59 };
 const BEAM_WIDTH = 36;
 const MAX_BASES = 6;
+const LIVE_ROUTE_SOURCES = new Set(['osrm', 'tomtom', 'openrouteservice']);
 
 const point = value => validCoordinate(value) ? { lat: Number(value.lat), lon: Number(value.lon) } : null;
 const normalizedText = value => String(value || '').trim().toLocaleLowerCase('nl-NL').replace(/\s+/g, ' ');
+
+function nodeIdentities(node) {
+  return new Set([node?.id, node?.providerId, node?.baseName, node?.name]
+    .map(normalizedText)
+    .filter(Boolean));
+}
+
+function corridorEndpointMatches(endpoint, identities) {
+  const values = [endpoint?.id, endpoint?.anchorId, endpoint?.providerId, endpoint?.name, endpoint]
+    .map(value => typeof value === 'object' ? '' : normalizedText(value))
+    .filter(Boolean);
+  return values.some(value => identities.has(value));
+}
+
+function catalogueCorridor(destination, from, to) {
+  const fromIds = nodeIdentities(from);
+  const toIds = nodeIdentities(to);
+  for (const corridor of destination.corridors || []) {
+    const forward = corridorEndpointMatches(corridor.from || corridor.fromId || corridor.fromAnchor || corridor.fromAnchorId, fromIds)
+      && corridorEndpointMatches(corridor.to || corridor.toId || corridor.toAnchor || corridor.toAnchorId, toIds);
+    const reverse = corridorEndpointMatches(corridor.to || corridor.toId || corridor.toAnchor || corridor.toAnchorId, fromIds)
+      && corridorEndpointMatches(corridor.from || corridor.fromId || corridor.fromAnchor || corridor.fromAnchorId, toIds);
+    if (forward || reverse) return { corridor, reverse };
+  }
+  return null;
+}
+
+function islandEvidence(node) {
+  const role = normalizedText(node?.geographicRole || node?.touringRole || node?.role);
+  const featureCode = normalizedText(node?.featureCode || node?.significance?.featureCode);
+  const tags = (node?.tags || []).map(normalizedText);
+  const explicitlyRequired = node?.requiresFerryAccess === true || node?.islandAccess === 'ferry-required';
+  const island = explicitlyRequired || featureCode === 'isl' || role.includes('island') || tags.includes('island');
+  return { island, explicitlyRequired };
+}
+
+function explicitRoadDisconnection(node) {
+  const value = node?.roadAccess;
+  if (value === false) return true;
+  if (value && typeof value === 'object' && (value.allowed === false || value.connected === false)) return true;
+  return /^(?:none|no|prohibited|disconnected)$/.test(normalizedText(value));
+}
+
+function explicitFerryEvidence(corridor, routeBacked) {
+  const value = corridor?.ferryEvidence ?? corridor?.ferry;
+  const ferry = value === true || value?.required === true || value?.present === true || value?.value === true;
+  const sourceIds = Array.isArray(corridor?.sourceIds) && corridor.sourceIds.some(Boolean);
+  const evidence = Array.isArray(corridor?.evidence) && corridor.evidence.some(item => /ferry|veer|boat/i.test(String(item)));
+  return Boolean(ferry && (routeBacked || sourceIds || evidence));
+}
+
+function catalogueConnectivity(corridor, from, to, routeBacked, endpointContext) {
+  const island = islandEvidence(from).island || islandEvidence(to).island;
+  const ferryEvidenceExplicit = explicitFerryEvidence(corridor, routeBacked);
+  if (ferryEvidenceExplicit) return {
+    status: 'confirmed-ferry', classification: 'confirmed', selectable: true,
+    requiresFerryEvidence: island, ferryEvidenceExplicit
+  };
+  if (island && !routeBacked && !ferryEvidenceExplicit) return {
+    status: 'missing-island-access-evidence', classification: 'incomplete', selectable: false,
+    requiresFerryEvidence: true, ferryEvidenceExplicit
+  };
+  if (routeBacked) return {
+    status: 'confirmed-road', classification: 'confirmed', selectable: true,
+    requiresFerryEvidence: island, ferryEvidenceExplicit
+  };
+  return {
+    status: endpointContext ? 'estimated-endpoint-context' : 'estimated-adjacency',
+    classification: 'estimated', selectable: true, requiresFerryEvidence: false, ferryEvidenceExplicit
+  };
+}
 
 export function normalizeHighlightGraph(destination) {
   const supplied = (destination.highlights || []).map((item, index) => ({
@@ -29,7 +110,14 @@ export function normalizeHighlightGraph(destination) {
     remote: Boolean(item.remote),
     contextOnly: Boolean(item.contextOnly),
     distanceFromRegionKm: Number(item.distanceFromRegionKm) || 0,
-    roadEvidence: item.roadEvidence || null
+    roadEvidence: item.roadEvidence || null,
+    vehicleFit: item.vehicleFit || item.vehicleCompatibility || null,
+    vehicleFitEvidence: item.vehicleFitEvidence || null,
+    geographicRole: item.geographicRole || item.touringRole || item.role || null,
+    featureCode: item.featureCode || item.significance?.featureCode || null,
+    islandAccess: item.islandAccess || null,
+    requiresFerryAccess: item.requiresFerryAccess === true,
+    roadAccess: item.roadAccess ?? null
   })).filter(item => item.name && item.point && item.overnightPoint);
   if (supplied.length) {
     const representedBases = base => supplied.some(item => item.baseName === base.name || (haversineKm(item.overnightPoint, base) ?? Infinity) < 2);
@@ -50,7 +138,14 @@ export function normalizeHighlightGraph(destination) {
       gateway: false,
       remote: Boolean(destination.remoteReadinessRequired),
       contextOnly: false,
-      distanceFromRegionKm: 0
+      distanceFromRegionKm: 0,
+      vehicleFit: base.vehicleFit || null,
+      vehicleFitEvidence: base.vehicleFitEvidence || null,
+      geographicRole: base.geographicRole || base.touringRole || base.role || null,
+      featureCode: base.featureCode || base.significance?.featureCode || null,
+      islandAccess: base.islandAccess || null,
+      requiresFerryAccess: base.requiresFerryAccess === true,
+      roadAccess: base.roadAccess ?? null
     }));
     return [...supplied, ...baseNodes].sort((a, b) => a.sequence - b.sequence || b.priority - a.priority);
   }
@@ -71,11 +166,106 @@ export function normalizeHighlightGraph(destination) {
     gateway: index === 0,
     remote: Boolean(destination.remoteReadinessRequired),
     contextOnly: false,
-    distanceFromRegionKm: 0
+    distanceFromRegionKm: 0,
+    vehicleFit: base.vehicleFit || null,
+    vehicleFitEvidence: base.vehicleFitEvidence || null,
+    geographicRole: base.geographicRole || base.touringRole || base.role || null,
+    featureCode: base.featureCode || base.significance?.featureCode || null,
+    islandAccess: base.islandAccess || null,
+    requiresFerryAccess: base.requiresFerryAccess === true,
+    roadAccess: base.roadAccess ?? null
   })).filter(item => item.point);
 }
 
+function edgeConstraintStatus(trip, vehicleCompatibility, surface, fuelServiceSpacingKm) {
+  const vehicle = transportId(trip.transport);
+  const suitability = vehicleSuitabilityFor(vehicleCompatibility, vehicle);
+  const surfaces = surfaceEvidenceValues(surface);
+  const heavyVehicleSurfaceConflict = ['motorhome', 'caravan'].includes(vehicle) && hasRoughSurfaceEvidence(surfaces);
+  const surfaceConflict = heavyVehicleSurfaceConflict || surfacePolicyConflict(trip, surfaces);
+  const fuelRangeExceeded = exceedsFuelRange(trip, fuelServiceSpacingKm);
+  const vehicleProhibited = suitability.status === 'prohibited';
+  return {
+    vehicleCompatible: !vehicleProhibited && !surfaceConflict && !fuelRangeExceeded,
+    vehicleProhibited,
+    vehicleSuitability: suitability.status,
+    vehicleSuitabilityEvidence: suitability.evidence,
+    surfaceConflict,
+    fuelRangeExceeded,
+    surfaceEvidence: surfaces,
+    fuelServiceSpacingKm: Number.isFinite(Number(fuelServiceSpacingKm)) ? Number(fuelServiceSpacingKm) : null
+  };
+}
+
 export function graphEdge(trip, from, to, destination = {}) {
+  const catalogueMatch = catalogueCorridor(destination, from, to);
+  if (catalogueMatch) {
+    const { corridor, reverse } = catalogueMatch;
+    const vehicle = transportId(trip.transport);
+    const distanceKm = Math.max(1, Math.round(Number(corridor.distanceKm) || haversineKm(from.overnightPoint, to.overnightPoint) * 1.16 || 1));
+    const carMovingHours = Number(corridor.carMovingHours || corridor.carHours || corridor.roadHours);
+    const motorcycleMovingHours = Number(corridor.motorcycleMovingHours);
+    const suppliedHours = vehicle === 'motorcycle'
+      ? (Number.isFinite(motorcycleMovingHours) && motorcycleMovingHours > 0
+          ? motorcycleMovingHours
+          : (Number.isFinite(carMovingHours) && carMovingHours > 0 ? carMovingHours * 1.05 : NaN))
+      : carMovingHours;
+    const speed = SPEED_KMH[vehicle] || SPEED_KMH.car;
+    const roadHours = Number((Number.isFinite(suppliedHours) && suppliedHours > 0 ? suppliedHours : distanceKm / speed).toFixed(1));
+    const timing = estimateLegTiming(trip, { distanceKm, roadHours, arrival: true });
+    const suppliedMotorcycleElapsed = Number(corridor.motorcycleElapsedHours);
+    if (vehicle === 'motorcycle' && Number.isFinite(suppliedMotorcycleElapsed) && suppliedMotorcycleElapsed > 0) {
+      timing.catalogueElapsedHours = suppliedMotorcycleElapsed;
+      timing.elapsedHours = Number(Math.max(timing.elapsedHours, suppliedMotorcycleElapsed).toFixed(1));
+    }
+    const surface = corridor.surface || corridor.surfaceEvidence || null;
+    const vehicleCompatibility = corridor.vehicleCompatibility || {};
+    const constraints = edgeConstraintStatus(trip, vehicleCompatibility, surface, corridor.fuelServiceSpacingKm);
+    const suppliedGeometry = (corridor.fallbackGeometry || corridor.geometry || []).filter(validCoordinate).map(point);
+    const geometry = reverse ? suppliedGeometry.slice().reverse() : suppliedGeometry;
+    const routeBacked = corridor.routeEvidenceScope === 'route';
+    const endpointContext = corridor.routeEvidenceScope === 'endpoint-context' || Boolean(corridor.overtureEndpointEvidence);
+    const connectivity = catalogueConnectivity(corridor, from, to, routeBacked, endpointContext);
+    return {
+      from: from.id, to: to.id, distanceKm, roadHours, elapsedHours: timing.elapsedHours, timing,
+      corridorIdentity: corridor.id || [String(from.baseName || from.id), String(to.baseName || to.id)].sort().join('>'),
+      corridorId: corridor.id || null,
+      geometry,
+      routeSource: routeBacked ? 'catalogue-corridor' : 'catalogue-fallback-geometry',
+      source: routeBacked
+        ? corridor.source || 'ReisSlim touringcatalogus'
+        : endpointContext ? 'ReisSlim geschatte corridor; brondata dekt alleen de eindpuntomgeving' : 'ReisSlim geschatte corridor',
+      confidence: routeBacked ? corridor.confidence || 'catalogue-evidence'
+        : endpointContext ? 'estimated-endpoint-context' : 'estimated-corridor',
+      routeEvidenceScope: routeBacked ? 'route' : endpointContext ? 'endpoint-context' : 'estimated',
+      routeEvidenceClassification: connectivity.classification,
+      connectivityStatus: connectivity.status,
+      routeSelectable: connectivity.selectable,
+      requiresFerryEvidence: connectivity.requiresFerryEvidence,
+      ferryEvidenceExplicit: connectivity.ferryEvidenceExplicit,
+      scenicValue: Math.max(0, Math.min(10, Number(corridor.scenicValue) || 0)),
+      surfaceEvidence: constraints.surfaceEvidence,
+      roadClassEvidence: [corridor.roadClass].filter(Boolean),
+      vehicleCompatible: constraints.vehicleCompatible,
+      vehicleProhibited: constraints.vehicleProhibited,
+      vehicleSuitability: constraints.vehicleSuitability,
+      vehicleSuitabilityEvidence: constraints.vehicleSuitabilityEvidence,
+      surfaceConflict: constraints.surfaceConflict,
+      fuelRangeExceeded: constraints.fuelRangeExceeded,
+      uncertainty: Number(corridor.confidenceScore) < .5 || corridor.geometryType === 'fallback-straight-line'
+        ? 'estimated-corridor'
+        : corridor.confidence || 'catalogue-evidence',
+      serviceEvidence: corridor.serviceEvidence !== null && corridor.serviceEvidence !== undefined && Number.isFinite(Number(corridor.serviceEvidence))
+        ? Number(corridor.serviceEvidence)
+        : corridor.fuelServiceSpacingKm !== null && corridor.fuelServiceSpacingKm !== undefined && Number.isFinite(Number(corridor.fuelServiceSpacingKm))
+          ? Math.max(0, 10 - Number(corridor.fuelServiceSpacingKm) / 50)
+          : Number(destination.evidence?.services || 0),
+      fuelServiceSpacingKm: constraints.fuelServiceSpacingKm,
+      tollEvidence: corridor.tollEvidence ?? corridor.toll ?? null,
+      ferryEvidence: corridor.ferryEvidence ?? corridor.ferry ?? null,
+      seasonalLimitations: corridor.seasonalLimitations || null
+    };
+  }
   const directKm = haversineKm(from.overnightPoint, to.overnightPoint) || 0;
   const distanceKm = Math.max(1, Math.round(directKm * (destination.roadDistanceFactor || 1.16)));
   const speed = SPEED_KMH[transportId(trip.transport)] || SPEED_KMH.car;
@@ -84,15 +274,33 @@ export function graphEdge(trip, from, to, destination = {}) {
   const evidence = [from.roadEvidence, to.roadEvidence].filter(Boolean);
   const scenicValue = Math.min(10, evidence.reduce((sum, item) => sum + (item.scenic ? 5 : 0) + (item.routeRelation ? 2 : 0), 0));
   const uncertainSurface = evidence.some(item => !item.surface) && evidence.length > 0;
-  const unsuitableSurface = evidence.some(item => ['unpaved', 'gravel', 'ground', 'sand'].includes(String(item.surface || '').toLowerCase()));
   const vehicle = transportId(trip.transport);
-  const vehicleCompatible = !(evidence.some(item => item.motorcycleAccess === 'no') && vehicle === 'motorcycle')
-    && !(unsuitableSurface && ['motorhome', 'caravan'].includes(vehicle));
+  const compatibilityEvidence = evidence.map(item => item.vehicleCompatibility?.[vehicle]
+    ?? item.vehicleFit?.[vehicle]
+    ?? (vehicle === 'motorcycle' ? item.motorcycleAccess : undefined)).filter(value => value !== undefined);
+  const vehicleCompatibility = compatibilityEvidence.some(value => vehicleSuitabilityFor(value, vehicle).status === 'prohibited')
+    ? { [vehicle]: 'prohibited' }
+    : {};
+  const surfaceEvidence = evidence.map(item => item.surface).filter(Boolean);
+  const constraints = edgeConstraintStatus(trip, vehicleCompatibility, surfaceEvidence, null);
+  const island = islandEvidence(from).island || islandEvidence(to).island;
+  const roadDisconnected = explicitRoadDisconnection(from) || explicitRoadDisconnection(to);
   return {
     from: from.id, to: to.id, distanceKm, roadHours, elapsedHours: timing.elapsedHours, timing,
     corridorIdentity: [String(from.baseName || from.id), String(to.baseName || to.id)].sort().join('>'),
-    scenicValue, surfaceEvidence: evidence.map(item => item.surface).filter(Boolean),
-    roadClassEvidence: evidence.map(item => item.roadClass).filter(Boolean), vehicleCompatible,
+    scenicValue, surfaceEvidence: constraints.surfaceEvidence,
+    roadClassEvidence: evidence.map(item => item.roadClass).filter(Boolean), vehicleCompatible: constraints.vehicleCompatible,
+    vehicleProhibited: constraints.vehicleProhibited, vehicleSuitability: constraints.vehicleSuitability,
+    vehicleSuitabilityEvidence: constraints.vehicleSuitabilityEvidence,
+    surfaceConflict: constraints.surfaceConflict, fuelRangeExceeded: constraints.fuelRangeExceeded, fuelServiceSpacingKm: null,
+    routeSource: island || roadDisconnected ? 'missing-connectivity' : 'geodesic-fallback',
+    confidence: island || roadDisconnected ? 'incomplete-connectivity' : 'estimated-geodesic',
+    routeEvidenceScope: island || roadDisconnected ? 'none' : 'estimated',
+    routeEvidenceClassification: island || roadDisconnected ? 'incomplete' : 'estimated',
+    connectivityStatus: island ? 'missing-island-access-evidence' : roadDisconnected ? 'missing-road-connectivity' : 'estimated-geodesic',
+    routeSelectable: !island && !roadDisconnected,
+    requiresFerryEvidence: island,
+    ferryEvidenceExplicit: false,
     uncertainty: evidence.length ? (uncertainSurface ? 'partial-road-evidence' : 'provider-road-evidence') : 'estimated-corridor',
     serviceEvidence: Number(destination.evidence?.services || 0), tollEvidence: null, ferryEvidence: null
   };
@@ -206,11 +414,12 @@ function routeWithinConstraints(trip, destination, path, gatewayGroup) {
   if (changes > Math.max(0, Number(trip.maxChanges) || 0)) return false;
   if (minimumDays > Number(trip.days)) return false;
   for (let index = 1; index < path.length; index += 1) {
-    if (graphEdge(trip, path[index - 1].representative, path[index].representative, destination).elapsedHours > trip.maxDrive + .05) return false;
+    const edge = graphEdge(trip, path[index - 1].representative, path[index].representative, destination);
+    if (!edge.vehicleCompatible || edge.elapsedHours > trip.maxDrive + .05) return false;
   }
   if (shouldReturnToGateway(trip, path)) {
     const edge = graphEdge(trip, path.at(-1).representative, gatewayGroup.representative, destination);
-    if (edge.elapsedHours > trip.maxDrive + .05) return false;
+    if (!edge.vehicleCompatible || edge.elapsedHours > trip.maxDrive + .05) return false;
   }
   return true;
 }
@@ -241,6 +450,7 @@ function beamSearchBases(trip, destination, groups, gatewayGroup) {
           distanceKm: state.distanceKm + edge.distanceKm,
           score: state.score + groupValue(candidate, trip) + 9
             + (trip.routeStyle === 'scenic' || transportId(trip.transport) === 'motorcycle' ? edge.scenicValue * 1.2 : 0)
+            + (destination.catalogue && Number(trip.days) >= 8 ? Math.min(9, edge.distanceKm / 25) : 0)
             + Math.min(3, edge.serviceEvidence * .3)
             - (edge.uncertainty === 'estimated-corridor' ? 2 : 0)
             - edge.elapsedHours * 1.35 - edge.distanceKm / 260
@@ -263,6 +473,67 @@ function beamSearchBases(trip, destination, groups, gatewayGroup) {
     return bScore - aScore || a.distanceKm - b.distanceKm || a.path.map(item => item.id).join('|').localeCompare(b.path.map(item => item.id).join('|'));
   });
   return { ...completed[0], targetBaseCount };
+}
+
+function liveRouteDay(day) {
+  const source = normalizedText(day?.routeSource);
+  return [...LIVE_ROUTE_SOURCES].some(provider => source.includes(provider));
+}
+
+function roadEvidenceForDay(day, trip) {
+  const access = ['outward', 'return'].includes(day.kind);
+  const internal = day.kind === 'transfer';
+  const surfaceAccess = trip.travelMode === 'rail-ferry' && access;
+  const directAccess = trip.travelMode === 'direct' && access;
+  if (!internal && !surfaceAccess && !directAccess) return null;
+  if (liveRouteDay(day)) return { classification: 'confirmed', reason: null };
+  if (day.routeEvidenceClassification === 'confirmed'
+      || ['confirmed-road', 'confirmed-ferry'].includes(day.connectivityStatus)) return { classification: 'confirmed', reason: null };
+  if (day.requiresFerryEvidence && !day.ferryEvidenceExplicit && day.routeEvidenceScope !== 'route') return {
+    classification: 'incomplete',
+    reason: `Dag ${day.day || '?'} bereikt een eilandanker zonder expliciet bronbewijs voor een ferry of vaste wegverbinding.`
+  };
+  if (day.connectivityStatus === 'missing-island-access-evidence') return {
+    classification: 'incomplete',
+    reason: `Dag ${day.day || '?'} mist bronbewijs voor de noodzakelijke eilandverbinding.`
+  };
+  if (internal && (day.connectivityStatus === 'missing-road-connectivity' || day.routeEvidenceScope === 'none')) return {
+    classification: 'incomplete',
+    reason: `Dag ${day.day || '?'} verbindt twee touringbases zonder catalogus-, weg- of ferryevidence.`
+  };
+  if (day.routeEvidenceScope === 'route') return { classification: 'confirmed', reason: null };
+  return {
+    classification: 'estimated',
+    reason: `Dag ${day.day || '?'} gebruikt alleen geschatte of geodetische routeconnectiviteit.`
+  };
+}
+
+export function assessPlanRouteFeasibility(trip, plan) {
+  const assessed = (plan?.days || []).map(day => ({ day, evidence: roadEvidenceForDay(day, trip) }))
+    .filter(item => item.evidence);
+  const incomplete = assessed.filter(item => item.evidence.classification === 'incomplete');
+  const estimated = assessed.filter(item => item.evidence.classification === 'estimated');
+  const confirmed = assessed.filter(item => item.evidence.classification === 'confirmed');
+  const status = incomplete.length ? 'incomplete' : estimated.length ? 'estimated' : assessed.length ? 'confirmed' : 'local-only';
+  const reasons = [...new Set([...incomplete, ...estimated].map(item => item.evidence.reason).filter(Boolean))];
+  return {
+    status,
+    normalExactEligible: status === 'confirmed' || status === 'local-only',
+    suggestedCategory: status === 'incomplete' ? 'incomplete' : status === 'estimated' ? 'stretch' : 'exact',
+    assessedRoadDays: assessed.length,
+    confirmedRoadDays: confirmed.length,
+    estimatedRoadDays: estimated.length,
+    incompleteRoadDays: incomplete.length,
+    confirmedRatio: assessed.length ? Number((confirmed.length / assessed.length).toFixed(3)) : null,
+    reasons,
+    summary: status === 'confirmed'
+      ? 'Alle geplande weg- en ferry-etappes hebben expliciete route-evidence.'
+      : status === 'local-only'
+        ? 'Dit plan bevat geen catalogusoverstap tussen touringbases.'
+        : status === 'estimated'
+          ? `${estimated.length} weg- of ferry-etappe${estimated.length === 1 ? '' : 's'} is alleen indicatief en wordt daarom als stretch getoond.`
+          : `${incomplete.length} noodzakelijke verbinding${incomplete.length === 1 ? '' : 'en'} mist weg- of ferryevidence; dit plan is onvolledig en niet selecteerbaar.`
+  };
 }
 
 function allocateStayDays(trip, destination, basePath, gatewayGroup) {
@@ -306,7 +577,9 @@ function omittedReason(node, trip, selectedBaseNames, selectedIds) {
 }
 
 export function planHighlightRoute(trip, destination) {
-  const graph = normalizeHighlightGraph(destination);
+  const rawGraph = normalizeHighlightGraph(destination);
+  const prohibited = rawGraph.filter(node => vehicleSuitabilityFor(node.vehicleFit, trip.transport).status === 'prohibited');
+  const graph = rawGraph.filter(node => !prohibited.includes(node));
   const gateway = graph.find(item => item.gateway) || graph[0];
   if (!gateway) return { graph: [], selected: [], route: [], baseVisits: [], omitted: [], stayAllocation: {}, nightAllocation: {}, minimumAdditionalDays: 0, evidence: [] };
 
@@ -324,14 +597,20 @@ export function planHighlightRoute(trip, destination) {
   for (const group of basePath) selected.push(...group.activities.slice(0, stayByGroup[group.id]));
   const selectedIds = new Set(selected.map(item => item.id));
   const selectedBaseNames = new Set(basePath.map(item => normalizedText(item.baseName)));
-  const omitted = graph.filter(item => item.id !== gateway.id && !selectedIds.has(item.id)).map(item => ({
+  const omitted = [...graph.filter(item => item.id !== gateway.id && !selectedIds.has(item.id)).map(item => ({
     ...item,
     reason: omittedReason(item, trip, selectedBaseNames, selectedIds),
     estimatedAdditionalDays: item.contextOnly
       ? Math.max(1, Math.ceil(item.distanceFromRegionKm / Math.max(120, trip.maxDrive * 60)))
       : selectedBaseNames.has(normalizedText(item.baseName)) ? 1 : 2
-  }));
-  const minimumAdditionalDays = omitted.length ? Math.min(...omitted.map(item => item.estimatedAdditionalDays)) : 0;
+  })), ...prohibited.map(item => ({
+    ...item,
+    reason: `${item.name} is weggelaten omdat de bron het gekozen voertuig expliciet uitsluit.`,
+    estimatedAdditionalDays: 0,
+    vehicleProhibited: true
+  }))];
+  const additionalDayEstimates = omitted.map(item => item.estimatedAdditionalDays).filter(days => days > 0);
+  const minimumAdditionalDays = additionalDayEstimates.length ? Math.min(...additionalDayEstimates) : 0;
   const stayAllocation = Object.fromEntries(baseVisits.map(item => [item.id, item.stayDays]));
   const nightAllocation = Object.fromEntries(baseVisits.map((item, index) => [item.id, item.stayDays + 1 + (index === 0 && route.at(-1)?.returnGateway ? 1 : 0)]));
   if (route.at(-1)?.returnGateway) nightAllocation[route.at(-1).id] = 1;

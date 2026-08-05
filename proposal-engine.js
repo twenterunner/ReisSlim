@@ -78,7 +78,14 @@ function proposalFromDestination(item, trip, focus, learnedProfile = null) {
   const [label, labelReason] = primaryStyle(item, trip);
   const learned = preferenceBonus(item, learnedProfile);
   const bases = item.bases?.length || 1;
-  const recommendedBases = trip.routeTopology === 'open-jaw' ? Math.min(2, bases) : Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2));
+  const canonicalBases = [...new Set((item.planStructure?.bases || []).map(normalize).filter(Boolean))].length;
+  const recommendedBases = canonicalBases || (trip.routeTopology === 'open-jaw'
+    ? Math.min(2, bases)
+    : Math.max(1, Math.min(bases, trip.maxChanges <= 2 ? 1 : trip.days >= 10 ? 3 : 2)));
+  const suppliedRouteDays = item.planStructure?.routeDays;
+  const routeDays = suppliedRouteDays !== null && suppliedRouteDays !== undefined && Number.isFinite(Number(suppliedRouteDays))
+    ? Math.max(0, Math.round(Number(suppliedRouteDays)))
+    : Math.max(0, Number(item.constraintStatus?.travelLegs || 0) * 2);
   return {
     ...item,
     proposalId: item.id,
@@ -89,15 +96,19 @@ function proposalFromDestination(item, trip, focus, learnedProfile = null) {
     portfolioScore: item.score + focusBonus(item, focus) + learned.score,
     learnedPreferenceReasons: learned.reasons,
     recommendedBases,
+    routeDays,
     routeCharacter: trip.travelMode !== 'direct' ? `${trip.travelMode} met lokale ${trip.routeTopology === 'open-jaw' ? 'open-jaw route' : 'rondreis'}` : trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
-    tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${item.constraintStatus.travelLegs * 2} reisetappes`,
+    tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${routeDays} reisetappes`,
     keyTradeoff: explainTradeoff(item),
     evidence: [
-      `${item.evidence?.anchors || 0} providerankers en ${item.evidence?.highlights || 0} highlights`,
-      `${item.bases.length} dynamisch afgeleide mogelijke uitvalsbases`,
-      `Voertuigscore ${item.dimensions.transport}/100; neutrale velden: ${(item.evidence?.neutralFields || []).join(', ') || 'geen'}`
+      `${item.evidence?.anchors || 0} ${item.catalogue ? 'catalogusankers' : 'providerankers'} en ${item.evidence?.highlights || 0} highlights`,
+      `${item.bases.length} ${item.catalogue ? 'bronvermelde catalogusuitvalsbases' : 'dynamisch afgeleide uitvalsbases'}`,
+      `Voertuigscore ${item.dimensions.transport}/100; neutrale velden: ${(item.evidence?.neutralFields || []).join(', ') || 'geen'}`,
+      ...(item.routeFeasibility ? [`Routebewijs ${item.routeFeasibility.status}: ${item.routeFeasibility.summary}`] : [])
     ],
-    sourceLabel: item.provider?.confidence
+    sourceLabel: item.catalogue
+      ? `ReisSlim touringcatalogus ${item.catalogVersion || ''}; brondata ${item.lastChecked || item.provider?.fetchedAt || 'datum onbekend'}, vertrouwen ${item.provider?.confidence || item.confidence || 'beperkt'}`
+      : item.provider?.confidence
       ? `Dynamisch ontdekt via ${item.discoverySource}; vertrouwen ${item.provider.confidence}, ${item.discoveryCache?.cached ? `exacte cache van ${Math.round(item.discoveryCache.ageMs / 3600000)} uur oud` : `opgehaald ${item.provider.fetchedAt || item.discoveredAt}`}`
       : 'Opnieuw opgebouwd uit eerder opgeslagen canoniek providerbewijs'
   };

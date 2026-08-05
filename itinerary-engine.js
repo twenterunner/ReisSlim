@@ -1,11 +1,12 @@
 import { validCoordinate } from './config.js';
 import { buildBreakWaypoints, buildTravelNodes, haversineKm, interpolateRoutePoint, segmentMetrics } from './route-engine.js';
-import { buildRecommendations } from './recommendation-engine.js';
+import { annotateAccommodationContinuity, buildRecommendations } from './recommendation-engine.js';
 import { estimateLegTiming, transportId, travelGuidance } from './vehicle-intelligence.js';
 import { applyDaySchedules, solveDayAllocation } from './plan-solver.js';
 import { buildAlternativeReturnNodes, routeExplorationMetrics } from './route-topology.js';
 import { buildAccessSegments, effectiveGroundVehicle, isMultimodal } from './multimodal-engine.js';
-import { graphEdge, localHighlightGeometry, planHighlightRoute } from './route-graph-engine.js';
+import { assessPlanRouteFeasibility, graphEdge, localHighlightGeometry, planHighlightRoute } from './route-graph-engine.js';
+import { resolveCatalogLocationFromPoint } from './catalog-index.js?v=1300';
 
 export function addDays(dateString, amount) {
   const date = new Date(`${dateString}T12:00:00`);
@@ -15,6 +16,27 @@ export function addDays(dateString, amount) {
 
 function labelFor(kind) {
   return ({ outward: 'Heenreis', return: 'Terugreis', transfer: 'Bestemmingstransfer', stay: 'Verblijfsdag', flex: 'Flexibele rustdag' })[kind];
+}
+
+function edgeConstraintFields(edge) {
+  if (!edge) return {};
+  return {
+    vehicleCompatible: edge.vehicleCompatible !== false,
+    vehicleProhibited: Boolean(edge.vehicleProhibited),
+    vehicleSuitability: edge.vehicleSuitability || 'unknown',
+    vehicleSuitabilityEvidence: edge.vehicleSuitabilityEvidence || [],
+    surfaceConflict: Boolean(edge.surfaceConflict),
+    surfaceEvidence: edge.surfaceEvidence || [],
+    fuelRangeExceeded: Boolean(edge.fuelRangeExceeded),
+    fuelServiceSpacingKm: edge.fuelServiceSpacingKm ?? null,
+    routeEvidenceScope: edge.routeEvidenceScope || 'none',
+    routeEvidenceClassification: edge.routeEvidenceClassification || 'incomplete',
+    connectivityStatus: edge.connectivityStatus || 'missing-road-connectivity',
+    routeSelectable: edge.routeSelectable !== false,
+    requiresFerryEvidence: Boolean(edge.requiresFerryEvidence),
+    ferryEvidenceExplicit: Boolean(edge.ferryEvidenceExplicit),
+    ferryEvidence: edge.ferryEvidence ?? null
+  };
 }
 
 function chooseActivities(trip, destination) {
@@ -59,7 +81,15 @@ function localTransfer(from, to, trip) {
 }
 
 export function buildItinerary(trip, destination) {
-  if (destination.dynamic) return buildChronologicalDynamicItinerary(trip, destination);
+  if (destination.dynamic) {
+    const plan = buildChronologicalDynamicItinerary(trip, destination);
+    if (destination.catalogue) {
+      plan.routeFeasibility = assessPlanRouteFeasibility(trip, plan);
+      plan.warnings = [...new Set([...(plan.warnings || []), ...(plan.routeFeasibility.normalExactEligible ? [] : [plan.routeFeasibility.summary])])];
+      if (!plan.routeFeasibility.normalExactEligible) plan.feasible = false;
+    }
+    return plan;
+  }
   if (isMultimodal(trip)) return buildMultimodalItinerary(trip, destination);
   const firstPass = buildTravelNodes(trip, destination, 1);
   const requiredLegs = firstPass.metrics.requiredLegs;
@@ -137,7 +167,8 @@ export function buildItinerary(trip, destination) {
   if (minimumDays > trip.days) warnings.push(`Deze bestemming vraagt minimaal ${minimumDays} dagen om onder ${trip.maxDrive} uur rijden per dag te blijven. De huidige ${trip.days}-daagse planning markeert de te lange rijdagen.`);
   if (metrics.warning) warnings.push(metrics.warning);
   if (excessiveDays.length) warnings.push(`${excessiveDays.length} rijdag${excessiveDays.length === 1 ? '' : 'en'} overschrijdt de ingestelde daglimiet.`);
-  const accommodationChanges = countAccommodationChanges(days, trip.origin);
+  const accommodationAudit = annotateAccommodationContinuity(days, trip.origin);
+  const accommodationChanges = accommodationAudit.totalChanges;
   if (accommodationChanges > trip.maxChanges) warnings.push(`De route vraagt circa ${accommodationChanges} accommodatiewissels; jouw voorkeur is maximaal ${trip.maxChanges}.`);
   if (destination.category === 'stretch' && destination.constraintStatus?.violations?.length) {
     warnings.unshift(`Stretch-idee: ${destination.constraintStatus.violations[0].detail}`);
@@ -147,7 +178,8 @@ export function buildItinerary(trip, destination) {
     days, routeMetrics: metrics, requiredLegs, usedLegs, minimumDays,
     feasible: minimumDays <= trip.days && excessiveDays.length === 0 && accommodationChanges <= trip.maxChanges,
     proposalCategory: destination.category || 'exact',
-    warnings, accommodationChanges, recommendations,
+    warnings, accommodationChanges, accommodationPropertyChanges: accommodationAudit.propertyChanges,
+    accommodationStays: accommodationAudit.stays, recommendations,
     routing: { source: 'offline-corridor', label: 'Offline corridorraming', live: false },
     origin: { name: trip.origin, ...(metrics.origin || {}) }
   };
@@ -165,33 +197,43 @@ function buildChronologicalDynamicItinerary(trip, destination) {
   const days = [];
   const usedActivityIds = new Set();
   const usedActivityTexts = new Set();
+  let recoveryDayUsed = false;
   const localSpeeds = { car: 48, motorcycle: 44, motorhome: 40, caravan: 37 };
 
   const accessDay = (kind, fromPoint, fromName, toPoint, toName, transportSegments) => {
-    let distanceKm; let timing;
+    let distanceKm; let timing; let edge = null;
     if (multimodal) {
       distanceKm = 25;
       timing = { roadHours: 1.2, elapsedHours: 1.2, breakHours: 0, restStops: 0, fuelStops: 0, stopCount: 0 };
     } else {
-      const edge = graphEdge(groundTrip, { id: `${kind}-from`, overnightPoint: fromPoint }, { id: `${kind}-to`, overnightPoint: toPoint }, destination);
+      edge = graphEdge(groundTrip, { id: `${kind}-from`, overnightPoint: fromPoint }, { id: `${kind}-to`, overnightPoint: toPoint }, destination);
       distanceKm = edge.distanceKm;
       timing = edge.timing;
     }
-    const geometry = validCoordinate(fromPoint) && validCoordinate(toPoint) ? [fromPoint, toPoint] : [toPoint].filter(validCoordinate);
+    const geometry = edge?.geometry?.length
+      ? edge.geometry
+      : validCoordinate(fromPoint) && validCoordinate(toPoint) ? [fromPoint, toPoint] : [toPoint].filter(validCoordinate);
     const waypoints = multimodal ? [] : buildBreakWaypoints(fromPoint, toPoint, timing, groundTrip.transport);
     return {
       kind, typeLabel: kind === 'outward' ? (multimodal ? 'Toegang + voertuig ophalen' : 'Heenreis') : 'Terugverbinding',
       from: fromName, to: toName, location: toName, fromPoint, toPoint, overnight: kind === 'return' ? trip.origin : toName,
       distanceKm, roadHours: timing.roadHours, driveHours: timing.elapsedHours, elapsedHours: timing.elapsedHours,
       breakHours: timing.breakHours, restStops: timing.restStops, fuelStops: timing.fuelStops, stopCount: timing.stopCount,
-      waypoints, geometry, routeSource: multimodal ? 'multimodal-fallback-geometry' : 'route-graph-estimate', routeConfidence: 'estimated', transportSegments,
+      waypoints, geometry,
+      routeSource: multimodal ? 'multimodal-fallback-geometry' : edge?.routeSource || 'route-graph-estimate',
+      routeConfidence: multimodal ? 'estimated' : edge?.confidence || 'estimated',
+      routeLegRole: 'access', transportSegments,
       primaryPlan: kind === 'outward'
         ? `Bereik ${toName}, rond de voertuigoverdracht af en houd een aankomstbuffer.`
         : 'Keer via de gekozen toegang terug en houd marge voor voertuigteruggave of de laatste wegverbinding.',
       rainAlternative: kind === 'outward'
         ? `Ga na aankomst rechtstreeks naar de eerste overnachtingsbasis in ${toName}.`
         : 'Vergroot de vertrekmarge en schrap alle optionele stops.',
-      exceedsDailyLimit: !multimodal && timing.elapsedHours > trip.maxDrive + .05
+      exceedsDailyLimit: !multimodal && timing.elapsedHours > trip.maxDrive + .05,
+      ...edgeConstraintFields(edge),
+      requiresFerryEvidence: Boolean(edge?.requiresFerryEvidence || fromPoint?.requiresFerryAccess || toPoint?.requiresFerryAccess
+        || fromPoint?.islandAccess === 'connection-evidence-required' || toPoint?.islandAccess === 'connection-evidence-required'),
+      ferryEvidenceExplicit: Boolean(edge?.ferryEvidenceExplicit)
     };
   };
 
@@ -201,10 +243,30 @@ function buildChronologicalDynamicItinerary(trip, destination) {
       const estimated = interpolateRoutePoint(fromPoint, toPoint, index / legCount, {
         role: 'transit', approximate: true, confidence: 'estimated'
       });
-      if (estimated) nodes.push({
-        point: estimated,
-        name: `Indicatieve transitstop ${index} op de ${direction} (exacte plaats volgt uit routeverrijking)`
-      });
+      if (estimated) {
+        const named = resolveCatalogLocationFromPoint(estimated, {
+          maximumDistanceKm: 65,
+          preferOvernightBase: true
+        });
+        if (named?.point && Number(named.distanceFromPointKm) <= 65) {
+          nodes.push({
+            point: {
+              ...named.point,
+              role: 'catalogue-transit',
+              approximate: true,
+              confidence: named.confidence || 'catalogue-evidence',
+              providerId: named.providerId,
+              sourceUrl: named.sourceUrl,
+              catalogueRole: named.role,
+              distanceFromEstimatedCorridorKm: named.distanceFromPointKm
+            },
+            name: `${named.displayName || named.name} (genoemd indicatief routeanker)`
+          });
+        } else nodes.push({
+          point: estimated,
+          name: `Indicatieve transitstop ${index} op de ${direction} (exacte plaats volgt uit routeverrijking)`
+        });
+      }
     }
     nodes.push({ point: toPoint, name: toName });
     return nodes;
@@ -219,7 +281,9 @@ function buildChronologicalDynamicItinerary(trip, destination) {
       segment.overnightRole = nodes[index + 1].point?.role || (kind === 'return' && index === nodes.length - 2 ? 'return' : 'gateway');
       if (nodes[index + 1].point?.approximate) {
         segment.routeConfidence = 'estimated';
-        segment.primaryPlan += ' De overnachtingsplaats is een transparant route-anker en wordt pas als echte plaats getoond wanneer providerdata die bevestigt.';
+        segment.primaryPlan += nodes[index + 1].point?.role === 'catalogue-transit'
+          ? ' Dit is een echte genoemde catalogusplaats nabij de geschatte corridor; de exacte doorgaande weg, omweg en accommodatie zijn nog niet routebreed bevestigd.'
+          : ' De overnachtingsplaats is een transparant route-anker en wordt pas als echte plaats getoond wanneer providerdata die bevestigt.';
       }
       days.push(segment);
     }
@@ -234,22 +298,34 @@ function buildChronologicalDynamicItinerary(trip, destination) {
       usedActivityIds.add(activity.id);
       usedActivityTexts.add(String(activity.activity || activity.name || '').trim().toLocaleLowerCase('nl-NL').replace(/\s+/g, ' '));
     }
+    const useRecoveryDay = !activity && !recoveryDayUsed;
+    if (useRecoveryDay) recoveryDayUsed = true;
+    const incomplete = !activity && !useRecoveryDay;
     const routeNode = activity || visit;
     const geometry = activity ? localHighlightGeometry(routeNode) : [visit.overnightPoint];
     const distanceKm = geometry.length > 1 ? Math.max(8, Math.round((haversineKm(routeNode.overnightPoint, routeNode.point) || 4) * 2.25)) : 0;
     const speed = localSpeeds[transportId(groundTrip.transport)] || localSpeeds.car;
     const roadHours = Number((distanceKm / speed).toFixed(1));
     const timing = estimateLegTiming(groundTrip, { distanceKm, roadHours, arrival: false });
-    const flex = !activity;
+    const flex = useRecoveryDay;
     return {
-      kind: flex ? 'flex' : 'stay', typeLabel: labelFor(flex ? 'flex' : 'stay'), from: visit.baseName, to: visit.baseName, location: visit.baseName,
+      kind: incomplete ? 'unplanned' : flex ? 'flex' : 'stay',
+      typeLabel: incomplete ? 'Onvolledige dag' : labelFor(flex ? 'flex' : 'stay'),
+      from: visit.baseName, to: visit.baseName, location: visit.baseName,
       fromPoint: { ...visit.overnightPoint, name: visit.baseName, role: 'overnight' }, toPoint: { ...visit.overnightPoint, name: visit.baseName, role: 'overnight' },
       overnight: visit.baseName, distanceKm, roadHours: timing.roadHours, driveHours: timing.elapsedHours, elapsedHours: timing.elapsedHours,
       breakHours: timing.breakHours, restStops: timing.restStops, fuelStops: timing.fuelStops, stopCount: timing.stopCount,
       waypoints: [], geometry, routeSource: geometry.length > 1 ? 'local-route-estimate' : 'local-base', routeConfidence: 'estimated',
-      activityId: activity?.id || null, activityType: activity?.tags?.[0] || (flex ? 'rust' : 'cultuur'),
-      primaryPlan: activity?.activity || `Herstel- en keuzedag ${visitIndex + 1} in ${visit.baseName}: houd ruimte voor rust en maximaal een korte, ter plaatse bevestigde activiteit.`,
-      rainAlternative: activity?.rainAlternative || `Gebruik deze buffer als rustige binnen- of hersteldag in ${visit.baseName}.`
+      activityId: activity?.id || (useRecoveryDay ? 'planner-recovery-logistics' : null),
+      activityType: activity?.tags?.[0] || (useRecoveryDay ? 'rust-logistiek' : 'onvolledig'),
+      planningStatus: incomplete ? 'incomplete-evidence' : 'planned',
+      incompleteReason: incomplete ? `Geen nieuw genoemd dagdoel beschikbaar voor ${visit.baseName}.` : null,
+      primaryPlan: activity?.activity || (useRecoveryDay
+        ? `Eenmalige herstel- en logistiekdag in ${visit.baseName}: rust, was en bevoorrading zonder een onbevestigde activiteit als aanbeveling te presenteren.`
+        : `Nog niet ingevuld in ${visit.baseName}: de catalogus bevat geen nieuw, onderscheidend dagdoel. Kies een andere basis, verkort de reis of verrijk de brondata.`),
+      rainAlternative: activity?.rainAlternative || (useRecoveryDay
+        ? `Gebruik deze eenmalige buffer als rustige binnen- of hersteldag in ${visit.baseName}.`
+        : 'Geen alternatief voorgesteld zolang er onvoldoende onderscheidend bewijs is.')
     };
   };
 
@@ -262,16 +338,20 @@ function buildChronologicalDynamicItinerary(trip, destination) {
       distanceKm: edge.distanceKm, roadHours: edge.roadHours, driveHours: edge.elapsedHours, elapsedHours: edge.elapsedHours,
       breakHours: edge.timing.breakHours, restStops: edge.timing.restStops, fuelStops: edge.timing.fuelStops,
       stopCount: edge.timing.stopCount, waypoints: buildBreakWaypoints(previous.overnightPoint, node.overnightPoint, edge.timing, groundTrip.transport),
-      geometry: [previous.overnightPoint, node.overnightPoint], routeSource: 'route-graph-estimate', routeConfidence: 'estimated',
+      geometry: edge.geometry?.length ? edge.geometry : [previous.overnightPoint, node.overnightPoint],
+      routeSource: edge.routeSource || 'route-graph-estimate', routeConfidence: edge.confidence || 'estimated',
+      routeLegRole: 'internal',
       primaryPlan: `Verplaats de uitvalsbasis van ${previous.baseName} naar ${node.baseName}; houd de rest van deze reisdag bewust licht.`,
       rainAlternative: `Rijd rechtstreeks naar ${node.baseName} en schrap optionele omwegen bij slecht weer.`,
-      exceedsDailyLimit: edge.elapsedHours > trip.maxDrive + .05
+      exceedsDailyLimit: edge.elapsedHours > trip.maxDrive + .05,
+      ...edgeConstraintFields(edge)
     };
   };
 
   appendAccessDays(
     'outward', origin, trip.origin,
-    { ...gateway.overnightPoint, name: gateway.baseName, role: 'gateway' }, gateway.baseName,
+    { ...gateway.overnightPoint, name: gateway.baseName, role: 'gateway', islandAccess: gateway.islandAccess,
+      requiresFerryAccess: gateway.requiresFerryAccess, featureCode: gateway.featureCode }, gateway.baseName,
     graphPlan.accessLegs?.outward || 1,
     accessSegments.filter(item => item.direction === 'outbound' || item.id === 'rental-pickup')
   );
@@ -288,7 +368,8 @@ function buildChronologicalDynamicItinerary(trip, destination) {
 
   const finalBase = route.at(-1) || gateway;
   appendAccessDays(
-    'return', { ...finalBase.overnightPoint, name: finalBase.baseName, role: 'gateway' }, finalBase.baseName,
+    'return', { ...finalBase.overnightPoint, name: finalBase.baseName, role: 'gateway', islandAccess: finalBase.islandAccess,
+      requiresFerryAccess: finalBase.requiresFerryAccess, featureCode: finalBase.featureCode }, finalBase.baseName,
     { ...origin, role: 'return' }, trip.origin,
     graphPlan.accessLegs?.return || 1,
     accessSegments.filter(item => item.direction === 'return')
@@ -296,12 +377,17 @@ function buildChronologicalDynamicItinerary(trip, destination) {
   days.forEach((day, index) => { day.day = index + 1; day.date = addDays(trip.startDate, index); });
   applyDaySchedules(groundTrip, days);
   const recommendations = buildRecommendations(groundTrip, destination, days);
-  const accommodationChanges = countAccommodationChanges(days, trip.origin);
+  const accommodationAudit = annotateAccommodationContinuity(days, trip.origin);
+  const accommodationChanges = accommodationAudit.totalChanges;
   const excessiveDays = days.filter(day => day.exceedsDailyLimit);
   const integrityIssues = itineraryIntegrityIssues({ days }, trip);
+  const incompleteDayCount = days.filter(day => day.planningStatus === 'incomplete-evidence').length;
+  const incompatibleDays = days.filter(day => day.vehicleCompatible === false || day.vehicleProhibited || day.surfaceConflict || day.fuelRangeExceeded);
   const warnings = excessiveDays.map(day => `Dag ${day.day} overschrijdt de limiet van ${trip.maxDrive} uur.`);
   const unresolvedTransitStops = days.filter(day => day.overnightRole === 'transit').length;
-  if (unresolvedTransitStops) warnings.push(`${unresolvedTransitStops} transitovernachting(en) zijn nog indicatieve corridorankers; kies pas na live plaatsverrijking een echte genoemde plaats en accommodatie.`);
+  const namedTransitStops = days.filter(day => day.overnightRole === 'catalogue-transit').length;
+  if (unresolvedTransitStops) warnings.push(`${unresolvedTransitStops} transitovernachting(en) zijn nog anonieme indicatieve corridorankers; kies pas na live plaatsverrijking een echte genoemde plaats en accommodatie.`);
+  if (namedTransitStops) warnings.push(`${namedTransitStops} genoemde transitplaats(en) komen uit de offline catalogus nabij de geschatte corridor; controleer de exacte route, omweg en accommodatie voordat je boekt.`);
   warnings.push(...integrityIssues);
   if (graphPlan.omitted.length) warnings.push(`${graphPlan.omitted.length} highlight(s) bewust weggelaten; minimaal ${graphPlan.minimumAdditionalDays || 1} extra dag(en) kunnen de eerstvolgende optie mogelijk maken.`);
   const outward = days[0]; const inbound = days.at(-1);
@@ -318,9 +404,11 @@ function buildChronologicalDynamicItinerary(trip, destination) {
   const plan = {
     days, accessSegments, routeGraph: graphPlan, omittedHighlights: graphPlan.omitted, minimumAdditionalDays: graphPlan.minimumAdditionalDays,
     routeMetrics, requiredLegs, usedLegs: requiredLegs, minimumDays: 3,
-    feasible: !excessiveDays.length && !integrityIssues.length && accommodationChanges <= trip.maxChanges,
+    feasible: !excessiveDays.length && !incompatibleDays.length && !integrityIssues.length && accommodationChanges <= trip.maxChanges,
     proposalCategory: destination.category || 'exact', warnings: [...new Set(warnings)],
-    accommodationChanges, recommendations, unresolvedTransitStops, routing: { source: 'dynamic-route-graph', label: 'Chronologische dynamische dagroutegraph', live: false }, origin
+    accommodationChanges, accommodationPropertyChanges: accommodationAudit.propertyChanges,
+    accommodationStays: accommodationAudit.stays, recommendations, unresolvedTransitStops, incompleteDayCount,
+    routing: { source: 'dynamic-route-graph', label: 'Chronologische dynamische dagroutegraph', live: false }, origin
   };
   plan.routeSegments = collectRouteSegments(plan);
   return plan;
@@ -376,10 +464,12 @@ function buildDynamicItinerary(trip, destination) {
       distanceKm: edge.distanceKm, roadHours: edge.roadHours, driveHours: edge.elapsedHours, elapsedHours: edge.elapsedHours,
       breakHours: edge.timing.breakHours, restStops: edge.timing.restStops, fuelStops: edge.timing.fuelStops,
       stopCount: edge.timing.stopCount, waypoints: buildBreakWaypoints(previous.overnightPoint, node.overnightPoint, edge.timing, groundTrip.transport),
-      geometry: [previous.overnightPoint, node.overnightPoint], routeSource: 'route-graph-estimate',
+      geometry: edge.geometry?.length ? edge.geometry : [previous.overnightPoint, node.overnightPoint],
+      routeSource: edge.routeSource || 'route-graph-estimate', routeConfidence: edge.confidence || 'estimated',
       primaryPlan: `Verplaats de uitvalsbasis van ${previous.baseName} naar ${node.baseName}. De graph solver koos deze etappe voor samenhang en beperkte terugweg.${arrivalActivity}`,
       rainAlternative: `Rijd rechtstreeks naar ${node.baseName} en schrap optionele omwegen bij slecht weer.`,
-      exceedsDailyLimit: edge.elapsedHours > trip.maxDrive + .05
+      exceedsDailyLimit: edge.elapsedHours > trip.maxDrive + .05,
+      ...edgeConstraintFields(edge)
     };
   };
 
@@ -412,7 +502,8 @@ function buildDynamicItinerary(trip, destination) {
   days.forEach((day, index) => { day.day = index + 1; day.date = addDays(trip.startDate, index); });
   applyDaySchedules(groundTrip, days);
   const recommendations = buildRecommendations(groundTrip, destination, days);
-  const accommodationChanges = countAccommodationChanges(days, trip.origin);
+  const accommodationAudit = annotateAccommodationContinuity(days, trip.origin);
+  const accommodationChanges = accommodationAudit.totalChanges;
   const excessiveDays = days.filter(day => day.exceedsDailyLimit);
   const warnings = excessiveDays.map(day => `Dag ${day.day} overschrijdt de limiet van ${trip.maxDrive} uur.`);
   if (graphPlan.omitted.length) warnings.push(`${graphPlan.omitted.length} highlight(s) bewust weggelaten; minimaal ${graphPlan.minimumAdditionalDays || 1} extra dag(en) kunnen de eerstvolgende optie mogelijk maken.`);
@@ -421,7 +512,9 @@ function buildDynamicItinerary(trip, destination) {
     routeMetrics: { origin, originKnown: validCoordinate(origin), destination: finalBase.overnightPoint, oneWayDistanceKm: destination.distanceKm, oneWayRoadHours: 0, oneWayElapsedHours: 0, oneWayDriveHours: 0, breakHours: 0, requiredLegs: Math.max(1, route.length - 1), routeSource: 'dynamic-route-graph', exploration: { overlap: 0, explorationScore: 85, method: 'constrained-route-graph' } },
     requiredLegs: Math.max(1, route.length - 1), usedLegs: Math.max(1, route.length - 1), minimumDays: 3,
     feasible: !excessiveDays.length && accommodationChanges <= trip.maxChanges, proposalCategory: destination.category || 'exact', warnings,
-    accommodationChanges, recommendations, routing: { source: 'dynamic-route-graph', label: 'Dynamische dagroutegraph', live: false }, origin
+    accommodationChanges, accommodationPropertyChanges: accommodationAudit.propertyChanges,
+    accommodationStays: accommodationAudit.stays, recommendations,
+    routing: { source: 'dynamic-route-graph', label: 'Dynamische dagroutegraph', live: false }, origin
   };
 }
 
@@ -432,6 +525,8 @@ function buildMultimodalItinerary(trip, destination) {
   const finalBase = openJaw ? destination.bases.at(-1) : base;
   const origin = { ...(trip.originPoint || {}), name: trip.origin, role: 'origin' };
   const activities = chooseActivities(trip, destination);
+  const usedActivityTexts = new Set();
+  let recoveryDayUsed = false;
   const days = [];
   const accessLabel = trip.travelMode.startsWith('fly-') ? 'Vlucht + voertuig ophalen' : 'Trein/ferry + aansluiting';
   days.push({
@@ -447,8 +542,6 @@ function buildMultimodalItinerary(trip, destination) {
     const switchIndex = Math.ceil((trip.days - 1) / 2);
     const switchDay = openJaw && index === switchIndex;
     const dayBase = openJaw && index >= switchIndex ? finalBase : base;
-    const flexible = trip.days >= 6 && index === Math.floor(trip.days / 2);
-    const activity = activities[(index - 1) % activities.length];
     if (switchDay) {
       const transfer = localTransfer(base, finalBase, { ...trip, transport: effectiveGroundVehicle(trip) });
       days.push({
@@ -460,14 +553,36 @@ function buildMultimodalItinerary(trip, destination) {
       });
       continue;
     }
+    const activity = activities.find(item => {
+      const identity = String(item.title || '').trim().toLocaleLowerCase('nl-NL').replace(/\s+/g, ' ');
+      return identity && !usedActivityTexts.has(identity);
+    }) || null;
+    if (activity) usedActivityTexts.add(String(activity.title).trim().toLocaleLowerCase('nl-NL').replace(/\s+/g, ' '));
+    const flexible = !activity && !recoveryDayUsed;
+    if (flexible) recoveryDayUsed = true;
+    const incomplete = !activity && !flexible;
     days.push({
-      kind: flexible ? 'flex' : 'stay', typeLabel: labelFor(flexible ? 'flex' : 'stay'), from: dayBase.name, to: dayBase.name,
+      kind: incomplete ? 'unplanned' : flexible ? 'flex' : 'stay',
+      typeLabel: incomplete ? 'Onvolledige dag' : labelFor(flexible ? 'flex' : 'stay'),
+      from: dayBase.name, to: dayBase.name,
       location: dayBase.name, fromPoint: { ...dayBase, role: 'destination' }, toPoint: { ...dayBase, role: 'destination' }, overnight: dayBase.name,
-      distanceKm: flexible ? 12 : 65, roadHours: flexible ? .3 : 1.5, driveHours: flexible ? .3 : 1.5, elapsedHours: flexible ? .3 : 1.5,
+      distanceKm: incomplete ? 0 : flexible ? 12 : 65,
+      roadHours: incomplete ? 0 : flexible ? .3 : 1.5,
+      driveHours: incomplete ? 0 : flexible ? .3 : 1.5,
+      elapsedHours: incomplete ? 0 : flexible ? .3 : 1.5,
       breakHours: 0, restStops: 0, fuelStops: 0, stopCount: 0, waypoints: [], geometry: [{ ...dayBase }], routeSource: 'local-estimate',
-      activityType: flexible ? 'rust' : activity.type,
-      primaryPlan: flexible ? 'Hersteldag en logistieke buffer; geen verplichte activiteit.' : activity.title,
-      rainAlternative: flexible ? 'Gebruik als volledige buffer of rustige binnenactiviteit dichtbij.' : activity.rainAlternative
+      activityType: flexible ? 'rust-logistiek' : incomplete ? 'onvolledig' : activity.type,
+      activityId: activity?.id || (flexible ? 'planner-recovery-logistics' : null),
+      planningStatus: incomplete ? 'incomplete-evidence' : 'planned',
+      incompleteReason: incomplete ? `Geen nieuw genoemd dagdoel beschikbaar voor ${dayBase.name}.` : null,
+      primaryPlan: flexible
+        ? `Eenmalige herstel- en logistiekdag in ${dayBase.name}; geen onbevestigde activiteit wordt als aanbeveling gepresenteerd.`
+        : incomplete
+          ? `Nog niet ingevuld in ${dayBase.name}: er is geen nieuw, onderscheidend dagdoel met bronbewijs.`
+          : activity.title,
+      rainAlternative: flexible
+        ? 'Gebruik deze eenmalige buffer als volledige rustdag of voor noodzakelijke logistiek.'
+        : incomplete ? 'Geen alternatief voorgesteld zolang er onvoldoende onderscheidend bewijs is.' : activity.rainAlternative
     });
   }
   days.push({
@@ -485,25 +600,34 @@ function buildMultimodalItinerary(trip, destination) {
     day.schedule = { activityWindow: 'Verbindingstijden niet bevestigd' };
   }
   const recommendations = buildRecommendations({ ...trip, transport: effectiveGroundVehicle(trip) }, destination, days);
-  const accommodationChanges = countAccommodationChanges(days, trip.origin);
+  const accommodationAudit = annotateAccommodationContinuity(days, trip.origin);
+  const accommodationChanges = accommodationAudit.totalChanges;
+  const integrityIssues = itineraryIntegrityIssues({ days }, trip);
+  const incompleteDayCount = days.filter(day => day.planningStatus === 'incomplete-evidence').length;
   return {
     days,
     accessSegments,
     routeMetrics: { origin, originKnown: validCoordinate(origin), destination: finalBase, oneWayDistanceKm: accessSegments[0]?.distanceKm || destination.distanceKm, oneWayRoadHours: 1.2, oneWayElapsedHours: accessSegments[0]?.durationHours || 0, oneWayDriveHours: 1.2, breakHours: 0, requiredLegs: 1, routeSource: 'multimodal-planning-estimate', exploration: { overlap: 0, explorationScore: openJaw ? 95 : 80, method: openJaw ? 'open-jaw' : 'multimodal-local-loop' } },
-    requiredLegs: 1, usedLegs: 1, minimumDays: 3, feasible: !days.some(day => day.exceedsDailyLimit) && accommodationChanges <= trip.maxChanges, proposalCategory: destination.category || 'exact', warnings: ['Internationale verbindingen, tarieven, bagage en huurvoorwaarden zijn indicatief totdat je ze bij de aanbieder bevestigt.'], accommodationChanges, recommendations,
+    requiredLegs: 1, usedLegs: 1, minimumDays: 3,
+    feasible: !days.some(day => day.exceedsDailyLimit) && !integrityIssues.length && accommodationChanges <= trip.maxChanges,
+    proposalCategory: destination.category || 'exact',
+    warnings: [...new Set(['Internationale verbindingen, tarieven, bagage en huurvoorwaarden zijn indicatief totdat je ze bij de aanbieder bevestigt.', ...integrityIssues])],
+    accommodationChanges, accommodationPropertyChanges: accommodationAudit.propertyChanges,
+    accommodationStays: accommodationAudit.stays, recommendations, incompleteDayCount,
     routing: { source: 'multimodal-planning-estimate', label: 'Multi-modale logistiek + lokale route', live: false }, origin
   };
 }
 
 export function countAccommodationChanges(days, origin) {
-  const overnights = days.map(day => day.overnight).filter(name => name && name !== origin);
-  return overnights.reduce((count, name, index) => count + (index > 0 && name !== overnights[index - 1] ? 1 : 0), 0);
+  return annotateAccommodationContinuity(days, origin).totalChanges;
 }
 
 export function itineraryIntegrityIssues(plan, trip) {
   const days = plan?.days || [];
   const issues = [];
   if (days.length !== Number(trip.days)) issues.push(`Het chronologische plan bevat ${days.length} in plaats van ${trip.days} dagen.`);
+  const incompleteDays = days.filter(day => day.planningStatus === 'incomplete-evidence' || day.kind === 'unplanned');
+  if (incompleteDays.length) issues.push(`${incompleteDays.length} dag${incompleteDays.length === 1 ? '' : 'en'} niet inhoudelijk ingevuld: er is onvoldoende onderscheidend, genoemd bewijs voor de toegewezen verblijfsduur.`);
   if (days[0]?.from !== trip.origin) issues.push(`Dag 1 vertrekt niet vanuit ${trip.origin}.`);
   if (days.at(-1)?.to !== trip.origin) issues.push(`De laatste dag keert niet terug naar ${trip.origin}.`);
   for (let index = 1; index < days.length; index += 1) {

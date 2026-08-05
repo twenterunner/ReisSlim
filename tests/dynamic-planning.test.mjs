@@ -61,7 +61,7 @@ const countryFixtures = {
   ])
 };
 
-test('production proposal flow has no destination catalogue import or service-worker entry', () => {
+test('legacy destination catalogue and country-specific route templates remain absent', () => {
   assert.doesNotMatch(source('app.js'), /from ['"]\.\/destinations\.js/);
   assert.doesNotMatch(source('service-worker.js'), /['"]\.\/destinations\.js['"]/);
   assert.doesNotMatch(source('destination-provider.js'), /Namibia|South Africa|Croatia|Bulgaria|Slovenia|Dolomites|Black Forest/i);
@@ -139,7 +139,8 @@ test('vehicle switching rebuilds recommendations without profile contamination',
   const days = [{ day: 1, kind: 'stay', from: 'Base', to: 'Base', location: 'Base', overnight: 'Base', toPoint: { lat: 1, lon: 1 }, waypoints: [], primaryPlan: 'Wandeling' }];
   const destination = { bases: [{ name: 'Base', lat: 1, lon: 1 }] };
   buildRecommendations(trip({ travelMode: 'fly-ride', transport: 'motorcycle' }), destination, days);
-  assert.match(JSON.stringify(days), /Motorvriendelijk/);
+  assert.match(JSON.stringify(days), /motorreizigers/i);
+  assert.doesNotMatch(JSON.stringify(days), /veilige parking|secure parking|overdekte parking/i);
   buildRecommendations(trip({ transport: 'car' }), destination, days);
   assert.doesNotMatch(JSON.stringify(days), /motorvriendelijk|motorparking|motorhotel/i);
   assert.ok(recommendationsMatchVehicle({ recommendations: days[0].recommendations }, 'car'));

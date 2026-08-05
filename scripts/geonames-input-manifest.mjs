@@ -1,0 +1,72 @@
+// Pinned GeoNames snapshot used to build the v1.3 offline catalogue.
+// Raw archives remain outside Git; byte counts and SHA-256 identities make rebuilds deterministic.
+export const GEONAMES_SNAPSHOT = Object.freeze({
+  id: 'geonames-2026-08-05',
+  snapshotDate: '2026-08-05',
+  sourceDateEpoch: 1785888000,
+  baseUrl: 'https://download.geonames.org/export/dump',
+  license: 'CC BY 4.0',
+  files: Object.freeze({
+    'AD.zip': Object.freeze({ bytes: 97847, sha256: '89523c3d0b512be086c666bddfcb5ece09cc00f976f52de755d75e6b1081453d' }),
+    'AL.zip': Object.freeze({ bytes: 385343, sha256: '1ef18c2bf2c4eeb4da5ac900d79e6bdb5fbdfb7b58a52412f522560616c23fb7' }),
+    'AM.zip': Object.freeze({ bytes: 1156383, sha256: 'f4c39a3a7dfdd4978324459764073e10f7b3bce25db36e186f32fc19cdcc56bf' }),
+    'AT.zip': Object.freeze({ bytes: 1565168, sha256: '9b71551f23022645f48f1150d6ca79d193333f85fb9cb6dd6a85e45eecc32864' }),
+    'AZ.zip': Object.freeze({ bytes: 603420, sha256: '02f03e9d21eca5821303b6a3fa48a7b8c5711a6bf8bb0d6b0426191df3c1a808' }),
+    'BA.zip': Object.freeze({ bytes: 1348635, sha256: '0f56a6ad00a67c39fe1d631fb4f60d0cf0e9ad56fbc9d9e535a81fb5c8953a6f' }),
+    'BE.zip': Object.freeze({ bytes: 677888, sha256: 'd5eaa52b41bde2d10eabb86edc671b250db1bfb2ea2e566731977331b9d5cf96' }),
+    'BG.zip': Object.freeze({ bytes: 762837, sha256: '9bfb8799d9f63e94629f4d3d67553be3db6daf27abe8405a139e0ce48cf896aa' }),
+    'BY.zip': Object.freeze({ bytes: 1389022, sha256: '63bac045c74b98ea05f3a7da2640bbfadb7fdfcee9274b243882840dd7103ad1' }),
+    'CH.zip': Object.freeze({ bytes: 2701775, sha256: 'e984969badb29eef056760f4a22ae6821fca99be18705ad2d4e6f2b83a60edd0' }),
+    'CY.zip': Object.freeze({ bytes: 292105, sha256: 'aaa795d29c8e6618ec65246837c08dbbd321c90c69d06a2922317493fdd19c7d' }),
+    'CZ.zip': Object.freeze({ bytes: 1601376, sha256: 'b8b9da87e32db0fc55a9d6c0917ec2bf158ef9ed6825f26d42a6967c7b8cf688' }),
+    'DE.zip': Object.freeze({ bytes: 7417368, sha256: '03c5d3286c7865cc2f71d950586a439e375598407a1231efdc763cf2df685c85' }),
+    'DK.zip': Object.freeze({ bytes: 471955, sha256: '9093acdd7d29353666c3cdef39cd005b5eea72d4328a4e07d2e745e196ceee16' }),
+    'EE.zip': Object.freeze({ bytes: 511298, sha256: '04babbb2d9727f4f2da16aa1ebb705e8a76758fdefa4feb071a355e3f0121917' }),
+    'ES.zip': Object.freeze({ bytes: 3326177, sha256: '035f6f3a021c78f583047cb3d95b32d48211d02f7290a56c51c47b6ac06c2dbf' }),
+    'FI.zip': Object.freeze({ bytes: 13530735, sha256: '5f014701b2d0f51a66941aa92396e3233afe67a726868880fff1c8f7e3d59cbb' }),
+    'FR.zip': Object.freeze({ bytes: 7293608, sha256: '5f3d69520d0f59c3374596d637d7293a2bc4e4a87f3dcba63e60a745b560fde4' }),
+    'GB.zip': Object.freeze({ bytes: 3638500, sha256: 'a56d98904d7282f1932bbfb0a2f0d465444d174926fee41670e8b02d9a5edc53' }),
+    'GE.zip': Object.freeze({ bytes: 414258, sha256: '5ea827203f190a01045f0044b42f04c0f7681a62156d9b63dfb989df9f6d5de3' }),
+    'GR.zip': Object.freeze({ bytes: 1738391, sha256: 'aef366b8fa93029f36aabf239410cf6c2d5ac395bbb6a71c4a2d1ba29c2f2e82' }),
+    'HR.zip': Object.freeze({ bytes: 797267, sha256: 'ef7285270f40acf005ddc4d3ca6af0be131d6715844f6176f77fac1bd3a2dbba' }),
+    'HU.zip': Object.freeze({ bytes: 695311, sha256: 'a16df6d963631400f2b938f263c1e1628db5c7870629b422695146c6d0aeb01a' }),
+    'IE.zip': Object.freeze({ bytes: 817542, sha256: '808f6f2d8ce6ef31c8ca10548d85b4300cb4940ccf78ab3496c6083612252fc6' }),
+    'IS.zip': Object.freeze({ bytes: 469626, sha256: '0aa1b6ef429d34f111f8d3f04e6ed34e96babb737d0a32e06125211706ff8034' }),
+    'IT.zip': Object.freeze({ bytes: 4349862, sha256: '46bdbdea45af06923dc61e1f3bf1211ddce9024bbef85b244ca2ea35bb2b2b9d' }),
+    'KZ.zip': Object.freeze({ bytes: 2719332, sha256: 'fab8c8f5b7ac27f210c12148f931b2ed6c830384508c6943a681fb36a0a88cac' }),
+    'LI.zip': Object.freeze({ bytes: 52203, sha256: '612744d85b34e1a2c82e3b5c5ccc648d26f472dc48260b8d8b3bd5519865888e' }),
+    'LT.zip': Object.freeze({ bytes: 1092521, sha256: 'fdb8affb6a77e6a08f9ad1d83d4eb17d0e5f3faa367313f69aff2a5675455417' }),
+    'LU.zip': Object.freeze({ bytes: 54845, sha256: '1fdcb538f4c1992e75cce1fec595afe75f526a38a23476668700f4083c217d3c' }),
+    'LV.zip': Object.freeze({ bytes: 1008850, sha256: '9b81af5ebbb642d949c7c2abe2857899fe8b631f960e1920af2fed37eb630fa7' }),
+    'MC.zip': Object.freeze({ bytes: 9022, sha256: 'fb158dd5ddfe1eadc7304bd9d736ffa369b3ea564f0a91516da625d11a13e518' }),
+    'MD.zip': Object.freeze({ bytes: 152521, sha256: '53e8255a33f1c3bdd6898ce62b84b8162ba046cfb2de8f768080d6a7a72b8a3d' }),
+    'ME.zip': Object.freeze({ bytes: 376321, sha256: '86058d6b09e4436428a53c2e992e28a9d99542d4ec99169ee5b069fbb4736cd4' }),
+    'MK.zip': Object.freeze({ bytes: 926902, sha256: '532572a5cee71b8154fb5286d846ecd5adb49c85a5bbc45c2994dc40b874f0a0' }),
+    'MT.zip': Object.freeze({ bytes: 106079, sha256: '82e6680f512c8b8a490009ab7fa43ffb33e6414aaf406ad41667a18865711d79' }),
+    'NA.zip': Object.freeze({ bytes: 360363, sha256: 'c76c06660cc0ddba914f81b89b81552e134b5125b64f63e9d38a9b5e3b39612d' }),
+    'NL.zip': Object.freeze({ bytes: 724193, sha256: 'aad315537bd1d73232920a54aedec25323d32b2780bec61c3fc27d778acbe835' }),
+    'NO.zip': Object.freeze({ bytes: 15767108, sha256: 'ea0e38d34238c39e235781bdf0d9a0a4ce2d47dc8c2fb8de603f5f2488a090e1' }),
+    'PL.zip': Object.freeze({ bytes: 2016142, sha256: '4d6b94fb1b512c52a34ca3762223511a461e5783c72b7684a76e466fda493286' }),
+    'PT.zip': Object.freeze({ bytes: 1164980, sha256: 'b972a4bb08ce7147946528c236d041b6d024c40ce0b71352272cfacd72e83654' }),
+    'RO.zip': Object.freeze({ bytes: 1998404, sha256: '3701fad9524178fa10ed5ba57c6ac973fffb626902badf7d0b43af294d1f96ef' }),
+    'RS.zip': Object.freeze({ bytes: 757078, sha256: 'e2ebe296a23f08f60f2a3b815fea227ff57dc72b851a3daad2ce4b6ad6cb40c3' }),
+    'RU.zip': Object.freeze({ bytes: 15235733, sha256: '31ab9c46fd0d6cc3ed59d8645bc65a9a7f10f4c3d18b55558d35f12a3ef0432c' }),
+    'SE.zip': Object.freeze({ bytes: 2610726, sha256: '3417078d3e6bd4ba54351d9dc33368a78960a2c22a9b23fc2e2207b4be059486' }),
+    'SI.zip': Object.freeze({ bytes: 417200, sha256: '6f8dd331fb4e608953cc842f9b56de2ce0323b5670ce6d0d591bfee045adf259' }),
+    'SK.zip': Object.freeze({ bytes: 450882, sha256: '000d2a56a79a65d86e8771b483de0d419d3ef7f94df16663a1d8c85a88d24df0' }),
+    'SM.zip': Object.freeze({ bytes: 12127, sha256: '9a3e1a077e5ac4e8fdd639a77c03ae80fec78203f0e75884dbb18c0e4da89c6a' }),
+    'TR.zip': Object.freeze({ bytes: 3554216, sha256: 'b751bcc6b627cdee1eda7605fc4bc0c34334039ec17eecc644e8c0d70d1377b4' }),
+    'UA.zip': Object.freeze({ bytes: 2245286, sha256: '9b3a7576f6824f1f678f28acd5b93a5d00eba53a4c1f0f944b93cddf642e905c' }),
+    'VA.zip': Object.freeze({ bytes: 12646, sha256: 'c9e869e970ffdae5c8d7660f75d7e3e88f6dfdf229d94081f45bf5f7f872c53c' }),
+    'XK.zip': Object.freeze({ bytes: 221973, sha256: '5510863807ae371a1f8f6e1a752950fcd9ac8035ec496a210a7db7b427c1c4f8' }),
+    'ZA.zip': Object.freeze({ bytes: 2694041, sha256: '501d549a521821db88130d07d28f1fd84259871907e39faafcc712b15721c702' }),
+    'countryInfo.txt': Object.freeze({ bytes: 31678, sha256: '93bafc525813f22e4711ff9ed6d626343094ce48c26388dc7c49189b3d7d5512' }),
+    'shapes_simplified_low.json.zip': Object.freeze({ bytes: 1302427, sha256: '974f4090fbfd42d3b5bc34d92e20f92eac00f945e8edaa5cf1a1fe4ba1e51295' })
+  })
+});
+
+export function geonamesInput(fileName) {
+  const entry = GEONAMES_SNAPSHOT.files[fileName];
+  if (!entry) throw new Error(`GeoNames input ${fileName} is absent from pinned snapshot ${GEONAMES_SNAPSHOT.id}`);
+  return entry;
+}

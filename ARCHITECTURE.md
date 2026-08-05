@@ -1,60 +1,56 @@
-# ReisSlim v1.2 architecture
+# ReisSlim v1.3 architecture
 
 ## System boundary
 
-ReisSlim is a flat-file, GitHub Pages-compatible PWA. `app.js` owns the current UI state; deterministic domain modules own planning decisions; optional providers only supply normalized evidence. There is one canonical itinerary and one canonical budget. No provider may silently replace user constraints or claim verification it cannot prove.
+ReisSlim is a flat-file, GitHub Pages-compatible PWA. `app.js` owns transient UI state; deterministic domain modules own planning decisions; catalogue modules supply versioned evidence; optional providers can only enrich that evidence. There is one canonical itinerary and one canonical budget. No source may silently relax hard constraints or claim verification it cannot prove.
 
 ## Data flow
 
-`TripRequest → origin geocoding → destination type/boundary resolution → multi-scale sampling → significant anchors → regional clusters/corridors → candidate concepts → hard-constraint gate → deterministic graph search → night allocation → canonical days/segments → route-aware enrichment → budget/readiness/quality gate → map + JSON + GPX`
+`TripRequest → country resolution → lazy country-pack load → evidence anchors and corridors → regional concepts → hard-constraint gate → constrained graph search → night allocation → canonical days and segments → named recommendations → optional live enrichment → budget/readiness/quality → map + optimizer + JSON + GPX`
 
-Every selected plan must contain exactly the requested number of days, begin at the entered origin and end there unless a confirmed multi-modal open-jaw topology returns from another destination base. The home origin is never an activity or accommodation destination.
+Every selected plan contains the requested number of days, starts each day at the previous overnight location and returns to the entered origin unless an explicit supported topology says otherwise. The home origin is never rendered as a destination activity or accommodation.
 
 ## Layers
 
-1. **Request and migration** — `trip-model.js`, `storage.js`, `config.js` normalize schema 9 and rebuild stale derived plans and vehicle-specific recommendations whenever schema 9 or engine 10 is not present.
-2. **Constraint and proposal domain** — `constraint-engine.js`, `destination-engine.js`, `proposal-engine.js`, `preference-engine.js` separate feasibility from ranking and apply bounded local learning.
-3. **Routing and itinerary** — `vehicle-intelligence.js`, `route-engine.js`, `route-graph-engine.js`, `route-topology.js`, `multimodal-engine.js`, `plan-solver.js`, `itinerary-engine.js` create graph nodes/edges, vehicle timings, omissions, return corridors, duration-scaled base targets and chronologically connected day schedules.
-4. **Decision support** — `budget-engine.js`, `travel-readiness.js`, `trip-quality-engine.js`, `trip-optimizer.js`, `assistant-engine.js` produce uncertainty ranges, blockers, explicit route-quality dimensions and previewable structural changes.
-5. **Provider platform** — `provider-platform.js` defines envelopes, request budgets, timeouts, health and deduplication. Destination, route, place, weather and image adapters retain source, freshness, confidence and fallback state.
-6. **Presentation/export** — `ui-renderer.js`, `map-view.js`, `gpx-generator.js` render escaped data from the canonical plan. `service-worker.js` provides the offline shell.
+1. **Request and migration** — `trip-model.js`, `storage.js` and `config.js` normalize compact schema-10 snapshots and rebuild stale derived plans under engine 11.
+2. **Catalogue knowledge** — the compact `catalog-locator.js` resolves source-derived country/city/region names without loading every pack; `catalog-index.js` then dynamically imports only the required flat `catalog-xx.js` pack. The pack schema retains anchors, recommendations, corridors, provenance, licence, generation date and honest unknown values.
+3. **Catalogue adapter** — `catalog-runtime.js` turns a selected pack into generic destination profiles and attaches named pack evidence to canonical days. It contains no country-specific itinerary functions.
+4. **Constraint and proposal domain** — `constraint-engine.js`, `destination-engine.js`, `proposal-engine.js` and `preference-engine.js` separate feasibility from ranking and diversity.
+5. **Routing and itinerary** — `vehicle-intelligence.js`, `route-engine.js`, `route-graph-engine.js`, `route-topology.js`, `plan-solver.js` and `itinerary-engine.js` solve base sequences, vehicle timings, omissions and chronologically connected days.
+6. **Decision support** — `budget-engine.js`, `travel-readiness.js`, `trip-quality-engine.js`, `trip-optimizer.js` and `assistant-engine.js` calculate uncertainty ranges, blockers, quality dimensions and structural plan mutations.
+7. **Optional providers** — normalized geocoding, route, place, weather and image adapters add freshness and geometry without becoming a prerequisite for proposal generation.
+8. **Presentation/export** — `ui-renderer.js`, `map-view.js` and `gpx-generator.js` render the same escaped canonical plan. `service-worker.js` provides the offline shell and on-demand country-pack cache.
 
-## Global discovery
+## Country-pack contract
 
-`destination-provider.js` treats a typed destination as a provider-resolved geographic object rather than a centre-point string. Country and region bounds drive multi-scale samples; significant gateways, protected areas, natural/cultural anchors and named settlements are retained with source evidence and clustered by distance, connectivity and constraints into regional concepts. Country-code and boundary evidence reject cross-border results. Each provider batch is bounded for reliability, while the discovery cursor has no catalogue or coverage cap.
+Each manifest record declares an ISO code, display name, aliases, data/schema version, generation date, sources and record counts. Each anchor has a stable ReisSlim ID, country code, real name, coordinates, role, significance, vehicle-fit evidence, provenance and last-checked date. Missing season, surface, access, parking or suitability evidence remains `null` or explicitly unknown.
 
-Production proposal generation has no catalogue import. Only an unexpired cache for the identical normalized request/provider/schema identity may be reused. Without it, failure is explicit and produces no proposals. Recorded country fixtures live only in tests.
+Named recommendations belong to a specific base and retain provider identity, coordinates, source URL, confidence and unverified status. Corridor records connect anchors and may retain distance, vehicle-specific timing, surface/road evidence, service spacing and fallback geometry. The generic runtime can use incomplete evidence but lowers confidence; it never fabricates the missing field.
 
-`route-graph-engine.js` uses deterministic constrained beam search to select a feasible base/highlight sequence. It rewards meaningful coverage, evidence, coherent progression, distinct experiences and vehicle fit, while penalizing backtracking, repeated corridors, ping-pong movement, weak micro-areas, accommodation churn and uncertainty. Edge elapsed time, changes and duration can remove a famous highlight; the canonical plan retains the omission reason and extra-day guidance.
+## Loading and offline behavior
 
-## Trip scale, night allocation and quality gate
+`catalog-index.js` uses dynamic imports. The loader, compact locator and catalogue runtime are part of the PWA shell; the full country packs are not. A destination pack is fetched when that country is requested. For a direct cross-border journey, the runtime samples the same estimated access corridor used to create transit days and loads only the additional packs needed for those named transit nights. Those packs can provide source-backed accommodation and service candidates without being copied into the canonical saved plan. The service worker stores requested packs for same-origin offline reuse; the full European catalogue is never downloaded at startup. Leaflet 1.9.4 and its default marker assets are also vendored as flat, precached files, with the upstream BSD-2-Clause licence retained in `LEAFLET_LICENSE.txt`.
 
-Trip scale is derived from destination type and bounds, duration, daily elapsed-time limit, topology, access mode, vehicle and maximum accommodation changes. A city break may remain at one base; a long country-level touring request receives multi-base coverage objectives when evidence permits. A plan that technically satisfies driving limits but collapses into a 20–50 km metropolitan loop fails the route-quality gate and cannot become a normal proposal.
+An unsupported destination is reported explicitly; no unrelated country is substituted. A previously loaded or saved pack/plan can be rebuilt offline. Public provider failure does not block catalogue planning.
 
-Night allocation is chronological: every day begins at the previous overnight point, and every transfer has a canonical segment. Non-gateway bases are visited once unless the topology explicitly requires a gateway return. Stay days require distinct named evidence or a declared rest/logistics purpose; repeated filler activities are not generated.
+## Generic solver and trip scale
 
-`trip-quality-engine.js` scores coverage, base and night-allocation quality, coherence, backtracking, corridor repetition, POI uniqueness/evidence, accommodation evidence, touring-road quality, vehicle suitability, completeness and uncertainty. This score follows—and cannot override—the hard-constraint gate.
+The selected pack becomes a graph of gateways, bases, highlights, services and corridors. Deterministic constrained search rewards significance, preference fit, coherent progress, multi-night stays with distinct evidence, scenic/touring value, named evidence and vehicle suitability. It penalizes weak suburban bases, excessive driving, backtracking, repeated corridors, ping-pong, filler days, accommodation churn, uncertain access and missing service coverage.
 
-## Route topology and segments
+Trip scale is derived from duration, daily elapsed-time limit, topology, access mode, vehicle and maximum accommodation changes. A short city break can use one base; a long country tour should use several meaningful bases when the pack supports them. Hard constraints gate the plan before quality ranking and cannot be compensated by a high score.
 
-Road plans represent every travel day as a canonical route segment with geometry, source, confidence and waypoints. Loop topology shifts the return corridor and calculates sampled geodesic overlap and an exploration score; out-and-back deliberately reuses the corridor. Live routing operates per segment and falls back independently. Day cards, selected map layers, POIs, accommodations and GPX consume these same segment/day identities.
+## Vehicle separation
 
-Multi-modal access uses normalized segments with mode, direction, indicative duration, source, confidence, external search link and explicit `scheduleVerified`, `priceVerified` and `bookable` flags. ReisSlim never creates a flight number or live fare. Open-jaw is enabled only for multi-modal journeys with more than one destination base.
+Vehicle identity is normalized once. Car planning rewards practical access, parking and coherent elapsed time and cannot display motorcycle wording. Motorcycle planning recalculates elapsed time, rests, fuel range, road/touring evidence, remoteness, daylight arrival and parking uncertainty. A secure/covered-parking statement requires explicit evidence; otherwise the UI states that motorcycle parking security is not verified.
 
-## Provider contract
+Changing vehicle rebuilds concepts, route, timing, rests, recommendations, budget, readiness, map, JSON and GPX. Run IDs prevent late live responses from restoring stale vehicle or proposal state.
 
-A normalized provider result includes provider, provider object ID, status, coordinates/bounds, source link, fetch/fresh timestamps, attribution, confidence, cache state and warnings. Adapters use abortable timeouts, bounded concurrency, input validation, exact-request caching, endpoint failover and graceful partial degradation. Late responses are tied to the active discovery/enrichment run so stale vehicle, date or selected-proposal data cannot overwrite the canonical plan. Shared production keys belong behind a gateway; no secret may ship in the PWA.
+## Canonical plan and optimizer
 
-## Budget, readiness and quality
+Every travel day owns one canonical segment with geometry, source, confidence and waypoints. Day cards, map layers, overnight/POI/accommodation markers and GPX consume those same identities. `budget-engine.js` remains the only total calculator.
 
-`budget-engine.js` is the only total calculator. Visible rows sum exactly to the central total and are recalculated after structural plan mutations. Multi-modal travel adds international access, rental and baggage, with low/central/high ranges and low confidence until live prices are supplied.
+Optimizer proposals must make structural canonical-plan changes—such as replacing/reordering a base, reallocating nights, removing repetition, shortening a segment or improving service readiness—and then recalculate all derived outputs. Text-only, no-op and negligible proposals are suppressed.
 
-Travel Readiness is a checklist, not legal or medical advice. Advice, entry and health items remain `verified: false` until an official integration confirms them. The quality model exposes 18 dimensions including completeness, exploration, vehicle suitability, safety, POI quality, booking and documents.
+## Generation boundary
 
-## Persistence and privacy
-
-Only input, selected identities, locally learned evidence and safe user settings are authoritative. Storage schema 9 reads schema 8 and older keys, retains the normalized request and provider-backed destination identity, and forces a full rebuild under engine 10 rather than rendering stale route, vehicle, POI or accommodation data. Preference signals are bounded, require repeated evidence for ranking, are inspectable in export code, and stop updating in private mode. Geolocation requires explicit browser permission.
-
-## Optimizer contract
-
-An optimizer proposal must contain an exact before/after structural change set, affected days, score-component changes and remaining compromises. Supported mutations replace/add/remove/reorder bases, reallocate nights, replace repeated POIs or weak accommodation, change topology, shorten excessive travel and improve coverage/readiness. Applying one mutation reruns the canonical itinerary, segment list, provider enrichment, budget, quality, map and GPX. Text-only, no-op and negligible proposals are suppressed.
+Development-time scripts retrieve/cache permitted open-source data, normalize boundaries and records, deduplicate, validate, rank anchors, create adjacency evidence and emit the flat packs plus a coverage report. The generated packs are committed; source downloads are not required at runtime. Bulk regeneration must follow the official source licences and usage policies in [API_SOURCES.md](API_SOURCES.md).

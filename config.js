@@ -1,7 +1,7 @@
-export const VERSION = '1.2.0';
-export const BUILD = '1200';
-export const ENGINE_VERSION = 10;
-export const STORAGE_SCHEMA_VERSION = 9;
+export const VERSION = '1.3.0';
+export const BUILD = '1300';
+export const ENGINE_VERSION = 11;
+export const STORAGE_SCHEMA_VERSION = 10;
 
 export const preferenceDefinitions = [
   ['natuur', 'Natuur'], ['bergen', 'Bergen'], ['zwemmen', 'Zwemmen'],
@@ -24,7 +24,7 @@ export const transportProfiles = {
     defaultFuelRangeKm: 260, arrivalBufferMinutes: 15, parkingDaily: 6,
     tollFactor: .65, accommodationFactor: .92, supportsDimensions: false,
     weatherReserveMinutesPerHour: 5,
-    accommodationLabel: 'motorvriendelijk verblijf met veilige, liefst overdekte parking'
+    accommodationLabel: 'verblijf passend bij motorreizigers; beveiliging en overdekking van motorparking niet geverifieerd'
   },
   motorhome: {
     label: 'Camper / motorhome', routeMode: 'truck', consumption: 11.5, roadTimeFactor: 1.12,

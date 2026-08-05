@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.3.0 — 2026-08-05
+
+### Added
+
+- versioned, source-backed touring country packs for South Africa, Namibia and all European countries, including microstates and Kosovo;
+- lazy country resolution/import with per-pack manifest counts, generation metadata, provenance, licence and integrity validation;
+- development-time catalogue generation, exact pinned Overture extraction/merge and reproducible coverage/data-quality reports;
+- named base-associated POIs, restaurants, accommodation candidates and services where source records support them;
+- source-backed road context at important corridor endpoints, counted separately from full route-backed corridors and retaining honestly labelled fallback geometry, unknown route condition and separate car/motorcycle timing;
+- offline catalogue proposal generation that does not call public discovery providers;
+- a compact offline place locator and locally vendored Leaflet 1.9.4 runtime/marker assets;
+- deterministic acceptance coverage for South Africa, Namibia, European car/motorcycle tours, vehicle-copy isolation, pack loading and service-worker scope.
+
+### Changed
+
+- version/build to 1.3.0/1300, engine version to 11 and storage schema to 10;
+- catalogue planning is now the primary runtime path; live geocoding, route, weather, place and image providers are optional enrichment;
+- the same generic constrained graph solver constructs every country itinerary—country packs contain knowledge, not pre-authored route functions;
+- the PWA shell precaches only the flat runtime and catalogue loader; requested country packs are cached on demand;
+- direct cross-border trips preload only sampled transit-country packs and attach named, source-backed accommodation candidates to catalogue transit nights without treating estimated access geometry as verified;
+- budgets sum the road distance of every canonical day, exclude flight/rail/ferry transfers from fuel distance, and expose generic nightly/activity priors as limited-confidence assumptions rather than sourced prices;
+- saved schema-9 and older trips are compacted and rebuilt under the current catalogue and vehicle profile; large derived plans are no longer duplicated in local storage.
+
+### Fixed
+
+- useful proposal generation no longer fails whenever public geocoding/discovery providers are slow or unavailable;
+- car output cannot retain motorcycle-accommodation language after a vehicle switch;
+- motorcycle secure/covered-parking claims require evidence; otherwise uncertainty is stated explicitly;
+- named recommendations are associated with their actual canonical base/day and deduplicated across the itinerary;
+- consecutive nights at one base retain one provider-identified accommodation choice, while a real property change is counted against the accommodation-change constraint;
+- GPX exports only road days as tracks and retains non-road transfers as explicit logistics metadata;
+- catalogue corridor geometry is shared by the itinerary, map and GPX instead of being presentation-only metadata.
+
+### Known data limitations
+
+- static catalogue records do not prove current opening, inventory, price, bookability, route safety, road status or parking security;
+- GeoNames population/feature records provide broad touring coverage but are not a substitute for live road restrictions or accommodation inventory;
+- some small countries and sparsely mapped areas contain fewer recommendations because records are never padded or fabricated;
+- optional public enrichment providers still have usage policies and no production SLA.
+
 ## 1.2.0 — 2026-08-05
 
 ### Added

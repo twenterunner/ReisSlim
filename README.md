@@ -1,46 +1,35 @@
-# ReisSlim 1.2.0 — route intelligence and structural optimization
+# ReisSlim 1.3.0 — catalogue-first touring planner
 
-ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips and multi-modal journeys. It supports direct trips by car, motorcycle, camper or caravan, plus fly-drive, fly-ride, fly-camper and train/ferry access. The deterministic planner works without a server; optional public data providers enrich destinations, routes, POIs, weather and open-license images.
+ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips. Version 1.3 uses a versioned, source-backed touring catalogue for South Africa, Namibia and every European country, including microstates and Kosovo. A useful itinerary no longer depends on public discovery APIs being available.
 
-## What v1.2 does
+## What v1.3 does
 
-- accepts any typed origin or privacy-aware current location;
-- resolves any typed city, region, country, island or bounded destination using provider identity, type and bounds;
-- samples typed destination boundaries at multiple scales, discovers significant provider-backed gateways and anchors, and clusters them into feasible trip regions;
-- keeps blank worldwide discovery usable through independent Photon settlement evidence and Wikipedia GeoSearch when Overpass is unavailable;
-- cancels stale discovery runs so a slow Android response cannot overwrite a newer request;
-- never uses a finite destination catalogue or unrelated fallback in the production proposal flow;
-- creates a materially diverse portfolio when enough evidence satisfies the hard constraints, and explains when fewer concepts are supportable;
-- permits at most two clearly labelled, bounded stretch ideas;
-- supports loops with a different return corridor, out-and-back routes and multi-modal open-jaw trips;
-- models flight/train/ferry and rental segments without inventing schedules, fares, bookability or availability;
-- applies distinct motorcycle pace, rest, fuel and road-evidence logic alongside car, camper and caravan requirements;
-- derives a duration- and boundary-aware trip scale, then uses deterministic constrained graph search to select bases, allocate nights and connect every day chronologically;
-- rejects long country trips that collapse into a weak urban micro-loop, repeat a corridor, ping-pong between bases or fill nights with duplicate activities;
-- discovers route- and base-aware named OpenStreetMap POIs and accommodations where evidence exists, with generic categories clearly labelled as unverified fallback search areas;
-- shows Open-Meteo weather with local symbols and vehicle-aware suitability;
-- provides low, central and high budget estimates, including international transport, rental and baggage;
-- exports daily GPX tracks and waypoints from the same geometry used on the map;
-- includes a Travel Readiness dashboard with official source links and explicit unverified states;
-- learns bounded preferences locally, supports private mode and never silently applies conversational changes;
-- builds a constrained highlight/overnight graph, explains omissions and renders selectable route layers plus associated POIs and accommodation per travel day;
-- scores geographic coverage, base quality, route coherence, backtracking, corridor repetition, POI uniqueness/evidence, accommodation evidence, vehicle fit, completeness and uncertainty separately from the hard-constraint gate;
-- applies only structural optimizer mutations and rebuilds the itinerary, route segments, budget, recommendations, map and GPX from the same canonical plan;
-- migrates older saved trips to schema 9 / engine 10 and rebuilds stale derived data with the current vehicle profile.
+- resolves country names, aliases and ISO codes against a flat catalogue manifest;
+- loads the requested `catalog-xx.js` pack plus only the packs sampled for named direct-trip transit nights, and caches them on demand;
+- keeps country packs out of the application-shell precache;
+- builds three to six deterministic regional touring concepts when the evidence and constraints permit;
+- uses a generic constrained graph solver—country packs provide evidence, never pre-authored itineraries;
+- selects meaningful gateways and overnight bases, allocates nights chronologically and prevents filler days, repeated POIs and A→B→A→B routes;
+- produces structurally different car and motorcycle plans, including separate elapsed-time, rest, fuel, road and parking treatment;
+- prefers named, sourced POIs, restaurants, accommodations and services from the selected pack;
+- labels static candidates honestly: prices, availability, opening hours, road conditions and parking security remain unverified unless live evidence confirms them;
+- lets optional OSRM/OpenRouteService, Open-Meteo and Wikimedia Commons data enrich—not enable—the plan;
+- uses one canonical plan for day cards, map routes, recommendations, budget, optimizer, JSON and GPX;
+- sums canonical road-day mileage in the budget and displays the unsourced generic nightly/activity priors, uncertainty range and limited confidence instead of presenting static candidates as current prices;
+- keeps the Leaflet map runtime in flat, locally cached files so the map UI starts without a CDN;
+- migrates older saved trips to compact storage-schema 10 / engine 11 snapshots and rebuilds derived vehicle-specific state without retaining stale plans.
 
-Namibia, South Africa and European self-drive cases exist only as recorded provider-shaped acceptance fixtures. They are not imported by production modules and do not control worldwide coverage.
-
-The v1.1 failure was architectural: the first successful local provider cluster could be treated as a complete country concept, night allocation could extend that weak cluster to the requested duration, and optimizer score changes did not always imply a different canonical route. Version 1.2 separates evidence discovery from trip-scale validation, quality-gates the solved route, and suppresses any optimization without a measurable structural mutation.
+The catalogue is generated at development time from legally reusable source records. It is not a hand-written collection of model guesses. Its manifest records the country, generation date, source versions and record counts; unknown attributes stay unknown. South Africa, Namibia and European acceptance cases exercise the same runtime solver and do not have country-specific itinerary functions. GeoNames base-pack generation plus exact, pinned Overture Places/Transportation extraction, normalization and merge form the release build; cached OpenStreetMap enrichment remains optional. Release reports separate full route-backed corridors from endpoint-only road context, which retains fallback geometry and unknown route condition. Direct cross-border trips use named locator anchors and source-backed recommendations from lazily loaded transit packs, while continuing to label the route and detour as estimated until a live routing provider confirms them. The reproducible workflow and strict evidence gates are documented in [CATALOG_BUILD.md](CATALOG_BUILD.md) and [API_SOURCES.md](API_SOURCES.md).
 
 ## Run locally
 
-No build step or npm install is required. ES modules need a static web server:
+No build step is required. ES modules need a static web server:
 
 ```bash
 python -m http.server 8080
 ```
 
-Open `http://localhost:8080`. On Android, GitHub Pages or a Codespaces forwarded port provides the same static app. Direct `file://` opening is not supported.
+Open `http://localhost:8080`. Direct `file://` opening is not supported. Android can use GitHub Pages or a forwarded Codespaces port.
 
 ## Test
 
@@ -50,20 +39,20 @@ Node.js 20+ is sufficient:
 npm run check
 ```
 
-This runs syntax, unit, integration, migration, GPX, static-server and PWA checks. See [TESTING.md](TESTING.md).
+This runs syntax, catalogue integrity, unit/integration, migration, canonical map/GPX, static-server and PWA checks. See [TESTING.md](TESTING.md).
 
-## Providers, privacy and trust
+## Sources, privacy and trust
 
-Dynamic proposal generation uses Nominatim and Overpass without a bundled API key. OSRM/OpenRouteService, Open-Meteo and Wikimedia Commons enrich the selected plan. If discovery fails and no exact-request cache exists, ReisSlim shows no unrelated trips. A personal OpenRouteService key is stored separately in the browser and is never included in saved-trip JSON or source control. See [API_SOURCES.md](API_SOURCES.md).
+The bundled catalogue is generated from source-backed open data described in [API_SOURCES.md](API_SOURCES.md). Catalogue-record licensing and attribution are documented separately in [CATALOG_DATA_NOTICE.md](CATALOG_DATA_NOTICE.md); that data notice does not change the licence of the application code. Live geocoding, routes, places, weather and imagery are optional enrichments. A personal OpenRouteService key is stored separately in the browser and is never included in source control or saved-trip JSON.
 
-Trips, dismissed/saved proposals and preference evidence stay in browser `localStorage`. Private mode disables new learning. Current-location coordinates are only used after explicit browser permission. See [PERSONALIZATION.md](PERSONALIZATION.md).
+Trips, saved/dismissed proposals and preference evidence stay in browser `localStorage`. Private mode disables new learning. Current-location coordinates are used only after explicit browser permission. See [PERSONALIZATION.md](PERSONALIZATION.md).
 
-ReisSlim is planning and decision support. It does not claim live inventory, confirmed prices, a booked connection, legal entry eligibility, medical clearance or route safety. Official advice, documents, opening times, vehicle restrictions, weather and booking conditions must be confirmed at the linked source.
+ReisSlim is planning support. It does not claim live inventory, confirmed prices, current opening, a booked connection, legal entry eligibility, medical clearance or route safety. Confirm official advice, vehicle restrictions, weather, road status, parking and booking conditions at the linked sources.
 
 ## GitHub Pages
 
-Publish the repository root through **Settings → Pages → Deploy from a branch**. All paths are project-site relative, and the v1.2 service worker caches only the flat dynamic runtime shell; the former `destinations.js` catalogue has been removed.
+Publish the repository root through **Settings → Pages → Deploy from a branch**. All browser runtime files remain flat and project-site relative. The v1.3 service worker precaches only the application shell; loaded country packs are runtime-cached for later offline use.
 
 ## Architecture
 
-The domain is provider-independent and uses one canonical itinerary, budget and export model. Derived state is rebuilt after migrations. See [ARCHITECTURE.md](ARCHITECTURE.md) and [CHANGELOG.md](CHANGELOG.md).
+The deterministic domain uses one canonical itinerary, budget and export model. Catalogue knowledge, optional provider evidence and UI state stay separated, and derived state is rebuilt after migrations or vehicle changes. See [ARCHITECTURE.md](ARCHITECTURE.md), [CATALOG_COVERAGE.md](CATALOG_COVERAGE.md), [CATALOG_DATA_QUALITY.md](CATALOG_DATA_QUALITY.md) and [CHANGELOG.md](CHANGELOG.md).
