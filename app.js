@@ -1,23 +1,23 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1102';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1102';
-import { discoverDestinationBatch, recommendAccessMode, resolveDestination } from './destination-provider.js?v=1102';
-import { buildItinerary } from './itinerary-engine.js?v=1102';
-import { buildItineraryVariant, buildItineraryVariants } from './itinerary-variants.js?v=1102';
-import { buildBudget } from './budget-engine.js?v=1102';
-import { calculateTripQuality } from './trip-quality-engine.js?v=1102';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1102';
-import { validatePlan } from './itinerary-validator.js?v=1102';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1102';
-import { localDate, normalizeTrip, readTripForm, resolveOrigin, validateTripInput, writeTripForm } from './trip-model.js?v=1102';
-import { downloadGpx, downloadJson } from './gpx-generator.js?v=1102';
-import { highlightMapDay, invalidateMap, renderMap } from './map-view.js?v=1102';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1102';
-import { evaluatePlanConstraints } from './constraint-engine.js?v=1102';
-import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js?v=1102';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1102';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1102';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1102';
-import { enrichDestinationImages, enrichHighlightImages } from './image-provider.js?v=1102';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1200';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1200';
+import { discoverDestinationBatch, recommendAccessMode, resolveDestination } from './destination-provider.js?v=1200';
+import { buildItinerary } from './itinerary-engine.js?v=1200';
+import { buildItineraryVariant, buildItineraryVariants } from './itinerary-variants.js?v=1200';
+import { buildBudget } from './budget-engine.js?v=1200';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1200';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1200';
+import { validatePlan } from './itinerary-validator.js?v=1200';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1200';
+import { localDate, normalizeTrip, readTripForm, resolveOrigin, validateTripInput, writeTripForm } from './trip-model.js?v=1200';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1200';
+import { highlightMapDay, invalidateMap, renderMap } from './map-view.js?v=1200';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1200';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1200';
+import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js?v=1200';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1200';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1200';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1200';
+import { enrichDestinationImages, enrichHighlightImages } from './image-provider.js?v=1200';
 
 const defaults = () => normalizeTrip({
   origin: 'Saasveld', startDate: localDate(30), days: 10, budget: 3500, travelMode: 'direct', routeTopology: 'loop', tripPace: 'balanced', destinationQuery: '',
@@ -30,7 +30,7 @@ const state = {
   trip: null, ranked: [], ranking: null, destination: null, plan: null, budget: null,
   validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false,
   undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, routingRun: 0, catalog: [], discoveryCursor: 0, discoveryBusy: false,
-  discoveryRunId: 0, discoveryController: null, accessNotice: null,
+  discoveryRunId: 0, discoveryController: null, enrichmentController: null, accessNotice: null,
   preferenceProfile: loadPreferenceProfile(), assistantPreview: null
 };
 
@@ -46,6 +46,7 @@ const materialTripFingerprint = trip => JSON.stringify({
 
 function beginDiscoveryRun() {
   state.discoveryController?.abort();
+  state.enrichmentController?.abort();
   const controller = new AbortController();
   const runId = ++state.discoveryRunId;
   state.discoveryController = controller;
@@ -304,12 +305,15 @@ function applyVariant(variantId) {
 }
 
 async function enhanceLiveData(destinationId, originalPlan) {
+  state.enrichmentController?.abort();
+  const controller = new AbortController();
+  state.enrichmentController = controller;
   const run = ++state.routingRun;
   $('mapDataStatus').textContent = 'Route en plaatsen laden…';
   try {
     let plan = originalPlan;
-    if (routingConfigured(state.trip)) plan = await enrichPlanWithLiveRouting(state.trip, state.destination, plan);
-    plan = await enrichPlanWithPlaces(state.trip, state.destination, plan);
+    if (routingConfigured(state.trip)) plan = await enrichPlanWithLiveRouting(state.trip, state.destination, plan, { signal: controller.signal });
+    plan = await enrichPlanWithPlaces(state.trip, state.destination, plan, { signal: controller.signal });
     if (run !== state.routingRun || state.destination?.id !== destinationId) return;
     Object.assign(state, derivePlanState(state.destination, plan));
     renderPlan(state);
@@ -318,8 +322,11 @@ async function enhanceLiveData(destinationId, originalPlan) {
     const liveParts = [plan.routing?.live ? 'wegroute' : null, plan.placeData?.live ? 'plaatsen' : null, plan.weather?.live ? 'weer' : null].filter(Boolean);
     persistDraft(liveParts.length ? `Live ${liveParts.join(', ')} opgeslagen` : 'Offline planning actief');
   } catch (error) {
+    if (error?.name === 'AbortError') return;
     console.warn('Live routering niet beschikbaar', error);
     if (run === state.routingRun) $('mapDataStatus').textContent = 'Offline corridorraming';
+  } finally {
+    if (state.enrichmentController === controller) state.enrichmentController = null;
   }
 }
 
@@ -349,7 +356,8 @@ function rebuildFromRecord(record) {
 
 function resetState(trip = defaults()) {
   state.discoveryController?.abort();
-  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [], discoveryCursor: 0, discoveryBusy: false, discoveryRunId: state.discoveryRunId + 1, discoveryController: null, accessNotice: null });
+  state.enrichmentController?.abort();
+  Object.assign(state, { trip, ranked: [], ranking: null, destination: null, plan: null, budget: null, validation: [], quality: null, compareIds: [], savedProposalIds: [], dismissedIds: [], variants: [], selectedVariantId: null, optimized: false, undoSnapshot: null, optimizationSummary: null, optimizationProposal: null, assistantPreview: null, routingRun: state.routingRun + 1, catalog: [], discoveryCursor: 0, discoveryBusy: false, discoveryRunId: state.discoveryRunId + 1, discoveryController: null, enrichmentController: null, accessNotice: null });
   writeTripForm(trip);
   renderVehicleControls();
   syncTravelModeControls();
@@ -360,6 +368,18 @@ function resetState(trip = defaults()) {
   $('mapHint').classList.remove('hidden');
   persistDraft('Nieuw concept opgeslagen');
   renderDashboard(state, loadTrips());
+}
+
+function rebuildAfterVehicleInputChange() {
+  state.discoveryController?.abort();
+  state.enrichmentController?.abort();
+  state.routingRun += 1;
+  state.plan = null;
+  state.destination = null;
+  state.variants = [];
+  state.optimizationProposal = null;
+  state.undoSnapshot = null;
+  if (!$('resultsSection').classList.contains('hidden')) queueMicrotask(() => $('tripForm').requestSubmit());
 }
 
 function initialize() {
@@ -387,15 +407,14 @@ function initialize() {
   });
   $('transport').addEventListener('change', () => {
     renderVehicleControls({ resetDefaults: true });
-    state.routingRun += 1;
-    state.plan = null; state.destination = null; state.variants = [];
-    if (!$('resultsSection').classList.contains('hidden')) queueMicrotask(() => $('tripForm').requestSubmit());
+    rebuildAfterVehicleInputChange();
   });
   $('travelMode').addEventListener('change', () => {
     const vehicle = { 'fly-drive': 'car', 'fly-ride': 'motorcycle', 'fly-camper': 'motorhome' }[$('travelMode').value];
     if (vehicle) $('transport').value = vehicle;
     renderVehicleControls({ resetDefaults: Boolean(vehicle) });
     syncTravelModeControls();
+    rebuildAfterVehicleInputChange();
   });
   $('routeStyle').addEventListener('change', () => renderVehicleControls());
   $('itinerary').addEventListener('click', event => {
@@ -585,12 +604,13 @@ function initialize() {
     const overallDelta = result.quality.rawOverall - before.rawOverall;
     const importantDelta = Math.max(...Object.keys(result.quality.rawDimensions).map(key => result.quality.rawDimensions[key] - before.rawDimensions[key]));
     const resolved = before.deductions.length > result.quality.deductions.length || (state.constraintStatus?.violations?.length || 0) > result.constraintStatus.violations.length;
-    if (overallDelta < 5 && importantDelta < 10 && !resolved) { alert('Deze selectie haalt de minimale verbeterdrempel niet. Kies meer gecoördineerde wijzigingen of sluit het voorstel.'); return; }
+    if (!result.changes?.length || (overallDelta < .75 && importantDelta < 4 && !resolved)) { alert('Deze selectie verandert het canonieke plan niet aantoonbaar genoeg en wordt daarom niet toegepast.'); return; }
     state.undoSnapshot = clone({ plan: state.plan, budget: state.budget, quality: state.quality, validation: state.validation, constraintStatus: state.constraintStatus, optimized: state.optimized });
     Object.assign(state, { ...result, validation: validatePlan(state.trip, state.destination, result.plan, result.budget), optimized: true });
-    state.optimizationSummary = { before: before.overall, after: result.quality.overall, changes: state.optimizationProposal.actions.filter(action => actionIds.includes(action.id)).map(action => action.description) };
+    state.optimizationSummary = { before: before.overall, after: result.quality.overall, changes: result.changes.map(change => `${change.title}: dag ${change.affectedDays.join(', ')}`) };
     state.optimizationProposal = null;
-    renderPlan(state); renderOptimizationPreview(state); renderMap(state.plan); persistDraft('Geselecteerde verbeteringen opgeslagen');
+    renderPlan(state); renderOptimizationPreview(state); renderMap(state.plan); persistDraft('Geselecteerde structurele verbeteringen opgeslagen');
+    if (state.trip.liveData) void enhanceLiveData(state.destination.id, state.plan);
   });
   $('rejectOptimizationBtn').addEventListener('click', () => {
     state.optimizationProposal = null; renderOptimizationPreview(state);

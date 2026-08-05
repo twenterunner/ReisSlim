@@ -6,11 +6,12 @@ let activeLayers = [];
 let layerControl;
 let activeBounds = [];
 let dayLayers = new Map();
+let dayMarkers = new Map();
 let selectedDay = null;
 
 const colors = {
   origin: '#176b5c', return: '#123f3a', overnight: '#e6a53b', destination: '#7a5dc7',
-  outward: '#176b5c', returnRoute: '#3b72a8', transfer: '#7a5dc7',
+  outward: '#176b5c', returnRoute: '#3b72a8', transfer: '#7a5dc7', stay: '#d37b2b', flex: '#7d6845',
   accommodation: '#e6a53b', restaurant: '#c95e42', activity: '#7a5dc7',
   fuel: '#2f7d62', rest: '#4a92b5', service: '#7d6845'
 };
@@ -25,6 +26,7 @@ function clearLayers() {
     layerControl = null;
   }
   dayLayers = new Map();
+  dayMarkers = new Map();
 }
 
 function addOverlay(name) {
@@ -69,12 +71,13 @@ export function renderMap(plan, elementId = 'map') {
     const liveRoute = ['tomtom', 'openrouteservice', 'osrm'].includes(segment.source);
     bounds.push(...coordinates);
     const multimodal = segment.mode && segment.mode !== 'road';
-    L.polyline(coordinates, {
+    const routeLine = L.polyline(coordinates, {
       weight: liveRoute ? 5 : 4,
-      dashArray: liveRoute ? null : multimodal ? '3 9' : '8 6',
+      dashArray: liveRoute ? null : multimodal ? '3 9' : segment.kind === 'stay' ? '2 5' : segment.kind === 'flex' ? '1 7' : '8 6',
       opacity: .9,
       color: segment.kind === 'return' ? colors.returnRoute : colors[segment.kind] || colors.outward
-    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : multimodal ? `Indicatief ${escapeHtml(segment.mode)}-segment; geen bevestigd schema` : 'Indicatieve corridor'}`);
+    }).addTo(routeLayer).bindPopup(`<strong>Dag ${segment.day}</strong><br>${liveRoute ? 'Live wegroute' : multimodal ? `Indicatief ${escapeHtml(segment.mode)}-segment; geen bevestigd schema` : 'Indicatieve corridor'}<br><small>Bron: ${escapeHtml(segment.source)} Â· vertrouwen: ${escapeHtml(segment.confidence || 'onbekend')}</small>`);
+    routeLine.options.reisslimBaseWeight = liveRoute ? 5 : 4;
   });
 
   routePoints.forEach((point, index) => {
@@ -93,13 +96,16 @@ export function renderMap(plan, elementId = 'map') {
       : item.type === 'accommodation' ? stayLayer
         : item.type === 'restaurant' ? foodLayer : activityLayer;
     bounds.push([item.lat, item.lon]);
-    L.circleMarker([item.lat, item.lon], {
+    const marker = L.circleMarker([item.lat, item.lon], {
       radius: 6,
       color: colors[item.type] || colors.activity,
       fillColor: colors[item.type] || colors.activity,
       fillOpacity: .75,
       weight: 2
-    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br><small>${escapeHtml(item.source)} · ${item.live ? 'live locatie, beschikbaarheid controleren' : 'offline categorievoorstel'}</small>`);
+    }).addTo(group).bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br>${escapeHtml(item.reason)}<br>${item.associatedBase ? `<small>Basis: ${escapeHtml(item.associatedBase)}</small><br>` : ''}<small>${escapeHtml(item.source)} · ${item.genericFallback ? 'categoriezoekgebied bij de basis; geen bevestigde locatie' : item.live ? 'providerlocatie; opening en beschikbaarheid controleren' : 'geplande routepauze'} · vertrouwen: ${escapeHtml(item.confidence || 'onbekend')}</small>`);
+    const markers = dayMarkers.get(Number(item.day)) || [];
+    markers.push(marker);
+    dayMarkers.set(Number(item.day), markers);
   });
 
   layerControl = L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(map);
@@ -128,9 +134,14 @@ export function highlightMapDay(day) {
   selectedDay = Number(day) || null;
   if (!map || !selectedDay) return false;
   const layer = dayLayers.get(selectedDay);
-  if (!layer) return false;
-  layer.eachLayer(item => item.setStyle?.({ weight: 8, opacity: 1 }));
-  const bounds = layer.getBounds?.();
+  const markers = dayMarkers.get(selectedDay) || [];
+  if (!layer && !markers.length) return false;
+  for (const routeLayer of dayLayers.values()) routeLayer.eachLayer(item => item.setStyle?.({ weight: item.options?.reisslimBaseWeight || 4, opacity: .55 }));
+  for (const markerList of dayMarkers.values()) for (const marker of markerList) marker.setStyle?.({ radius: 6, weight: 2, fillOpacity: .6 });
+  layer?.eachLayer(item => item.setStyle?.({ weight: 8, opacity: 1 }));
+  for (const marker of markers) marker.setStyle?.({ radius: 9, weight: 4, fillOpacity: 1 });
+  const features = [...(layer?.getLayers?.() || []), ...markers];
+  const bounds = features.length ? L.featureGroup(features).getBounds() : null;
   if (bounds?.isValid?.()) map.fitBounds(bounds, { padding: [40, 40] });
   return true;
 }

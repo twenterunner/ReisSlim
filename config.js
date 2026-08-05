@@ -1,7 +1,7 @@
-export const VERSION = '1.1.2';
-export const BUILD = '1102';
-export const ENGINE_VERSION = 9;
-export const STORAGE_SCHEMA_VERSION = 8;
+export const VERSION = '1.2.0';
+export const BUILD = '1200';
+export const ENGINE_VERSION = 10;
+export const STORAGE_SCHEMA_VERSION = 9;
 
 export const preferenceDefinitions = [
   ['natuur', 'Natuur'], ['bergen', 'Bergen'], ['zwemmen', 'Zwemmen'],

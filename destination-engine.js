@@ -1,8 +1,10 @@
 import { clamp, roundScore } from './config.js';
 import { buildBudget } from './budget-engine.js';
+import { buildItinerary } from './itinerary-engine.js';
 import { calculateRouteMetrics, haversineKm } from './route-engine.js';
+import { calculateTripQuality } from './trip-quality-engine.js';
 import { estimateLegTiming, transportId } from './vehicle-intelligence.js';
-import { STRETCH_LIMITS, closestAdjustments, evaluateDestinationConstraints } from './constraint-engine.js';
+import { STRETCH_LIMITS, closestAdjustments, evaluateDestinationConstraints, evaluatePlanConstraints } from './constraint-engine.js';
 
 const tagScore = (destination, tag, matched = 90, unmatched = 45) => destination.tags?.includes(tag) ? matched : unmatched;
 
@@ -27,6 +29,82 @@ function destinationIntentScore(trip, destination) {
   const haystack = [destination.name, destination.country, destination.summary, ...(destination.tags || [])].join(' ').toLocaleLowerCase('nl-NL');
   const matches = words.filter(word => haystack.includes(word)).length;
   return matches ? Math.min(30, 18 + matches * 6) : -12;
+}
+
+const normalizedIdentity = value => String(value || '').trim().toLocaleLowerCase('nl-NL');
+const coordinateIdentity = point => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lon))
+  ? `${Math.floor(Number(point.lat) / 4)}:${Math.floor(Number(point.lon) / 4)}`
+  : '';
+
+function planStructure(trip, destination, plan) {
+  const origin = normalizedIdentity(trip.origin);
+  const bases = [...new Set((plan.days || [])
+    .map(day => normalizedIdentity(day.overnight))
+    .filter(name => name && name !== origin))];
+  const graphRoute = plan.routeGraph?.route || [];
+  const gateway = normalizedIdentity(graphRoute.find(node => node.gateway)?.baseName
+    || graphRoute[0]?.baseName
+    || plan.days?.find(day => day.kind === 'outward')?.to
+    || destination.bases?.[0]?.name);
+  const highlights = [...new Set([
+    ...(plan.routeGraph?.selected || []).map(item => normalizedIdentity(item.id || item.name)),
+    ...(plan.days || []).filter(day => day.kind === 'stay').map(day => normalizedIdentity(day.primaryPlan))
+  ].filter(Boolean))];
+  const corridors = [...new Set((plan.days || [])
+    .filter(day => ['outward', 'transfer', 'return'].includes(day.kind))
+    .map(day => {
+      const endpoints = [normalizedIdentity(day.from), normalizedIdentity(day.to)].sort();
+      return endpoints[0] && endpoints[1] ? `${endpoints[0]}>${endpoints[1]}` : '';
+    }).filter(Boolean))];
+  const points = destination.bases?.filter(point => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon))) || [];
+  const centroid = points.length ? {
+    lat: points.reduce((sum, point) => sum + Number(point.lat), 0) / points.length,
+    lon: points.reduce((sum, point) => sum + Number(point.lon), 0) / points.length
+  } : destination.point || destination.center || destination.bases?.[0];
+  const providerRegion = destination.regionId || destination.clusterId || destination.boundary?.providerId || destination.destinationBoundary?.providerId;
+  const macroRegion = normalizedIdentity(providerRegion) || `${normalizedIdentity(destination.country)}:${coordinateIdentity(centroid)}`;
+  return {
+    macroRegion,
+    country: normalizedIdentity(destination.country),
+    gateway,
+    bases,
+    highlights,
+    corridors,
+    topology: trip.routeTopology,
+    routeDays: (plan.days || []).filter(day => ['outward', 'transfer', 'return'].includes(day.kind)).length
+  };
+}
+
+function planQualityViolation(quality) {
+  const detail = quality.gate.reasons.join(' ');
+  return {
+    key: 'planQuality',
+    label: 'Planstructuur',
+    actual: quality.overall,
+    limit: 65,
+    detail: detail || 'Het canonieke dagplan haalt de minimale structuur- en evidencekwaliteit niet.',
+    adjustment: quality.recommendations[0]?.text || 'Ontdek sterkere routeankers of kies een kortere, geografisch samenhangende regio.',
+    stretchable: false,
+    severity: Math.max(.1, (65 - quality.overall) / 65)
+  };
+}
+
+function applyProposalQualityGate(trip, plan, quality, structure) {
+  const selectedHighlights = plan.routeGraph?.selected?.length
+    ?? new Set((plan.days || []).filter(day => day.kind === 'stay').map(day => normalizedIdentity(day.primaryPlan)).filter(Boolean)).size;
+  const weakLongMicroLoop = trip.days >= 10
+    && structure.bases.length <= 1
+    && selectedHighlights <= 1
+    && (quality.dimensions.corridorRepetition < 45 || quality.dimensions.nightAllocation < 55);
+  if (!weakLongMicroLoop) return quality;
+  const reason = 'De ontdekte route blijft voor deze lange reis vrijwel volledig op één basis, één highlight en dezelfde corridor.';
+  quality.evidence = { ...quality.evidence, weakMicroLoop: true, proposalWeakMicroLoop: true };
+  quality.gate = { passed: false, reasons: [...new Set([...(quality.gate?.reasons || []), reason])] };
+  quality.passes = false;
+  quality.overall = Math.min(54, quality.overall);
+  quality.rawOverall = Math.min(54, quality.rawOverall);
+  if (!quality.deductions.includes(reason)) quality.deductions.unshift(reason);
+  return quality;
 }
 
 export function scoreDestination(trip, destination) {
@@ -73,7 +151,7 @@ export function scoreDestination(trip, destination) {
   if (!route.originKnown) compromises.push('De vertrekplaats kon niet worden gegeocodeerd; de routebelasting heeft lager vertrouwen.');
   const confidence = route.originKnown ? (destination.routeStops?.length >= route.requiredLegs - 1 ? 'redelijk' : 'beperkt') : 'beperkt';
   const matchLabels = preference.matches.length ? preference.matches.slice(0, 3).join(', ') : 'algemene reiswensen';
-  return {
+  const scoredDestination = {
     ...destination, score, dimensions, estimate: budget.total, budget, route, matches: preference.matches, intentMatch: intentScore > 0,
     minimumDays, feasible: constraintStatus.exact, category: constraintStatus.category,
     constraintStatus, confidence, compromises,
@@ -81,6 +159,43 @@ export function scoreDestination(trip, destination) {
       ? `Past bij ${matchLabels} en blijft binnen je harde voorwaarden voor budget, tijd en wissels.`
       : `Past inhoudelijk bij ${matchLabels}, maar staat alleen als expliciet begrensd stretch-idee in de resultaten.`
   };
+  const canonicalPlan = buildItinerary(trip, scoredDestination);
+  const canonicalBudget = buildBudget(trip, scoredDestination, canonicalPlan);
+  const planConstraintStatus = evaluatePlanConstraints(trip, canonicalPlan, canonicalBudget, { allowStretch: constraintStatus.stretch });
+  canonicalPlan.constraintStatus = planConstraintStatus;
+  canonicalPlan.feasible = planConstraintStatus.exact;
+  const structure = planStructure(trip, scoredDestination, canonicalPlan);
+  const quality = applyProposalQualityGate(trip, canonicalPlan, calculateTripQuality(trip, scoredDestination, canonicalPlan, canonicalBudget), structure);
+  const planSelectable = constraintStatus.selectable && planConstraintStatus.selectable && quality.passes;
+  if (!planSelectable) {
+    const qualityIssue = quality.passes ? null : planQualityViolation(quality);
+    const issues = [...constraintStatus.violations, ...planConstraintStatus.violations, ...(qualityIssue ? [qualityIssue] : [])]
+      .filter((item, index, all) => all.findIndex(candidate => candidate.key === item.key && candidate.detail === item.detail) === index);
+    scoredDestination.destinationConstraintStatus = constraintStatus;
+    scoredDestination.constraintStatus = {
+      ...constraintStatus,
+      category: 'rejected', exact: false, stretch: false, selectable: false,
+      violations: issues,
+      summary: issues.map(item => item.detail).join(' ')
+    };
+    scoredDestination.category = 'rejected';
+    scoredDestination.feasible = false;
+    scoredDestination.rejectionType = qualityIssue ? 'plan-quality' : 'canonical-plan-constraint';
+    scoredDestination.compromises = [...scoredDestination.compromises, ...issues.map(item => item.detail)];
+    scoredDestination.explanation = qualityIssue
+      ? `De bestemming is ontdekt, maar het gegenereerde dagplan is niet selecteerbaar: ${qualityIssue.detail}`
+      : `De bestemming is ontdekt, maar het canonieke dagplan schendt een harde reisvoorwaarde.`;
+  }
+  scoredDestination.planQuality = quality;
+  scoredDestination.planQualityStatus = {
+    selectable: planSelectable,
+    category: planSelectable ? (constraintStatus.stretch ? 'stretch' : 'accepted') : 'rejected',
+    reasons: quality.gate.reasons,
+    score: quality.overall
+  };
+  scoredDestination.planStructure = structure;
+  scoredDestination.previewBudget = canonicalBudget;
+  return scoredDestination;
 }
 
 const byMatch = (a, b) => Number(b.intentMatch) - Number(a.intentMatch) || b.score - a.score || a.estimate - b.estimate || a.name.localeCompare(b.name, 'nl');

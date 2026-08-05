@@ -2,6 +2,7 @@ import { routingConfig, validCoordinate } from './config.js';
 import { buildRecommendations } from './recommendation-engine.js';
 import { estimateLegTiming, minimumTravelLegs, transportId, vehicleSpec } from './vehicle-intelligence.js';
 import { applyDaySchedules } from './plan-solver.js';
+import { collectRouteSegments } from './itinerary-engine.js';
 
 const SETTINGS_KEY = 'reisslim.integration.v1';
 const OSRM_URL = 'https://router.project-osrm.org';
@@ -85,22 +86,33 @@ function applyResult(trip, day, result) {
   return true;
 }
 
-async function fetchWithTimeout(url, options, fetchImpl, timeoutMs) {
+const throwIfAborted = signal => {
+  if (signal?.aborted) throw new DOMException('Routing cancelled', 'AbortError');
+};
+
+async function fetchWithTimeout(url, options, fetchImpl, timeoutMs, externalSignal = null) {
+  throwIfAborted(externalSignal);
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  externalSignal?.addEventListener?.('abort', abort, { once: true });
+  if (externalSignal?.aborted) controller.abort();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, { ...options, signal: controller.signal });
     if (!response.ok) throw new Error(`Routeprovider antwoordde met ${response.status}.`);
     return response.json();
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener?.('abort', abort);
+  }
 }
 
-async function fetchGatewayRoute(apiUrl, request, fetchImpl, timeoutMs) {
+async function fetchGatewayRoute(apiUrl, request, fetchImpl, timeoutMs, signal) {
   return fetchWithTimeout(apiUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request)
-  }, fetchImpl, timeoutMs);
+  }, fetchImpl, timeoutMs, signal);
 }
 
 function normalizeOsrmRoute(payload) {
@@ -115,12 +127,12 @@ function normalizeOsrmRoute(payload) {
   };
 }
 
-async function fetchOsrmRoute(trip, request, fetchImpl, timeoutMs, baseUrl = OSRM_URL) {
+async function fetchOsrmRoute(trip, request, fetchImpl, timeoutMs, baseUrl = OSRM_URL, signal = null) {
   if (!['car', 'motorcycle'].includes(transportId(trip.transport))) throw new Error('OSRM wordt niet gebruikt voor grote voertuigen.');
   const { origin, destination } = request;
   const url = new URL(`/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}`, baseUrl);
   url.search = new URLSearchParams({ overview: 'full', geometries: 'geojson', steps: 'false', alternatives: 'false' });
-  return normalizeOsrmRoute(await fetchWithTimeout(url, { headers: { accept: 'application/json' } }, fetchImpl, timeoutMs));
+  return normalizeOsrmRoute(await fetchWithTimeout(url, { headers: { accept: 'application/json' } }, fetchImpl, timeoutMs, signal));
 }
 
 function normalizeOrsRoute(payload) {
@@ -136,7 +148,7 @@ function normalizeOrsRoute(payload) {
   };
 }
 
-async function fetchOrsRoute(trip, request, apiKey, fetchImpl, timeoutMs, baseUrl = ORS_URL) {
+async function fetchOrsRoute(trip, request, apiKey, fetchImpl, timeoutMs, baseUrl = ORS_URL, signal = null) {
   const vehicle = vehicleSpec(trip);
   const heavy = ['motorhome', 'caravan'].includes(vehicle.transport);
   const profile = heavy ? 'driving-hgv' : 'driving-car';
@@ -152,17 +164,28 @@ async function fetchOrsRoute(trip, request, apiKey, fetchImpl, timeoutMs, baseUr
     method: 'POST',
     headers: { authorization: apiKey, 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify(body)
-  }, fetchImpl, timeoutMs);
+  }, fetchImpl, timeoutMs, signal);
   return normalizeOrsRoute(payload);
 }
 
 async function fetchRouteForDay(trip, day, options, fetchImpl, timeoutMs) {
   const request = buildRoutingRequest(trip, day);
   const gateway = options.apiUrl ?? routingEndpoint();
-  if (gateway) return fetchGatewayRoute(gateway, request, fetchImpl, timeoutMs);
+  if (gateway) return fetchGatewayRoute(gateway, request, fetchImpl, timeoutMs, options.signal);
   const settings = options.settings || readRoutingSettings(options.storage);
-  if (settings.orsApiKey) return fetchOrsRoute(trip, request, settings.orsApiKey, fetchImpl, timeoutMs, options.orsUrl);
-  return fetchOsrmRoute(trip, request, fetchImpl, timeoutMs, options.osrmUrl);
+  if (settings.orsApiKey) return fetchOrsRoute(trip, request, settings.orsApiKey, fetchImpl, timeoutMs, options.orsUrl, options.signal);
+  return fetchOsrmRoute(trip, request, fetchImpl, timeoutMs, options.osrmUrl, options.signal);
+}
+
+async function settleInBatches(items, concurrency, worker) {
+  const settled = [];
+  for (let index = 0; index < items.length; index += concurrency) {
+    settled.push(...await Promise.all(items.slice(index, index + concurrency).map(async item => {
+      try { return { status: 'fulfilled', value: await worker(item) }; }
+      catch (reason) { return { status: 'rejected', reason }; }
+    })));
+  }
+  return settled;
 }
 
 const providerLabel = source => ({
@@ -179,9 +202,11 @@ export async function enrichPlanWithLiveRouting(trip, destination, plan, options
     : JSON.parse(JSON.stringify(plan));
   const routeDays = next.days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind)
     && validCoordinate(day.fromPoint) && validCoordinate(day.toPoint));
-  const settled = await Promise.allSettled(routeDays.map(day => fetchRouteForDay(
+  throwIfAborted(options.signal);
+  const settled = await settleInBatches(routeDays, Math.max(1, Math.min(4, Number(options.concurrency) || 3)), day => fetchRouteForDay(
     trip, day, options, fetchImpl, options.timeoutMs || routingConfig.requestTimeoutMs
-  )));
+  ));
+  throwIfAborted(options.signal);
   let applied = 0;
   const providers = [];
   settled.forEach((entry, index) => {
@@ -224,5 +249,6 @@ export async function enrichPlanWithLiveRouting(trip, destination, plan, options
     totalSegments: routeDays.length,
     error: applied < routeDays.length ? 'Niet alle segmenten konden live worden berekend.' : null
   };
+  next.routeSegments = collectRouteSegments(next);
   return next;
 }

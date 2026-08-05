@@ -1,6 +1,8 @@
 import { buildBudget } from './budget-engine.js';
 import { evaluatePlanConstraints } from './constraint-engine.js';
-import { buildItinerary } from './itinerary-engine.js';
+import { buildItinerary, collectRouteSegments } from './itinerary-engine.js';
+import { buildRecommendations } from './recommendation-engine.js';
+import { applyDaySchedules } from './plan-solver.js';
 import { calculateTripQuality } from './trip-quality-engine.js';
 
 const definitions = Object.freeze([
@@ -31,18 +33,32 @@ function adaptPlan(plan, definition) {
 
 export function buildItineraryVariant(trip, destination, variantId = 'balanced') {
   const definition = definitions.find(item => item.id === variantId) || definitions[1];
+  const gatewayHighlight = (destination.highlights || []).find(item => item.gateway);
+  const availableBases = [...(destination.bases || [])];
+  if (gatewayHighlight?.overnightPoint && !availableBases.some(base => base.name === gatewayHighlight.baseName)) {
+    availableBases.unshift({ name: gatewayHighlight.baseName, ...gatewayHighlight.overnightPoint });
+  }
+  const selectedBases = availableBases.slice(0, Math.max(1, Math.min(definition.baseLimit, availableBases.length)));
+  const selectedNames = new Set(selectedBases.map(base => base.name));
   const variantDestination = {
     ...destination,
-    bases: destination.bases.slice(0, Math.max(1, Math.min(definition.baseLimit, destination.bases.length))),
+    bases: selectedBases,
+    highlights: destination.dynamic
+      ? (destination.highlights || []).filter(item => item.gateway || selectedNames.has(item.baseName))
+      : destination.highlights,
     activityDaily: Math.round(destination.activityDaily * definition.activityFactor)
   };
   const plan = adaptPlan(buildItinerary(trip, variantDestination), definition);
+  applyDaySchedules(trip, plan.days);
+  plan.recommendations = buildRecommendations(trip, variantDestination, plan.days);
+  plan.routeSegments = collectRouteSegments(plan);
   const budget = buildBudget(trip, variantDestination, plan);
   const constraintStatus = evaluatePlanConstraints(trip, plan, budget, { allowStretch: destination.category === 'stretch' });
   plan.constraintStatus = constraintStatus;
   plan.feasible = constraintStatus.exact;
   plan.warnings = [...new Set([...(plan.warnings || []), ...constraintStatus.violations.map(item => item.detail)])];
   const quality = calculateTripQuality(trip, variantDestination, plan, budget);
+  const selectable = constraintStatus.selectable && quality.passes;
   return {
     id: definition.id,
     label: definition.label,
@@ -51,13 +67,16 @@ export function buildItineraryVariant(trip, destination, variantId = 'balanced')
     plan,
     budget,
     quality,
+    selectable,
+    qualityWarning: quality.gate?.reasons?.join(' ') || null,
     constraintStatus,
     metrics: {
       total: budget.total,
       maxDrive: constraintStatus.maxElapsed,
       changes: plan.accommodationChanges,
       flexDays: plan.days.filter(day => day.kind === 'flex').length,
-      activityDays: plan.days.filter(day => day.kind === 'stay').length
+      activityDays: plan.days.filter(day => day.kind === 'stay').length,
+      quality: quality.overall
     }
   };
 }

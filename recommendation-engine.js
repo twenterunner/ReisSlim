@@ -32,10 +32,9 @@ const rules = {
   }
 };
 
-function offsetPoint(point, seed = 0) {
+function recommendationPoint(point) {
   if (!validCoordinate(point)) return null;
-  const offset = ((seed % 3) - 1) * .009;
-  return { lat: Number((point.lat + offset).toFixed(5)), lon: Number((point.lon - offset).toFixed(5)) };
+  return { lat: Number(point.lat), lon: Number(point.lon) };
 }
 
 function proposal({ day, type, name, reason, point, transport, seed = 0 }) {
@@ -45,7 +44,7 @@ function proposal({ day, type, name, reason, point, transport, seed = 0 }) {
     type,
     name,
     reason,
-    point: offsetPoint(point, seed),
+    point: recommendationPoint(point),
     vehicleFit: [transport],
     vehicleProfileId: transport,
     confidence: 'categorievoorstel',
@@ -54,7 +53,41 @@ function proposal({ day, type, name, reason, point, transport, seed = 0 }) {
     detourKm: null,
     openingHours: null,
     url: null,
-    lastChecked: null
+    lastChecked: null,
+    providerId: null,
+    associatedBase: null,
+    genericFallback: true,
+    coordinateRole: 'search-anchor'
+  };
+}
+
+function namedHighlightProposal(day, highlight, transport) {
+  const point = recommendationPoint(highlight?.point || highlight);
+  if (!highlight?.name || !point) return null;
+  return {
+    id: `day-${day.day}-activity-${highlight.id || highlight.providerId}`,
+    providerId: highlight.providerId || highlight.id || null,
+    day: day.day,
+    associatedDay: day.day,
+    associatedBase: day.overnight,
+    type: 'activity',
+    name: highlight.name,
+    reason: `${day.primaryPlan} Opening, toegang en actuele omstandigheden zijn niet bevestigd.`,
+    point,
+    vehicleFit: [transport],
+    vehicleProfileId: transport,
+    confidence: highlight.confidence || 'provider-evidence',
+    verified: false,
+    live: true,
+    source: highlight.evidence || highlight.provider || 'Providerbewijs uit dynamische ontdekking',
+    detourKm: null,
+    openingHours: null,
+    url: highlight.sourceUrl || null,
+    sourceUrl: highlight.sourceUrl || null,
+    lastChecked: highlight.fetchedAt || null,
+    freshness: highlight.fetchedAt || null,
+    genericFallback: false,
+    coordinateRole: 'provider-location'
   };
 }
 
@@ -68,6 +101,9 @@ export function buildRecommendations(trip, destination, days) {
     const isTravel = ['outward', 'return', 'transfer'].includes(day.kind);
     const isHomecoming = day.kind === 'return' && day.to === trip.origin;
     const anchor = day.toPoint || day.fromPoint || destination.bases[0];
+    const highlight = day.activityId
+      ? (destination.highlights || []).find(item => item.id === day.activityId || item.providerId === day.activityId)
+      : null;
 
     for (const [index, waypoint] of (day.waypoints || []).entries()) {
       recommendations.push(proposal({
@@ -109,7 +145,7 @@ export function buildRecommendations(trip, destination, days) {
     }
 
     if (!isTravel) {
-      recommendations.push(proposal({
+      recommendations.push(namedHighlightProposal(day, highlight, transport) || proposal({
         day: day.day,
         type: 'activity',
         name: day.primaryPlan,
@@ -133,6 +169,7 @@ export function buildRecommendations(trip, destination, days) {
     }
 
     day.recommendations = recommendations;
+    for (const item of recommendations) item.associatedBase ||= day.overnight;
     day.sleepProposal = recommendations.find(item => item.type === 'accommodation') || null;
     all.push(...recommendations);
   }

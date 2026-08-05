@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeTrip } from '../trip-model.js';
-import { destinations } from '../destinations.js';
+import {
+  placeSyntheticDestination,
+  primarySyntheticDestination,
+  remoteFlyDriveDestination,
+  syntheticDestinations
+} from './fixtures/synthetic-destinations.mjs';
 import { buildItinerary, collectPlanWaypoints, collectRouteGeometry } from '../itinerary-engine.js';
 import { buildBudget } from '../budget-engine.js';
 import { rankDestinationGroups, rankDestinations, scoreDestination } from '../destination-engine.js';
@@ -26,6 +31,7 @@ import { applyAssistantPatch, interpretAssistantMessage } from '../assistant-eng
 import { emptyPreferenceProfile, preferenceBonus, recordPreferenceEvent } from '../preference-engine.js';
 import { weatherCondition, weatherSuitability } from '../weather-engine.js';
 import { normalizeCommonsImage } from '../image-provider.js';
+import { buildRecommendations } from '../recommendation-engine.js';
 
 const makeTrip = overrides => normalizeTrip({
   id: 'fixed-trip', tripName: 'Testreis', origin: 'Utrecht', startDate: '2026-07-01',
@@ -33,31 +39,31 @@ const makeTrip = overrides => normalizeTrip({
   maxDrive: 5, maxChanges: 6, comfort: 'mid', preferences: ['natuur', 'bergen', 'kinderen'],
   preferenceWeights: { natuur: 3, bergen: 3, kinderen: 2 }, ...overrides
 });
-const slovenia = destinations.find(item => item.id === 'slovenia');
+const primaryDestination = primarySyntheticDestination;
 
 test('Day 1 starts from the entered origin', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia);
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination);
   assert.equal(plan.days[0].from, 'Utrecht');
   assert.notEqual(plan.days[0].to, 'Utrecht');
 });
 
 test('Final day returns to the entered origin', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia);
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination);
   assert.equal(plan.days.at(-1).to, 'Utrecht');
   assert.equal(plan.days.at(-1).kind, 'return');
 });
 
 test('Origin is never treated as a destination stay', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia);
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination);
   assert.equal(plan.days.some(day => ['stay', 'flex', 'transfer'].includes(day.kind) && day.location === trip.origin), false);
 });
 
 test('Itinerary day count exactly matches the requested duration', () => {
-  for (const days of [3, 5, 9, 14, 30]) assert.equal(buildItinerary(makeTrip({ days }), slovenia).days.length, days);
+  for (const days of [3, 5, 9, 14, 30]) assert.equal(buildItinerary(makeTrip({ days }), primaryDestination).days.length, days);
 });
 
 test('Maximum daily elapsed travel time is respected for sufficient trips', () => {
-  const trip = makeTrip({ days: 11, maxDrive: 5, maxChanges: 10 }); const plan = buildItinerary(trip, slovenia);
+  const trip = makeTrip({ days: 11, maxDrive: 5, maxChanges: 10 }); const plan = buildItinerary(trip, primaryDestination);
   assert.equal(plan.feasible, true);
   assert.ok(Math.max(...plan.days.map(day => day.driveHours)) <= trip.maxDrive);
 });
@@ -82,7 +88,7 @@ test('Legacy camper trips become motorhome trips with safe vehicle defaults', ()
 
 test('Recommendations match the selected vehicle and cover the trip essentials', () => {
   const trip = makeTrip({ transport: 'motorcycle', fuelRangeKm: 180 });
-  const plan = buildItinerary(trip, slovenia);
+  const plan = buildItinerary(trip, primaryDestination);
   const types = new Set(plan.recommendations.map(item => item.type));
   assert.ok(plan.recommendations.length > plan.days.length);
   assert.ok(['accommodation', 'restaurant', 'activity', 'fuel'].every(type => types.has(type)));
@@ -92,18 +98,18 @@ test('Recommendations match the selected vehicle and cover the trip essentials',
 
 test('Route geometry and waypoints are produced for map and export layers', () => {
   const trip = makeTrip({ transport: 'car', fuelRangeKm: 300 });
-  const plan = buildItinerary(trip, slovenia);
+  const plan = buildItinerary(trip, primaryDestination);
   const geometry = collectRouteGeometry(plan);
   const waypoints = collectPlanWaypoints(plan);
   assert.ok(geometry.length > 2);
   assert.ok(waypoints.length > plan.days.length);
   assert.ok(geometry.every(point => Number.isFinite(point.lat) && Number.isFinite(point.lon)));
   assert.ok(waypoints.some(point => ['rest', 'fuel'].includes(point.role)));
-  assert.ok(waypoints.some(point => point.role === 'accommodation'));
+  assert.equal(waypoints.some(point => point.role === 'accommodation'), false, 'generic category anchors must not become exported place waypoints');
 });
 
 test('Insufficient-duration trips are explicit and still structurally complete', () => {
-  const trip = makeTrip({ days: 3, maxDrive: 4 }); const plan = buildItinerary(trip, slovenia);
+  const trip = makeTrip({ days: 3, maxDrive: 4 }); const plan = buildItinerary(trip, primaryDestination);
   assert.equal(plan.feasible, false);
   assert.equal(plan.days.length, trip.days);
   assert.ok(plan.warnings.some(item => item.includes('minimaal')));
@@ -111,7 +117,7 @@ test('Insufficient-duration trips are explicit and still structurally complete',
 });
 
 test('Budget totals are internally consistent', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia); const budget = buildBudget(trip, slovenia, plan);
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination); const budget = buildBudget(trip, primaryDestination, plan);
   assert.equal(budget.total, budget.rows.reduce((sum, [, value]) => sum + value, 0));
   assert.equal(budget.remaining, trip.budget - budget.total);
   assert.equal(budget.perDay, Math.round(budget.total / trip.days));
@@ -119,12 +125,12 @@ test('Budget totals are internally consistent', () => {
 
 test('Destination rankings are stable for fixed inputs', () => {
   const trip = makeTrip();
-  assert.deepEqual(rankDestinations(trip, destinations).map(item => [item.id, item.score]), rankDestinations(trip, destinations).map(item => [item.id, item.score]));
+  assert.deepEqual(rankDestinations(trip, syntheticDestinations).map(item => [item.id, item.score]), rankDestinations(trip, syntheticDestinations).map(item => [item.id, item.score]));
 });
 
 test('Portfolio returns at least six genuinely different proposals when six are viable', () => {
   const trip = makeTrip({ budget: 4000, days: 10, maxChanges: 6 });
-  const portfolio = buildProposalPortfolio(trip, destinations, { limit: 8 });
+  const portfolio = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8 });
   assert.ok(portfolio.visible.length >= 6);
   assert.equal(new Set(portfolio.visible.map(item => item.id)).size, portfolio.visible.length);
   assert.ok(portfolio.stretched.length <= 2);
@@ -138,30 +144,30 @@ test('Portfolio returns at least six genuinely different proposals when six are 
 
 test('Portfolio diversity selection is deterministic for fixed inputs', () => {
   const trip = makeTrip({ budget: 4000 });
-  const first = buildProposalPortfolio(trip, destinations, { limit: 8, focus: 'surprising' });
-  const second = buildProposalPortfolio(trip, destinations, { limit: 8, focus: 'surprising' });
+  const first = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8, focus: 'surprising' });
+  const second = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8, focus: 'surprising' });
   assert.deepEqual(first.visible.map(item => item.id), second.visible.map(item => item.id));
 });
 
 test('More options excludes every proposal already seen', () => {
   const trip = makeTrip({ budget: 4000 });
-  const initial = buildProposalPortfolio(trip, destinations, { limit: 6 });
+  const initial = buildProposalPortfolio(trip, syntheticDestinations, { limit: 6 });
   const seen = initial.visible.map(item => item.id);
-  const more = getMoreProposals(trip, destinations, seen, { limit: 4 });
+  const more = getMoreProposals(trip, syntheticDestinations, seen, { limit: 4 });
   assert.ok(more.length > 0);
   assert.equal(more.some(item => seen.includes(item.id)), false);
 });
 
 test('Soft constraints remain visible trade-offs instead of silent rejection', () => {
   const trip = makeTrip({ budget: 700, strictBudget: false, days: 10, maxDrive: 5, maxChanges: 6 });
-  const portfolio = buildProposalPortfolio(trip, destinations, { limit: 8 });
+  const portfolio = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8 });
   assert.ok(portfolio.exact.length > 0);
   assert.ok(portfolio.exact.some(item => item.constraintStatus.softConstraints.some(issue => issue.key === 'budget')));
 });
 
 test('Selected destination offers three materially different itinerary variants', () => {
   const trip = makeTrip({ days: 10, budget: 4000, maxChanges: 6 });
-  const destination = buildProposalPortfolio(trip, destinations, { limit: 8 }).exact[0];
+  const destination = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8 }).exact[0];
   const variants = buildItineraryVariants(trip, destination);
   assert.equal(variants.length, 3);
   assert.deepEqual(variants.map(item => item.id), ['relaxed', 'balanced', 'active']);
@@ -169,17 +175,18 @@ test('Selected destination offers three materially different itinerary variants'
   assert.ok(variants.every(item => item.plan.days.length === trip.days && item.plan.days.at(-1).to === trip.origin));
 });
 
-test('Optimizer previews coordinated changes, honours locks and uses full rescoring', () => {
+test('Optimizer previews only meaningful structural changes, honours locks and uses full rescoring', () => {
   const trip = makeTrip({ days: 11, budget: 3000, maxChanges: 10 });
-  const destination = scoreDestination(trip, slovenia);
+  const destination = scoreDestination(trip, primaryDestination);
   const plan = buildItinerary(trip, destination);
   plan.days.forEach(day => { if (!['outward', 'return'].includes(day.kind)) day.rainAlternative = ''; });
   plan.days.forEach(day => { if (day.kind === 'flex') { day.kind = 'stay'; day.typeLabel = 'Verblijfsdag'; day.activityType = 'natuur'; } });
   const proposal = proposeOptimizations(trip, destination, plan, { mode: 'balanced' });
-  assert.ok(proposal.actions.length >= 2);
-  assert.ok(proposal.actions.some(action => action.id === 'weather'));
-  assert.notDeepEqual(proposal.after.quality.rawDimensions, proposal.before.quality.rawDimensions);
-  assert.equal(proposal.meaningful, true);
+  assert.equal(proposal.actions.some(action => ['weather', 'variety', 'value'].includes(action.id)), false);
+  assert.equal(proposal.meaningful, proposal.actions.length > 0);
+  assert.equal(proposal.changeSet.length, proposal.actions.length);
+  assert.ok(proposal.changeSet.every(change => change.structural && change.affectedDays.length && change.before.length === change.after.length));
+  if (proposal.meaningful) assert.notDeepEqual(proposal.after.quality.rawDimensions, proposal.before.quality.rawDimensions);
   const locked = proposeOptimizations(trip, destination, plan, { locks: { route: true, accommodation: true, activities: true, budget: true } });
   assert.equal(locked.actions.length, 0);
   assert.equal(locked.meaningful, false);
@@ -187,7 +194,7 @@ test('Optimizer previews coordinated changes, honours locks and uses full rescor
 
 test('Optimizer cannot manufacture a score increase when no change is selected', () => {
   const trip = makeTrip({ days: 11, budget: 4000, maxChanges: 10 });
-  const destination = scoreDestination(trip, slovenia);
+  const destination = scoreDestination(trip, primaryDestination);
   const plan = buildItinerary(trip, destination);
   const budget = buildBudget(trip, destination, plan);
   const before = calculateTripQuality(trip, destination, plan, budget);
@@ -223,7 +230,7 @@ test('OpenStreetMap discovery normalizes arbitrary towns into plannable dynamic 
 
 test('Normal proposals satisfy every hard destination constraint and stretch ideas are capped', () => {
   const trip = makeTrip({ days: 10, budget: 3500, maxDrive: 5, maxChanges: 5, allowStretch: true });
-  const groups = rankDestinationGroups(trip, destinations);
+  const groups = rankDestinationGroups(trip, syntheticDestinations);
   assert.ok(groups.exact.length > 0);
   assert.ok(groups.exact.every(item => item.constraintStatus.exact && item.constraintStatus.violations.length === 0));
   assert.ok(groups.stretched.length <= 2);
@@ -233,7 +240,7 @@ test('Normal proposals satisfy every hard destination constraint and stretch ide
 
 test('Rejected destinations provide a concrete smallest adjustment instead of a selectable plan', () => {
   const trip = makeTrip({ days: 4, budget: 1200, maxDrive: 3, maxChanges: 1, allowStretch: true });
-  const groups = rankDestinationGroups(trip, destinations);
+  const groups = rankDestinationGroups(trip, syntheticDestinations);
   assert.ok(groups.rejected.length > 0);
   assert.ok(groups.closestAdjustments.length > 0);
   assert.ok(groups.closestAdjustments.every(item => item.adjustments.length > 0));
@@ -241,13 +248,13 @@ test('Rejected destinations provide a concrete smallest adjustment instead of a 
 });
 
 test('Trip-quality scores remain between 0 and 100', () => {
-  const trip = makeTrip(); const destination = scoreDestination(trip, slovenia); const plan = buildItinerary(trip, destination); const budget = buildBudget(trip, destination, plan); const quality = calculateTripQuality(trip, destination, plan, budget);
+  const trip = makeTrip(); const destination = scoreDestination(trip, primaryDestination); const plan = buildItinerary(trip, destination); const budget = buildBudget(trip, destination, plan); const quality = calculateTripQuality(trip, destination, plan, budget);
   assert.ok(quality.overall >= 0 && quality.overall <= 100);
   Object.values(quality.dimensions).forEach(score => assert.ok(score >= 0 && score <= 100));
 });
 
 test('Optimisation preserves essential constraints', () => {
-  const trip = makeTrip({ days: 11, maxChanges: 10 }); const plan = buildItinerary(trip, slovenia); const result = optimisePlan(trip, slovenia, plan);
+  const trip = makeTrip({ days: 11, maxChanges: 10 }); const plan = buildItinerary(trip, primaryDestination); const result = optimisePlan(trip, primaryDestination, plan);
   assert.equal(constraintsPreserved(plan, result.plan, trip), true);
   assert.equal(result.plan.days.length, trip.days);
   assert.equal(result.plan.days.at(-1).to, trip.origin);
@@ -255,7 +262,7 @@ test('Optimisation preserves essential constraints', () => {
 
 test('Plan validation treats budget, time and accommodation changes as constraints', () => {
   const trip = makeTrip({ days: 11, maxChanges: 10, budget: 5000 });
-  const destination = scoreDestination(trip, slovenia);
+  const destination = scoreDestination(trip, primaryDestination);
   const plan = buildItinerary(trip, destination);
   const budget = buildBudget(trip, destination, plan);
   const status = evaluatePlanConstraints(trip, plan, budget);
@@ -267,7 +274,7 @@ test('Plan validation treats budget, time and accommodation changes as constrain
 
 test('Live place enrichment replaces generic sleep and restaurant proposals with named OSM places', async () => {
   const trip = makeTrip({ days: 5, maxDrive: 10, maxChanges: 5, liveData: true });
-  const destination = scoreDestination(trip, destinations.find(item => item.id === 'blackforest'));
+  const destination = scoreDestination(trip, placeSyntheticDestination);
   const plan = buildItinerary(trip, destination);
   const payload = { elements: [
     { type: 'node', id: 11, lat: 48.13, lon: 8.23, tags: { tourism: 'hotel', name: 'Hotel Boszicht', website: 'https://example.test/hotel' } },
@@ -279,8 +286,45 @@ test('Live place enrichment replaces generic sleep and restaurant proposals with
   assert.equal(enriched.placeData.live, true);
   assert.ok(enriched.recommendations.some(item => item.name === 'Hotel Boszicht' && item.source.includes('Overpass')));
   assert.ok(enriched.recommendations.some(item => item.name === 'Gasthaus Wald'));
+  assert.match(createGpx(trip, destination, enriched), /<type>accommodation<\/type>/);
   assert.match(buildOverpassQuery(plan), /tourism/);
   assert.equal(normalizeOverpassPlaces(payload).length, 3);
+});
+
+test('Place enrichment preserves successful chunks when a later Overpass chunk fails', async () => {
+  const trip = makeTrip({ days: 8, maxDrive: 10, maxChanges: 8, liveData: true, startDate: '2028-06-01' });
+  const destination = scoreDestination(trip, placeSyntheticDestination);
+  const plan = buildItinerary(trip, destination);
+  const payload = { elements: [{ type: 'node', id: 901, lat: 48.13, lon: 8.23, tags: { tourism: 'hotel', name: 'Provider Hotel Partial' } }] };
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) return { ok: true, json: async () => payload };
+    throw new Error('recorded later-chunk outage');
+  };
+  const enriched = await enrichPlanWithPlaces(trip, destination, plan, { fetchImpl, storage: null, overpassEndpoints: ['https://one.test'] });
+  assert.equal(enriched.placeData.live, true);
+  assert.ok(enriched.placeData.partialFailures >= 1);
+  assert.ok(enriched.recommendations.some(item => item.name === 'Provider Hotel Partial'));
+  assert.match(enriched.placeData.error, /succesvolle providerresultaten zijn behouden/i);
+});
+
+test('A sparse accommodation result belongs to only one unrelated overnight base', async () => {
+  const trip = makeTrip({ days: 4, liveData: true, startDate: '2028-06-01', maxChanges: 4 });
+  const baseOne = { name: 'Provider Base One', lat: 50, lon: 5 };
+  const baseTwo = { name: 'Provider Base Two', lat: 50.08, lon: 5.08 };
+  const days = [
+    { day: 1, date: '2028-06-01', kind: 'stay', from: baseOne.name, to: baseOne.name, location: baseOne.name, overnight: baseOne.name, fromPoint: baseOne, toPoint: baseOne, waypoints: [], geometry: [baseOne], primaryPlan: 'Named activity one' },
+    { day: 2, date: '2028-06-02', kind: 'stay', from: baseTwo.name, to: baseTwo.name, location: baseTwo.name, overnight: baseTwo.name, fromPoint: baseTwo, toPoint: baseTwo, waypoints: [], geometry: [baseTwo], primaryPlan: 'Named activity two' }
+  ];
+  const plan = { days };
+  plan.recommendations = buildRecommendations(trip, { bases: [baseOne, baseTwo], highlights: [] }, days);
+  const payload = { elements: [{ type: 'node', id: 902, lat: 50.04, lon: 5.04, tags: { tourism: 'hotel', name: 'Single Provider Hotel' } }] };
+  const enriched = await enrichPlanWithPlaces(trip, { bases: [baseOne, baseTwo] }, plan, {
+    fetchImpl: async () => ({ ok: true, json: async () => payload }), storage: null
+  });
+  const liveHotelBases = new Set(enriched.recommendations.filter(item => item.providerId === 'node-902').map(item => item.associatedBase));
+  assert.equal(liveHotelBases.size, 1);
 });
 
 test('Unknown origins can be geocoded once without changing the entered place name', async () => {
@@ -292,7 +336,7 @@ test('Unknown origins can be geocoded once without changing the entered place na
 });
 
 test('Optimisation supports one-step undo', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia); const snapshot = createUndoSnapshot(plan); const optimized = optimisePlan(trip, slovenia, plan).plan;
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination); const snapshot = createUndoSnapshot(plan); const optimized = optimisePlan(trip, primaryDestination, plan).plan;
   assert.notDeepEqual(optimized, plan);
   assert.deepEqual(restorePlan(snapshot), plan);
 });
@@ -309,10 +353,10 @@ function assertWellFormedXml(xml) {
 }
 
 test('GPX is well-formed XML and only contains valid coordinates', () => {
-  const trip = makeTrip(); const plan = buildItinerary(trip, slovenia); const xml = createGpx(trip, slovenia, plan);
+  const trip = makeTrip(); const plan = buildItinerary(trip, primaryDestination); const xml = createGpx(trip, primaryDestination, plan);
   assertWellFormedXml(xml);
   assert.match(xml, /<gpx version="1\.1"/);
-  assert.match(xml, /<type>accommodation<\/type>/);
+  assert.doesNotMatch(xml, /<type>accommodation<\/type>/, 'unconfirmed category anchors are not exported as real accommodation waypoints');
   assert.ok([...xml.matchAll(/<trkpt /g)].length > 2);
   for (const [, lat, lon] of xml.matchAll(/(?:wpt|trkpt) lat="([^"]+)" lon="([^"]+)"/g)) {
     assert.ok(Math.abs(Number(lat)) <= 90); assert.ok(Math.abs(Number(lon)) <= 180);
@@ -324,7 +368,7 @@ test('Routing requests include route style and motorhome restrictions', () => {
     transport: 'motorhome', routeStyle: 'fastest', fuelRangeKm: 480,
     vehicleMaxSpeedKmh: 95, vehicleHeightM: 3.25, vehicleLengthM: 7.8, vehicleWeightKg: 3850
   });
-  const day = buildItinerary(trip, slovenia).days.find(item => item.kind === 'outward');
+  const day = buildItinerary(trip, primaryDestination).days.find(item => item.kind === 'outward');
   const request = buildRoutingRequest(trip, day);
   assert.deepEqual(request.origin, { lat: day.fromPoint.lat, lon: day.fromPoint.lon });
   assert.equal(request.vehicle.routeMode, 'truck');
@@ -336,7 +380,7 @@ test('Routing requests include route style and motorhome restrictions', () => {
 
 test('A complete live routing response replaces corridor geometry without mutating the original plan', async () => {
   const trip = makeTrip({ transport: 'motorcycle', days: 8 });
-  const original = buildItinerary(trip, slovenia);
+  const original = buildItinerary(trip, primaryDestination);
   const fetchImpl = async (_url, options) => {
     const request = JSON.parse(options.body);
     const middle = {
@@ -348,7 +392,7 @@ test('A complete live routing response replaces corridor geometry without mutati
       json: async () => ({ provider: 'tomtom', distanceKm: 280, roadHours: 3.6, geometry: [request.origin, middle, request.destination] })
     };
   };
-  const live = await enrichPlanWithLiveRouting(trip, slovenia, original, { apiUrl: 'https://routing.example.test', fetchImpl });
+  const live = await enrichPlanWithLiveRouting(trip, primaryDestination, original, { apiUrl: 'https://routing.example.test', fetchImpl });
   const originalTravelDays = original.days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind));
   const liveTravelDays = live.days.filter(day => ['outward', 'return', 'transfer'].includes(day.kind));
   assert.equal(originalTravelDays.every(day => day.routeSource === 'offline-corridor'), true);
@@ -392,7 +436,7 @@ test('TomTom gateway adapter applies motorcycle and dimension parameters and nor
 test('JSON export is parseable and export filenames are safe', () => {
   const payload = { version: '0.8.0', trip: makeTrip() };
   assert.deepEqual(JSON.parse(createJson(payload)), payload);
-  assert.equal(safeFilename('Slovenië / Test 2026', 'gpx'), 'slovenie-test-2026.gpx');
+  assert.equal(safeFilename('Synthetic Résumé / Test 2026', 'gpx'), 'synthetic-resume-test-2026.gpx');
 });
 
 class MemoryStorage {
@@ -403,18 +447,36 @@ class MemoryStorage {
 }
 
 test('Old stored data migrates without crashing and discards stale derived plans', () => {
-  const legacy = { trip: makeTrip(), destination: { id: 'slovenia' }, itinerary: [{ location: 'Saasveld' }], savedAt: '2026-01-01T00:00:00Z' };
+  const legacy = { trip: makeTrip(), destination: { id: 'legacy-provider-place' }, itinerary: [{ location: 'Legacy origin' }], savedAt: '2026-01-01T00:00:00Z' };
   const migrated = migrateState(legacy);
-  assert.equal(migrated.destinationId, 'slovenia');
+  assert.equal(migrated.destinationId, 'legacy-provider-place');
   assert.equal(migrated.needsRebuild, true);
   assert.equal('itinerary' in migrated, false);
   const storage = new MemoryStorage(); storage.setItem('reisslim.current.v2', JSON.stringify(legacy));
   assert.doesNotThrow(() => loadDraft(storage));
-  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v8'));
+  saveDraft(migrated, storage); assert.ok(storage.getItem('reisslim.current.v9'));
 });
 
-test('Global discovery is not clipped to Europe and supports targeted locations', () => {
-  const globalTrip = makeTrip({ travelMode: 'fly-drive', destinationPoint: { lat: -22.56, lon: 17.08, name: 'Windhoek' } });
+test('Schema 8 drafts migrate to schema 9 and force a canonical plan rebuild', () => {
+  const storage = new MemoryStorage();
+  storage.setItem('reisslim.current.v8', JSON.stringify({
+    schemaVersion: 8,
+    engineVersion: 9,
+    trip: makeTrip(),
+    destinationProfile: { id: 'provider-place', dynamic: true },
+    plan: { days: [{ day: 1, location: 'stale plan' }] }
+  }));
+  const migrated = loadDraft(storage);
+  assert.equal(migrated.schemaVersion, 9);
+  assert.equal(migrated.engineVersion, 10);
+  assert.equal(migrated.needsRebuild, true);
+  assert.equal(migrated.destinationProfile.id, 'provider-place');
+  assert.ok(storage.getItem('reisslim.current.v9'));
+  assert.equal(storage.getItem('reisslim.current.v8'), null);
+});
+
+test('Global discovery is not clipped to the origin continent and supports targeted locations', () => {
+  const globalTrip = makeTrip({ travelMode: 'fly-drive', destinationPoint: { lat: -22.56, lon: 17.08, name: 'Remote target' } });
   const seeds = discoverySeeds(globalTrip, 0, 8);
   assert.equal(seeds.length, 8);
   assert.ok(seeds.every(point => point.lat < 0));
@@ -428,32 +490,30 @@ test('Loop topology reduces geometric overlap compared with an identical return'
   assert.ok(routeExplorationMetrics(outbound, alternate).explorationScore > 0);
 });
 
-test('Namibia fly-drive builds honest multi-modal segments and uncertainty range', () => {
+test('Remote fly-drive builds honest multi-modal segments and uncertainty range', () => {
   const trip = makeTrip({ travelMode: 'fly-drive', routeTopology: 'open-jaw', maxDrive: 12, transport: 'car', days: 14, budget: 9000, originPoint: { lat: 52.09, lon: 5.12 } });
-  const namibia = destinations.find(item => item.id === 'namibia-fixture');
-  const plan = buildItinerary(trip, namibia);
-  const costs = estimateAccessCosts(trip, namibia);
+  const plan = buildItinerary(trip, remoteFlyDriveDestination);
+  const costs = estimateAccessCosts(trip, remoteFlyDriveDestination);
   assert.equal(plan.days.length, 14);
   assert.equal(plan.accessSegments.some(segment => segment.mode === 'flight' && segment.bookable === false), true);
   assert.ok(plan.accessSegments[0].durationHours > 0);
   assert.equal(plan.days[0].schedule.departure, undefined);
   assert.equal(plan.days.some(day => day.kind === 'transfer'), true);
   assert.ok(costs.low < costs.central && costs.high > costs.central);
-  assert.equal(buildAccessSegments(trip, namibia).every(segment => segment.scheduleVerified === false || segment.mode === 'rental'), true);
+  assert.equal(buildAccessSegments(trip, remoteFlyDriveDestination).every(segment => segment.scheduleVerified === false || segment.mode === 'rental'), true);
 });
 
 test('An explicitly requested destination outside constraints is explained, not silently ranked as a normal proposal', () => {
-  const trip = makeTrip({ travelMode: 'fly-drive', destinationQuery: 'Namibië', budget: 5000 });
-  const portfolio = buildProposalPortfolio(trip, destinations, { limit: 8 });
-  assert.equal(portfolio.requestedMismatch?.id, 'namibia-fixture');
-  assert.equal(portfolio.visible.some(item => item.id === 'namibia-fixture'), false);
+  const trip = makeTrip({ travelMode: 'fly-drive', destinationQuery: 'Remote Expanse', budget: 5000 });
+  const portfolio = buildProposalPortfolio(trip, syntheticDestinations, { limit: 8 });
+  assert.equal(portfolio.requestedMismatch?.id, 'synthetic-remote-fly-drive');
+  assert.equal(portfolio.visible.some(item => item.id === 'synthetic-remote-fly-drive'), false);
   assert.ok(portfolio.requestedMismatch.constraintStatus.violations.length > 0);
 });
 
 test('Travel readiness never claims unverified entry or advisory data is complete', () => {
   const trip = makeTrip({ travelMode: 'fly-drive', remoteTravel: true });
-  const namibia = destinations.find(item => item.id === 'namibia-fixture');
-  const readiness = buildTravelReadiness(trip, namibia, buildItinerary(trip, namibia));
+  const readiness = buildTravelReadiness(trip, remoteFlyDriveDestination, buildItinerary(trip, remoteFlyDriveDestination));
   assert.ok(readiness.blockers >= 3);
   assert.equal(readiness.items.find(item => item.id === 'documents').verified, false);
 });

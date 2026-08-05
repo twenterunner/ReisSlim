@@ -26,9 +26,14 @@ const trip = overrides => normalizeTrip({
 const countryFixtures = {
   'South Africa': fixture([
     node(1, 'Cape Town', -33.925, 18.424, { place: 'city', population: '4600000' }), node(2, 'Knysna', -34.036, 23.047, { place: 'town' }),
+    node(5, 'Hermanus', -34.418, 19.234, { place: 'town' }), node(6, 'Swellendam', -34.022, 20.441, { place: 'town' }),
+    node(7, 'George', -33.964, 22.461, { place: 'city' }),
     node(3, 'Mbombela', -25.475, 30.969, { place: 'city' }), node(4, 'Durban', -29.858, 31.022, { place: 'city' }),
     node(11, 'Table Mountain', -33.962, 18.409, { tourism: 'attraction', natural: 'peak', wikidata: 'Q164598' }),
     node(12, 'Garden Route National Park', -34.02, 23.04, { boundary: 'national_park', tourism: 'attraction' }),
+    node(15, 'Cape Whale Coast', -34.43, 19.25, { tourism: 'viewpoint', natural: 'coastline' }),
+    node(16, 'Bontebok National Park', -34.07, 20.45, { boundary: 'national_park', tourism: 'attraction' }),
+    node(17, 'Outeniqua Pass', -33.9, 22.42, { tourism: 'viewpoint', mountain_pass: 'yes', scenic: 'yes' }),
     node(13, 'Blyde River Canyon', -24.59, 30.80, { tourism: 'viewpoint', natural: 'cliff' }),
     node(14, 'uShaka Marine World', -29.87, 31.05, { tourism: 'attraction' })
   ]),
@@ -74,6 +79,34 @@ test('recorded country provider responses produce dynamic regional concepts with
     assert.ok(concepts.every(item => item.dynamic && /OpenStreetMap Overpass/.test(item.provider?.name)));
     assert.ok(concepts.some(item => item.highlights.length > 1));
   }
+});
+
+test('raw country provider responses traverse discovery, boundary filtering, clustering and itinerary generation', async () => {
+  const request = trip({ destinationQuery: 'South Africa', travelMode: 'fly-drive', transport: 'car' });
+  const resolved = resolution('South Africa', 71001, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
+  resolved.countryCode = 'ZA';
+  const photonFeatures = [
+    ['Cape Town', -33.925, 18.424, 8001], ['Knysna', -34.036, 23.047, 8002],
+    ['Hermanus', -34.418, 19.234, 8005], ['Swellendam', -34.022, 20.441, 8006], ['George', -33.964, 22.461, 8007],
+    ['Mbombela', -25.475, 30.969, 8003], ['Durban', -29.858, 31.022, 8004]
+  ].map(([name, lat, lon, id]) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] },
+    properties: { name, city: name, country: 'South Africa', countrycode: 'ZA', osm_type: 'N', osm_id: id, osm_key: 'place', osm_value: 'city', layer: 'city' }
+  }));
+  const fetchImpl = async url => {
+    const address = String(url);
+    if (address.includes('photon.komoot.io')) return { ok: true, json: async () => ({ type: 'FeatureCollection', features: photonFeatures }) };
+    if (address.includes('wikipedia.org')) return { ok: true, json: async () => ({ query: { pages: {} } }) };
+    return { ok: true, json: async () => countryFixtures['South Africa'] };
+  };
+  const result = await discoverDestinationBatch(request, { resolution: resolved, storage: null, fetchImpl, timeoutMs: 1000, deadlineMs: 5000 });
+  assert.ok(result.destinations.length >= 3);
+  assert.ok(result.destinations.every(item => item.dynamic && item.destinationScope?.geographicType === 'country'));
+  assert.ok(result.destinations.every(item => item.bases.every(base => base.lat >= -35 && base.lat <= -22 && base.lon >= 16 && base.lon <= 33)));
+  const plan = buildItinerary(request, result.destinations.sort((a, b) => b.highlights.length - a.highlights.length)[0]);
+  assert.equal(plan.days.length, request.days);
+  assert.ok(new Set(plan.days.filter(day => day.overnight !== request.origin).map(day => day.overnight)).size >= 3);
+  assert.ok(plan.days.filter(day => ['outward', 'transfer', 'return'].includes(day.kind)).every(day => day.geometry.length >= 2));
 });
 
 test('Namibia golden case is a generic multi-base graph and omits an infeasible southern highlight', () => {
@@ -195,9 +228,12 @@ test('country discovery uses bounded staged queries instead of one oversized cat
   const resolved = resolution('South Africa', 711, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
   const stages = buildDiscoveryQueries(trip({ destinationQuery: 'South Africa' }), 0, resolved);
   assert.deepEqual(stages.map(item => item.stage), ['anchors', 'enrichment']);
-  assert.ok((stages[0].query.match(/nwr/g) || []).length <= 4);
-  assert.ok((stages[1].query.match(/nwr/g) || []).length <= 16);
+  assert.ok((stages[0].query.match(/nwr/g) || []).length <= 20);
+  assert.ok((stages[1].query.match(/(?:nwr|way|rel)/g) || []).length <= 55);
+  assert.match(stages[1].query, /mountain_pass|scenic|route"="road/);
   assert.match(stages[0].query, /\[timeout:6\]/);
+  assert.match(stages[0].query, /map_to_area->\.targetArea/);
+  assert.match(stages[0].query, /nwr\(area\.targetArea\)\(around:/);
   assert.doesNotMatch(stages[0].query, /\["place"="city"\]\["name"\]\(-35\.0000,16\.0000,-22\.0000,33\.0000\)/);
 });
 

@@ -2,12 +2,39 @@ import { rankDestinationGroups } from './destination-engine.js';
 import { preferenceBonus } from './preference-engine.js';
 
 const clamp01 = value => Math.max(0, Math.min(1, value));
-const band = (value, size) => Math.floor(Number(value || 0) / size);
 const overlap = (left = [], right = []) => {
-  const a = new Set(left); const b = new Set(right);
+  const a = new Set(left.map(value => String(value || '').trim().toLocaleLowerCase('nl-NL')).filter(Boolean));
+  const b = new Set(right.map(value => String(value || '').trim().toLocaleLowerCase('nl-NL')).filter(Boolean));
   const union = new Set([...a, ...b]);
   return union.size ? [...a].filter(item => b.has(item)).length / union.size : 0;
 };
+const normalize = value => String(value || '').trim().toLocaleLowerCase('nl-NL');
+
+function structuralProfile(item) {
+  const supplied = item?.planStructure || {};
+  const bases = supplied.bases?.length ? supplied.bases : (item?.bases || []).map(base => base.id || base.name);
+  const highlights = supplied.highlights?.length ? supplied.highlights : (item?.highlights || []).map(highlight => highlight.id || highlight.name);
+  const gateway = supplied.gateway || item?.gateway?.id || item?.gateway?.name || item?.bases?.[0]?.name || '';
+  const corridors = supplied.corridors?.length ? supplied.corridors : (item?.routeStops || []).slice(1).map((stop, index) => {
+    const previous = item.routeStops[index];
+    return [normalize(previous?.name), normalize(stop?.name)].filter(Boolean).sort().join('>');
+  });
+  const points = (item?.bases || []).filter(point => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon)));
+  const centroid = points.length ? {
+    lat: points.reduce((sum, point) => sum + Number(point.lat), 0) / points.length,
+    lon: points.reduce((sum, point) => sum + Number(point.lon), 0) / points.length
+  } : null;
+  const geographicBand = centroid ? `${Math.floor(centroid.lat / 4)}:${Math.floor(centroid.lon / 4)}` : '';
+  return {
+    macroRegion: normalize(supplied.macroRegion || item?.regionId || item?.clusterId || `${item?.country || ''}:${geographicBand}`),
+    country: normalize(supplied.country || item?.country),
+    gateway: normalize(gateway),
+    bases: bases.map(normalize).filter(Boolean),
+    highlights: highlights.map(normalize).filter(Boolean),
+    corridors: corridors.map(normalize).filter(Boolean),
+    topology: normalize(supplied.topology || item?.routeTopology)
+  };
+}
 
 const focusProfiles = Object.freeze({
   balanced: { label: 'Beste mix', keys: [] },
@@ -78,21 +105,30 @@ function proposalFromDestination(item, trip, focus, learnedProfile = null) {
 
 export function proposalDifference(left, right) {
   if (!left || !right || left.destinationId === right.destinationId) return 0;
-  const geography = left.country === right.country ? .45 : 1;
-  const distance = Math.min(1, Math.abs(left.distanceKm - right.distanceKm) / 700);
-  const cost = Math.min(1, Math.abs(left.estimate - right.estimate) / 1800);
-  const tags = 1 - overlap(left.tags, right.tags);
-  const baseShape = left.recommendedBases === right.recommendedBases ? .25 : 1;
-  return clamp01(geography * .25 + distance * .2 + cost * .15 + tags * .3 + baseShape * .1);
+  const a = structuralProfile(left);
+  const b = structuralProfile(right);
+  const macroRegion = a.macroRegion && b.macroRegion && a.macroRegion === b.macroRegion ? 0 : a.country && a.country === b.country ? .55 : 1;
+  const gateway = a.gateway && b.gateway ? (a.gateway === b.gateway ? 0 : 1) : .5;
+  const bases = a.bases.length || b.bases.length ? 1 - overlap(a.bases, b.bases) : .5;
+  const highlights = a.highlights.length || b.highlights.length ? 1 - overlap(a.highlights, b.highlights) : .5;
+  const corridors = a.corridors.length || b.corridors.length ? 1 - overlap(a.corridors, b.corridors) : .5;
+  return clamp01(macroRegion * .24 + gateway * .16 + bases * .24 + highlights * .2 + corridors * .16);
 }
 
 export function nearDuplicate(left, right) {
   if (!left || !right) return false;
   if (left.destinationId === right.destinationId) return true;
-  return band(left.distanceKm, 120) === band(right.distanceKm, 120)
-    && band(left.estimate, 500) === band(right.estimate, 500)
-    && overlap(left.tags, right.tags) >= .8
-    && left.country === right.country;
+  const a = structuralProfile(left);
+  const b = structuralProfile(right);
+  const sameMacro = Boolean(a.macroRegion && b.macroRegion && a.macroRegion === b.macroRegion);
+  const sameGateway = Boolean(a.gateway && b.gateway && a.gateway === b.gateway);
+  const baseOverlap = overlap(a.bases, b.bases);
+  const highlightOverlap = overlap(a.highlights, b.highlights);
+  const corridorOverlap = overlap(a.corridors, b.corridors);
+  return sameMacro
+    && sameGateway
+    && baseOverlap >= .65
+    && (highlightOverlap >= .6 || corridorOverlap >= .65);
 }
 
 export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = [] } = {}) {
@@ -100,10 +136,11 @@ export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = []
   const pool = candidates.filter(item => !excluded.has(item.id) && !excluded.has(item.proposalId));
   const selected = [];
   while (pool.length && selected.length < limit) {
-    const ranked = pool.map(candidate => {
+    const structurallyDistinct = pool.filter(candidate => !selected.some(existing => nearDuplicate(candidate, existing)));
+    if (!structurallyDistinct.length) break;
+    const ranked = structurallyDistinct.map(candidate => {
       const minDifference = selected.length ? Math.min(...selected.map(existing => proposalDifference(candidate, existing))) : 1;
-      const duplicatePenalty = selected.some(existing => nearDuplicate(candidate, existing)) ? 24 : 0;
-      return { candidate, merit: candidate.portfolioScore * .72 + minDifference * 28 - duplicatePenalty };
+      return { candidate, merit: candidate.portfolioScore * .68 + minDifference * 32 };
     }).sort((a, b) => b.merit - a.merit || b.candidate.score - a.candidate.score || a.candidate.id.localeCompare(b.candidate.id));
     const winner = ranked[0].candidate;
     selected.push(winner);

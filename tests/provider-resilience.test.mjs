@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { geocodePlace } from '../geocoding-provider.js';
-import { discoverDestinationBatch, normalizeDestinationResolution } from '../destination-provider.js';
+import { geocodePlace, normalizeBoundaryGeometry, pointInBoundary } from '../geocoding-provider.js';
+import { normalizePhotonSettlements, selectSignificantSettlements } from '../discovery-bootstrap-provider.js';
+import { buildBoundarySamples, buildDiscoveryCacheKey, buildDiscoveryQueries, clusterDestinationRegions, discoverDestinationBatch, normalizeDestinationResolution } from '../destination-provider.js';
 import { buildItinerary } from '../itinerary-engine.js';
 import { normalizeTrip } from '../trip-model.js';
 
@@ -14,6 +15,10 @@ const wikiPayload = (name, lat, lon, id) => ({ query: { pages: { [id]: {
   pageid: id, title: name, fullurl: `https://en.wikipedia.org/?curid=${id}`,
   coordinates: [{ lat, lon }]
 } } } });
+const rectangle = (south, north, west, east) => ({
+  type: 'Polygon',
+  coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]]
+});
 const screenshotTrip = overrides => normalizeTrip({
   origin: 'Saasveld', originPoint: { name: 'Saasveld', lat: 52.33, lon: 6.81 },
   destinationQuery: '', startDate: '2026-09-03', days: 3, budget: 10000,
@@ -85,7 +90,8 @@ test('blank three-day motorcycle request survives Overpass failure with independ
 test('broad country fallback yields named regional bases instead of a country-centroid stay', async () => {
   const resolved = normalizeDestinationResolution('South Africa', {
     osm_type: 'relation', osm_id: 87565, display_name: 'South Africa', addresstype: 'country', type: 'administrative', class: 'boundary',
-    importance: .9, boundingbox: ['-35', '-22', '16', '33'], lat: '-30.56', lon: '22.94', address: { country: 'South Africa', country_code: 'za' }
+    importance: .9, boundingbox: ['-35', '-22', '16', '33'], lat: '-30.56', lon: '22.94', address: { country: 'South Africa', country_code: 'za' },
+    geojson: rectangle(-35, -22, 16, 33)
   });
   const names = [
     ['Stampriet', -24.34, 18.40, 'NA'],
@@ -132,4 +138,157 @@ test('all-provider outage returns a structured infrastructure outcome without fa
   assert.equal(result.outcome, 'provider-unavailable');
   assert.deepEqual(result.destinations, []);
   assert.match(result.reason, /onafhankelijke settlementprovider/);
+});
+
+test('boundary-aware macro samples stay inside polygons and outside holes', () => {
+  const boundary = normalizeBoundaryGeometry({
+    type: 'Polygon',
+    coordinates: [
+      [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+      [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]]
+    ]
+  });
+  const samples = buildBoundarySamples({ bounds: [0, 10, 0, 10], boundary }, 0, 8);
+  assert.equal(samples.length, 8);
+  assert.ok(samples.every(sample => pointInBoundary(sample, boundary)));
+  assert.ok(samples.every(sample => !(sample.lat > 4 && sample.lat < 6 && sample.lon > 4 && sample.lon < 6)));
+  assert.ok(samples.every(sample => sample.scale === 'macro'));
+});
+
+test('macro settlement ranking prefers significant cities and towns over nearby suburbs', () => {
+  const payload = { features: [
+    photonFeature('Metro suburb', 1, 1, 501, 'suburb'),
+    { ...photonFeature('Evidence City', 1.04, 1.04, 502, 'city'), properties: { ...photonFeature('Evidence City', 1.04, 1.04, 502, 'city').properties, population: 900000 } },
+    { ...photonFeature('Regional Town', 4, 4, 503, 'town'), properties: { ...photonFeature('Regional Town', 4, 4, 503, 'town').properties, population: 45000 } }
+  ] };
+  const normalized = normalizePhotonSettlements(payload, { sample: { lat: 1, lon: 1, sequence: 0 } });
+  const ranked = selectSignificantSettlements(normalized, { minSeparationKm: 20 });
+  assert.deepEqual(ranked.map(item => item.name), ['Evidence City', 'Regional Town']);
+  assert.ok(ranked[0].importance > normalized.find(item => item.name === 'Metro suburb').importance);
+  assert.ok(ranked.every(item => item.macroCandidate));
+});
+
+test('broad dynamic evidence creates diverse regional concepts without suburbs, centroids, or cross-boundary anchors', () => {
+  const resolved = normalizeDestinationResolution('Evidence Republic', {
+    osm_type: 'relation', osm_id: 99001, display_name: 'Evidence Republic', addresstype: 'country', type: 'administrative', class: 'boundary',
+    importance: .8, boundingbox: ['0', '7', '0', '7'], lat: '3.5', lon: '3.5', address: { country: 'Evidence Republic', country_code: 'zz' },
+    geojson: rectangle(0, 7, 0, 7)
+  });
+  const settlement = (id, name, lat, lon, importance, macroType = 'city', countryCode = 'ZZ') => ({
+    id, providerId: id, name, point: { lat, lon }, role: 'settlement', tags: [], rawTags: { place: macroType },
+    importance, macroType, macroCandidate: ['city', 'town', 'municipality'].includes(macroType), countryCode,
+    countryEvidence: 'provider', confidence: 'provider-evidence', provider: 'Recorded provider', sourceUrl: `https://example.test/${id}`
+  });
+  const highlight = (id, name, lat, lon) => ({
+    id, providerId: id, name, point: { lat, lon }, role: 'highlight', tags: ['natuur'], rawTags: { tourism: 'attraction' },
+    importance: 78, countryCode: 'ZZ', countryEvidence: 'provider', confidence: 'provider-evidence', provider: 'Recorded provider', sourceUrl: `https://example.test/${id}`
+  });
+  const anchors = [
+    settlement('city-a', 'Alpha City', 1, 1, 94), settlement('suburb-a', 'Alpha Suburb', 1.03, 1.03, 35, 'suburb'),
+    settlement('city-b', 'Beta City', 1, 5.5, 88), settlement('city-c', 'Gamma City', 5.5, 3.2, 84),
+    settlement('outside', 'Outside City', 8, 3, 99, 'city', 'YY'),
+    highlight('highlight-a', 'Alpha Reserve', 1.1, 1.1), highlight('highlight-b', 'Beta Coast', 1.1, 5.4), highlight('highlight-c', 'Gamma Peak', 5.4, 3.2),
+    highlight('outside-highlight', 'Outside Monument', 8.1, 3)
+  ];
+  const request = screenshotTrip({ destinationQuery: 'Evidence Republic', days: 12, maxDrive: 2, travelMode: 'fly-ride' });
+  const concepts = clusterDestinationRegions(request, resolved, anchors);
+  assert.equal(concepts.length, 3);
+  assert.deepEqual(new Set(concepts.map(item => item.bases[0].name)), new Set(['Alpha City', 'Beta City', 'Gamma City']));
+  assert.doesNotMatch(JSON.stringify(concepts), /Alpha Suburb|Outside City|Outside Monument|Evidence Republic"\s*,\s*"lat/);
+  assert.ok(concepts.every(item => item.highlights.some(highlightItem => /Reserve|Coast|Peak/.test(highlightItem.name))));
+});
+
+test('a broad boundary never becomes a country-centroid proposal without regional evidence', () => {
+  const resolved = normalizeDestinationResolution('Empty Republic', {
+    osm_type: 'relation', osm_id: 99002, display_name: 'Empty Republic', addresstype: 'country', type: 'administrative', class: 'boundary',
+    boundingbox: ['0', '10', '0', '10'], lat: '5', lon: '5', geojson: rectangle(0, 10, 0, 10)
+  });
+  assert.deepEqual(clusterDestinationRegions(screenshotTrip({ destinationQuery: 'Empty Republic' }), resolved, []), []);
+});
+
+test('large relation discovery scopes every macro query to the resolved boundary area', () => {
+  const resolved = normalizeDestinationResolution('Area Country', {
+    osm_type: 'relation', osm_id: 99003, display_name: 'Area Country', addresstype: 'country', type: 'administrative', class: 'boundary',
+    boundingbox: ['-20', '20', '-25', '25'], lat: '0', lon: '0'
+  });
+  const stages = buildDiscoveryQueries(screenshotTrip({ destinationQuery: 'Area Country', days: 18 }), 0, resolved);
+  assert.ok(stages.length === 2 && stages.every(stage => stage.boundaryProviderId === 'relation/99003'));
+  assert.ok(stages.every(stage => stage.query.includes('map_to_area->.targetArea')));
+  assert.ok(stages.every(stage => [...stage.query.matchAll(/nwr([^;]+);/g)].every(match => match[1].includes('(area.targetArea)'))));
+  assert.ok(stages[0].query.includes('(around:') && !stages[0].query.includes('][name](-20.0000'));
+});
+
+test('exact stale geocoding cache survives a transient outage without substituting another place', async () => {
+  const records = new Map();
+  const storage = { getItem: key => records.get(key) || null, setItem: (key, value) => records.set(key, value) };
+  globalThis.__reisslimNominatimRequestAt = 0;
+  const first = await geocodePlace('Evidence City', {
+    storage,
+    fetchImpl: async url => {
+      const parsed = new URL(url);
+      assert.equal(parsed.searchParams.get('polygon_geojson'), '1');
+      return response([{ osm_type: 'relation', osm_id: 73001, display_name: 'Evidence City, Evidence Republic', addresstype: 'city', type: 'administrative', class: 'boundary', lat: '2', lon: '3', boundingbox: ['1', '3', '2', '4'] }]);
+    }
+  });
+  assert.equal(first.status, 'fresh');
+  for (const [key, value] of records) {
+    const record = JSON.parse(value); record.savedAt = Date.now() - 100 * 24 * 60 * 60 * 1000; records.set(key, JSON.stringify(record));
+  }
+  globalThis.__reisslimNominatimRequestAt = 0;
+  const stale = await geocodePlace('Evidence City', { storage, fetchImpl: async () => { throw new Error('offline'); } });
+  assert.equal(stale.status, 'stale-cache');
+  assert.equal(stale.resolution.providerId, 'relation/73001');
+  assert.equal(stale.resolution.stale, true);
+  assert.match(stale.warnings.at(-1), /exact passende oudere/);
+});
+
+test('exact cached discovery is boundary-filtered before it can create proposals', async () => {
+  const resolved = normalizeDestinationResolution('Cache Country', {
+    osm_type: 'relation', osm_id: 99004, display_name: 'Cache Country', addresstype: 'country', type: 'administrative', class: 'boundary',
+    boundingbox: ['0', '6', '0', '6'], lat: '3', lon: '3', address: { country_code: 'zz' }, geojson: rectangle(0, 6, 0, 6)
+  });
+  const request = screenshotTrip({ destinationQuery: 'Cache Country', days: 10, travelMode: 'fly-ride' });
+  const key = buildDiscoveryCacheKey(request, { resolution: resolved });
+  const cachedAnchors = [
+    { id: 'inside', providerId: 'inside', name: 'Inside City', point: { lat: 2, lon: 2 }, role: 'settlement', tags: [], rawTags: { place: 'city' }, importance: 90, macroCandidate: true, countryCode: 'ZZ', provider: 'Recorded cache' },
+    { id: 'outside', providerId: 'outside', name: 'Outside City', point: { lat: 8, lon: 2 }, role: 'settlement', tags: [], rawTags: { place: 'city' }, importance: 99, macroCandidate: true, countryCode: 'YY', provider: 'Recorded cache' }
+  ];
+  const record = JSON.stringify({ savedAt: Date.now(), endpoint: 'Recorded exact cache', anchors: cachedAnchors, payload: { elements: [] }, degraded: false, warnings: [] });
+  const storage = { getItem: candidate => candidate === key ? record : null, setItem: () => {} };
+  const result = await discoverDestinationBatch(request, { resolution: resolved, storage, fetchImpl: async () => { throw new Error('network should not be used'); } });
+  assert.equal(result.cached, true);
+  assert.deepEqual(result.anchors.map(item => item.name), ['Inside City']);
+  assert.deepEqual(result.destinations.map(item => item.bases[0].name), ['Inside City']);
+});
+
+test('an already-aborted discovery cannot return cached data or write provider results', async () => {
+  const controller = new AbortController(); controller.abort();
+  let writes = 0; let requests = 0;
+  const storage = { getItem: () => null, setItem: () => { writes += 1; } };
+  await assert.rejects(
+    discoverDestinationBatch(screenshotTrip(), { storage, signal: controller.signal, fetchImpl: async () => { requests += 1; return response({ elements: [] }); } }),
+    error => error?.name === 'AbortError'
+  );
+  assert.equal(requests, 0);
+  assert.equal(writes, 0);
+});
+
+test('aborting concurrent macro providers rejects once and never populates the exact cache', async () => {
+  const controller = new AbortController();
+  let writes = 0; let requests = 0;
+  const storage = { getItem: () => null, setItem: () => { writes += 1; } };
+  const fetchImpl = async (url, options = {}) => {
+    requests += 1;
+    return await new Promise((resolve, reject) => {
+      const abort = () => reject(new DOMException(`aborted ${url}`, 'AbortError'));
+      options.signal?.addEventListener('abort', abort, { once: true });
+    });
+  };
+  const pending = discoverDestinationBatch(screenshotTrip(), {
+    storage, signal: controller.signal, fetchImpl, endpoints: ['https://overpass.invalid/api'], timeoutMs: 500, deadlineMs: 1000
+  });
+  setTimeout(() => controller.abort(), 5);
+  await assert.rejects(pending, error => error?.name === 'AbortError');
+  assert.ok(requests >= 2, 'Overpass and macro bootstrap should both have started');
+  assert.equal(writes, 0);
 });

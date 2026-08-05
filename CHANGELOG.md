@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.2.0 — 2026-08-05
+
+### Added
+
+- multi-scale, boundary-aware discovery that retains significant gateways and samples beyond the first successful local cluster;
+- duration-aware trip-scale objectives for meaningful bases, geographic coverage, nights per base and distinct experiences;
+- deterministic constrained beam search for coherent base sequences with explicit highlight omissions and additional-day guidance;
+- canonical route segments shared by itinerary, selectable map days, POIs, accommodations and GPX;
+- route-/base-aware named OpenStreetMap POIs and multiple accommodation candidates with source, confidence, freshness and unverified status;
+- explicit quality dimensions for coverage, base/night allocation, coherence, backtracking, corridor repetition, POI uniqueness/evidence, accommodation evidence, touring-road quality, vehicle fit, completeness and uncertainty;
+- structural optimizer change sets with exact before/after state, affected days and full canonical-plan recalculation;
+- deterministic regression coverage for weak metropolitan loops, multi-base continuity, ping-pong prevention, portfolio diversity, vehicle timing, named evidence and optimizer integrity;
+- Android 412 × 915 release procedure for route lines, markers, named recommendations, budget and exports.
+
+### Fixed
+
+- long country trips can no longer pass normal proposal quality as a tiny urban loop merely because daily travel limits are satisfied;
+- night allocation no longer alternates illogically between two non-gateway bases or repeats an attraction to fill the requested duration;
+- nearby weak settlements no longer automatically outrank stronger provider-backed touring anchors;
+- vehicle changes cancel stale enrichment and rebuild derived recommendations instead of retaining incompatible wording;
+- late route/place responses preserve the selected proposal and day state;
+- generic fallback recommendations no longer invent offset venue coordinates;
+- optimizer suggestions that only alter text, perform no structural mutation or provide negligible benefit are suppressed.
+
+### Changed
+
+- version/build to 1.2.0/1200, engine version to 10 and storage schema to 9;
+- schema 8 and older saved requests migrate to schema 9 and force a canonical engine-10 rebuild;
+- public place enrichment uses bounded queries, cancellation, deduplication and endpoint failover while retaining explicit partial-result states;
+- the zero-catalogue production restriction remains: named-country fixtures are test-only and the dormant runtime `destinations.js` catalogue has been removed entirely.
+
+### Known provider limitations
+
+- public Nominatim, Overpass and OSRM endpoints have usage policies and no production SLA;
+- mapped POIs/accommodations do not confirm opening hours, road access, secure parking, price, inventory or availability;
+- OSRM geometry is car-profile geometry; motorcycle elapsed time and suitability are recalculated, not advertised as motorcycle-optimized;
+- robust high-volume worldwide aggregation requires an optional provider gateway or owned instances, never a shared key in the PWA.
+
 ## 1.1.2 — 2026-08-04
 
 - add Photon as a secondary typed-place geocoder and constraint-derived settlement bootstrap;

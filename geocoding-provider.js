@@ -2,9 +2,52 @@ import { validCoordinate } from './config.js';
 
 const NOMINATIM_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
 const PHOTON_ENDPOINT = 'https://photon.komoot.io/api/';
-const CACHE_SCHEMA = 2;
+const CACHE_SCHEMA = 3;
 
 const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
+
+const throwIfAborted = (signal, message = 'Geocoding cancelled') => {
+  if (signal?.aborted) throw new DOMException(message, 'AbortError');
+};
+
+function normalizeRing(ring) {
+  if (!Array.isArray(ring)) return null;
+  const points = ring.map(coordinate => ({ lon: Number(coordinate?.[0]), lat: Number(coordinate?.[1]) }))
+    .filter(validCoordinate);
+  return points.length >= 4 ? points : null;
+}
+
+export function normalizeBoundaryGeometry(value) {
+  if (!value || !['Polygon', 'MultiPolygon'].includes(value.type)) return null;
+  const polygons = value.type === 'Polygon' ? [value.coordinates] : value.coordinates;
+  const normalized = (polygons || []).map(polygon => (polygon || []).map(normalizeRing).filter(Boolean)).filter(polygon => polygon.length);
+  return normalized.length ? { type: 'MultiPolygon', polygons: normalized } : null;
+}
+
+function longitudeRelativeTo(value, reference) {
+  let longitude = Number(value);
+  while (longitude - reference > 180) longitude -= 360;
+  while (longitude - reference < -180) longitude += 360;
+  return longitude;
+}
+
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const currentPoint = ring[index]; const previousPoint = ring[previous];
+    const currentLon = longitudeRelativeTo(currentPoint.lon, point.lon);
+    const previousLon = longitudeRelativeTo(previousPoint.lon, point.lon);
+    const intersects = ((currentPoint.lat > point.lat) !== (previousPoint.lat > point.lat))
+      && (point.lon < (previousLon - currentLon) * (point.lat - currentPoint.lat) / ((previousPoint.lat - currentPoint.lat) || Number.EPSILON) + currentLon);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+export function pointInBoundary(point, boundary) {
+  if (!validCoordinate(point) || !boundary?.polygons?.length) return false;
+  return boundary.polygons.some(polygon => pointInRing(point, polygon[0]) && !polygon.slice(1).some(hole => pointInRing(point, hole)));
+}
 
 function defaultStorage() {
   try { return globalThis.localStorage || null; } catch { return null; }
@@ -20,7 +63,7 @@ function parseNominatimBounds(value) {
 function parsePhotonBounds(value) {
   const numbers = Array.isArray(value) ? value.map(Number) : [];
   if (numbers.length !== 4 || numbers.some(number => !Number.isFinite(number))) return null;
-  const [west, north, east, south] = numbers;
+  const [west, south, east, north] = numbers;
   return south < north && west < east ? [south, north, west, east] : null;
 }
 
@@ -44,6 +87,7 @@ export function normalizeNominatimPlace(query, match) {
     importance: finite(match.importance),
     point,
     bounds: parseNominatimBounds(match.boundingbox),
+    boundary: normalizeBoundaryGeometry(match.geojson),
     countryCode: String(match.address?.country_code || '').trim().toUpperCase() || null,
     countryName: match.address?.country || null,
     provider: 'OpenStreetMap Nominatim',
@@ -83,10 +127,11 @@ export function normalizePhotonPlace(query, feature) {
 }
 
 async function fetchJson(url, { fetchImpl, timeoutMs, signal, headers = {} }) {
-  if (signal?.aborted) throw new DOMException('Geocoding cancelled', 'AbortError');
+  throwIfAborted(signal);
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener?.('abort', abort, { once: true });
+  if (signal?.aborted) controller.abort();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, { headers: { accept: 'application/json', ...headers }, signal: controller.signal });
@@ -127,6 +172,13 @@ function readCache(storage, key, maxAgeMs) {
   } catch { return null; }
 }
 
+function readCacheRecord(storage, key) {
+  try {
+    const record = JSON.parse(storage?.getItem(key) || 'null');
+    return record?.resolution && Number.isFinite(record.savedAt) ? record : null;
+  } catch { return null; }
+}
+
 function writeCache(storage, key, resolution) {
   try { storage?.setItem(key, JSON.stringify({ savedAt: Date.now(), resolution })); } catch { /* cache is optional */ }
 }
@@ -142,8 +194,10 @@ export async function geocodePlace(query, {
 } = {}) {
   const value = String(query || '').trim();
   if (!value) return { resolution: null, status: 'empty', warnings: [] };
+  throwIfAborted(signal);
   const storage = suppliedStorage === undefined ? defaultStorage() : suppliedStorage;
   const key = cacheKey(value);
+  const cacheRecord = readCacheRecord(storage, key);
   const cached = readCache(storage, key, 90 * 24 * 60 * 60 * 1000);
   if (cached) return { resolution: cached, status: 'cached', warnings: [] };
   if (typeof fetchImpl !== 'function') return { resolution: null, status: 'unavailable', warnings: ['Geen netwerkfunctie beschikbaar.'] };
@@ -152,7 +206,10 @@ export async function geocodePlace(query, {
   try {
     await respectNominatimRateLimit(signal);
     const url = new URL(nominatimEndpoint);
-    url.search = new URLSearchParams({ q: value, format: 'jsonv2', limit: '3', addressdetails: '1', extratags: '1', namedetails: '1' });
+    url.search = new URLSearchParams({
+      q: value, format: 'jsonv2', limit: '3', addressdetails: '1', extratags: '1', namedetails: '1',
+      polygon_geojson: '1', polygon_threshold: '0.03'
+    });
     const payload = await fetchJson(url, { fetchImpl, timeoutMs: nominatimTimeoutMs, signal, headers: { 'accept-language': 'nl,en;q=0.8' } });
     const resolution = (payload || []).map(match => normalizeNominatimPlace(value, match)).find(Boolean) || null;
     if (resolution) {
@@ -178,6 +235,14 @@ export async function geocodePlace(query, {
   } catch (error) {
     if (signal?.aborted) throw error;
     warnings.push(`Photon: ${error?.message || 'niet beschikbaar'}`);
+  }
+  const staleAgeMs = cacheRecord ? Date.now() - cacheRecord.savedAt : Infinity;
+  if (cacheRecord?.resolution && staleAgeMs < 365 * 24 * 60 * 60 * 1000) {
+    return {
+      resolution: { ...cacheRecord.resolution, cached: true, stale: true, cacheAgeMs: staleAgeMs },
+      status: 'stale-cache',
+      warnings: [...warnings, 'Live geocoding reageerde niet; exact passende oudere geocodingdata wordt gebruikt.']
+    };
   }
   return { resolution: null, status: 'unavailable', warnings };
 }
