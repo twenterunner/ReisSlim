@@ -1,11 +1,11 @@
-const CACHE = 'reisslim-v1.1.1-build-1101';
+const CACHE = 'reisslim-v1.1.2-build-1102';
 const ASSETS = [
-  './', './index.html', './styles.css?v=1101', './app.js?v=1101', './manifest.webmanifest', './icon.svg',
-  './config.js?v=1101', './destination-provider.js?v=1101', './trip-model.js?v=1101', './route-engine.js?v=1101', './route-topology.js?v=1101', './route-graph-engine.js?v=1101', './storage.js?v=1101',
-  './destination-engine.js?v=1101', './proposal-engine.js?v=1101', './constraint-engine.js?v=1101', './plan-solver.js?v=1101', './itinerary-engine.js?v=1101', './itinerary-variants.js?v=1101',
-  './itinerary-validator.js?v=1101', './budget-engine.js?v=1101', './trip-quality-engine.js?v=1101', './trip-optimizer.js?v=1101', './multimodal-engine.js?v=1101', './provider-platform.js?v=1101',
-  './vehicle-intelligence.js?v=1101', './recommendation-engine.js?v=1101', './routing-provider.js?v=1101', './place-provider.js?v=1101', './travel-readiness.js?v=1101', './preference-engine.js?v=1101',
-  './assistant-engine.js?v=1101', './weather-engine.js?v=1101', './image-provider.js?v=1101', './map-view.js?v=1101', './gpx-generator.js?v=1101', './ui-renderer.js?v=1101'
+  './', './index.html', './styles.css?v=1102', './app.js?v=1102', './manifest.webmanifest', './icon.svg',
+  './config.js?v=1102', './destination-provider.js?v=1102', './geocoding-provider.js?v=1102', './discovery-bootstrap-provider.js?v=1102', './trip-model.js?v=1102', './route-engine.js?v=1102', './route-topology.js?v=1102', './route-graph-engine.js?v=1102', './storage.js?v=1102',
+  './destination-engine.js?v=1102', './proposal-engine.js?v=1102', './constraint-engine.js?v=1102', './plan-solver.js?v=1102', './itinerary-engine.js?v=1102', './itinerary-variants.js?v=1102',
+  './itinerary-validator.js?v=1102', './budget-engine.js?v=1102', './trip-quality-engine.js?v=1102', './trip-optimizer.js?v=1102', './multimodal-engine.js?v=1102', './provider-platform.js?v=1102',
+  './vehicle-intelligence.js?v=1102', './recommendation-engine.js?v=1102', './routing-provider.js?v=1102', './place-provider.js?v=1102', './travel-readiness.js?v=1102', './preference-engine.js?v=1102',
+  './assistant-engine.js?v=1102', './weather-engine.js?v=1102', './image-provider.js?v=1102', './map-view.js?v=1102', './gpx-generator.js?v=1102', './ui-renderer.js?v=1102'
 ];
 
 self.addEventListener('install', event => {

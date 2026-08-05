@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.2 — 2026-08-04
+
+- add Photon as a secondary typed-place geocoder and constraint-derived settlement bootstrap;
+- add Wikipedia GeoSearch as an independent source of named nearby evidence;
+- replace stale Overpass instances and avoid full-country settlement scans;
+- make blank destination searches resilient without introducing a destination catalogue;
+- turn broad country results into named regional bases instead of a country-centroid stay;
+- reject cross-border bootstrap anchors before they can be labelled as part of the requested country;
+- allocate multi-base nights chronologically so every stay begins at the previous day's overnight location;
+- let three-day loops schedule a real local highlight between outward and return days;
+- cancel and ignore stale Android discovery requests;
+- distinguish provider outages, unresolved places and exhausted proposal pages.
+
 ## 1.1.1 — 2026-08-04
 
 - split large country discovery into bounded anchor and enrichment stages;

@@ -203,7 +203,7 @@ test('Live discovery uses new deterministic search rings instead of a fixed dest
   assert.ok(first.length >= 4 && later.length >= 4);
   assert.notDeepEqual(first.map(point => [point.lat, point.lon]), later.map(point => [point.lat, point.lon]));
   assert.match(buildDiscoveryQuery(trip, 12), /place.*city\|town/);
-  assert.match(buildDiscoveryQuery(trip, 12), /timeout:8/);
+  assert.match(buildDiscoveryQuery(trip, 12), /timeout:6/);
 });
 
 test('OpenStreetMap discovery normalizes arbitrary towns into plannable dynamic regions', async () => {

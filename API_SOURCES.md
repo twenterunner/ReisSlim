@@ -3,7 +3,9 @@
 | Source | Use | Verification / limits | Fallback |
 |---|---|---|---|
 | OpenStreetMap Nominatim | User-triggered origin and destination geocoding | Shared client throttle above one second, cached results, no autocomplete; destination type and bounds retained | Typed name remains; no unrelated proposal is generated |
-| OpenStreetMap Overpass | Global staged anchor discovery and route-area POIs | Configurable endpoint list, bounded batch, abort timeout, exact-request cache; no availability or price claim | Exact cached evidence only; otherwise explicit no-results state |
+| Photon | Secondary typed-place geocoding and constraint-derived settlement bootstrap | Bounded, user-triggered requests; provider IDs, coordinates and OSM source retained | Nominatim or exact cache |
+| OpenStreetMap Overpass | Tiled anchor discovery and route-area POIs | Current configurable endpoint list, small-area batches, abort timeout, exact-request cache; no availability or price claim | Photon settlements plus Wikipedia evidence |
+| Wikipedia GeoSearch | Named nearby evidence around dynamically discovered settlements | Coordinates and page URL retained; treated as limited-confidence evidence, not verified availability | OSM evidence or clearly generic local suggestion |
 | OSRM public demo | Car-profile road geometry for car/motorcycle | No heavy-vehicle constraints; motorcycle timing is recalculated by ReisSlim | Offline corridor |
 | OpenRouteService | Optional heavy-vehicle routing with user-owned key | Key stored locally; user must verify restrictions | Offline corridor |
 | ReisSlim/TomTom gateway | Optional protected production routing | Server-side key required; normalized response contract | Other road adapter or offline corridor |

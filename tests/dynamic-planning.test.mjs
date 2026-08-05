@@ -71,7 +71,7 @@ test('recorded country provider responses produce dynamic regional concepts with
     const [bounds, point] = definitions[name];
     const concepts = clusterDestinationRegions(trip({ destinationQuery: name }), resolution(name, name.length, bounds, point), normalizeAnchorElements(payload));
     assert.ok(concepts.length >= 2, `${name} should create more than one region concept`);
-    assert.ok(concepts.every(item => item.dynamic && item.provider?.name === 'OpenStreetMap'));
+    assert.ok(concepts.every(item => item.dynamic && /OpenStreetMap Overpass/.test(item.provider?.name)));
     assert.ok(concepts.some(item => item.highlights.length > 1));
   }
 });
@@ -86,6 +86,9 @@ test('Namibia golden case is a generic multi-base graph and omits an infeasible 
   assert.ok(bases.size >= 3);
   assert.ok(plan.omittedHighlights.some(item => /Fish River Canyon/i.test(item.name)));
   assert.equal(plan.days.at(-1).to, request.origin);
+  for (let index = 1; index < plan.days.length; index += 1) {
+    assert.equal(plan.days[index].from, plan.days[index - 1].overnight, `day ${index + 1} must start at the prior overnight base`);
+  }
 });
 
 test('every graph travel day is a selectable map segment and map/plan share canonical data', () => {
@@ -127,13 +130,17 @@ test('provider failure cannot produce unrelated fallback proposals', async () =>
     storage: null, endpoints: ['https://invalid.test'], fetchImpl: async () => { throw new Error('offline'); }
   });
   assert.equal(result.live, false);
+  assert.equal(result.outcome, 'provider-unavailable');
   assert.deepEqual(result.destinations, []);
-  assert.match(result.reason, /No unrelated fallback trips have been generated/);
+  assert.match(result.reason, /geen ongerelateerde reizen toegevoegd/);
 });
 
-test('a geocoded typed destination remains available when Overpass enrichment fails', async () => {
-  const resolved = resolution('South Africa', 710, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
-  const request = trip({ destinationQuery: 'South Africa', travelMode: 'fly-drive', transport: 'car' });
+test('a geocoded typed city remains available when anchor enrichment fails', async () => {
+  const resolved = normalizeDestinationResolution('Cape Town', {
+    osm_type: 'relation', osm_id: 710, display_name: 'Cape Town, South Africa', addresstype: 'city', type: 'administrative', class: 'boundary', importance: .85,
+    boundingbox: ['-34.10', '-33.75', '18.30', '18.70'], lat: '-33.925', lon: '18.424', address: { country: 'South Africa', country_code: 'za' }
+  });
+  const request = trip({ destinationQuery: 'Cape Town', travelMode: 'fly-drive', transport: 'car' });
   const result = await discoverDestinationBatch(request, {
     resolution: resolved,
     storage: null,
@@ -146,13 +153,16 @@ test('a geocoded typed destination remains available when Overpass enrichment fa
   assert.equal(result.degraded, true);
   assert.equal(result.destinations.length, 1);
   assert.match(result.destinations[0].discoverySource, /Nominatim/);
-  assert.match(result.destinations[0].name, /South Africa/);
+  assert.match(result.destinations[0].name, /Cape Town/);
   assert.doesNotMatch(JSON.stringify(result.destinations), /Slovenia|Dolomites|Black Forest/i);
 });
 
 test('an exact degraded discovery result avoids repeated provider waits', async () => {
-  const resolved = resolution('South Africa', 714, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
-  const request = trip({ destinationQuery: 'South Africa', travelMode: 'fly-drive', transport: 'car' });
+  const resolved = normalizeDestinationResolution('Cape Town', {
+    osm_type: 'relation', osm_id: 714, display_name: 'Cape Town, South Africa', addresstype: 'city', type: 'administrative', class: 'boundary', importance: .85,
+    boundingbox: ['-34.10', '-33.75', '18.30', '18.70'], lat: '-33.925', lon: '18.424', address: { country: 'South Africa', country_code: 'za' }
+  });
+  const request = trip({ destinationQuery: 'Cape Town', travelMode: 'fly-drive', transport: 'car' });
   const records = new Map();
   const storage = { getItem: key => records.get(key) || null, setItem: (key, value) => records.set(key, value) };
   let requests = 0;
@@ -170,13 +180,25 @@ test('an exact degraded discovery result avoids repeated provider waits', async 
   assert.equal(requests, afterFirst);
 });
 
+test('a broad country centroid is never emitted as an invented itinerary when anchor providers fail', async () => {
+  const resolved = resolution('South Africa', 715, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
+  const request = trip({ destinationQuery: 'South Africa', travelMode: 'fly-drive', transport: 'car' });
+  const result = await discoverDestinationBatch(request, {
+    resolution: resolved, storage: null, endpoints: ['https://invalid.test'], timeoutMs: 5, deadlineMs: 50,
+    fetchImpl: async () => { throw new Error('offline'); }
+  });
+  assert.equal(result.outcome, 'provider-unavailable');
+  assert.deepEqual(result.destinations, []);
+});
+
 test('country discovery uses bounded staged queries instead of one oversized catalogue-like scan', () => {
   const resolved = resolution('South Africa', 711, [-35, -22, 16, 33], { lat: -30.56, lon: 22.94 });
   const stages = buildDiscoveryQueries(trip({ destinationQuery: 'South Africa' }), 0, resolved);
   assert.deepEqual(stages.map(item => item.stage), ['anchors', 'enrichment']);
-  assert.ok((stages[0].query.match(/nwr/g) || []).length <= 3);
-  assert.ok((stages[1].query.match(/nwr/g) || []).length <= 20);
-  assert.match(stages[0].query, /\[timeout:8\]/);
+  assert.ok((stages[0].query.match(/nwr/g) || []).length <= 4);
+  assert.ok((stages[1].query.match(/nwr/g) || []).length <= 16);
+  assert.match(stages[0].query, /\[timeout:6\]/);
+  assert.doesNotMatch(stages[0].query, /\["place"="city"\]\["name"\]\(-35\.0000,16\.0000,-22\.0000,33\.0000\)/);
 });
 
 test('intercontinental direct road requests receive a generic access-mode decision', () => {
@@ -208,9 +230,12 @@ test('typed destination resolution is cached exactly for reliable repeat submiss
   assert.equal(requests, 1);
 });
 
-test('browser discovery always clears its busy state', () => {
+test('browser discovery cancels stale runs and commits only the current request', () => {
   const app = source('app.js');
-  assert.match(app, /finally\s*{\s*state\.discoveryBusy = false;/);
+  assert.match(app, /state\.discoveryController\?\.abort\(\)/);
+  assert.match(app, /discoveryRunIsCurrent\(run\.runId\)/);
+  assert.match(app, /signal:\s*run\.signal/);
+  assert.match(app, /finally\s*{[\s\S]*state\.discoveryBusy = false;/);
 });
 
 test('an unknown geocoded region works without a production code release', () => {

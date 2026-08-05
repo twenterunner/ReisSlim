@@ -59,7 +59,7 @@ function localTransfer(from, to, trip) {
 }
 
 export function buildItinerary(trip, destination) {
-  if (destination.dynamic && isMultimodal(trip)) return buildDynamicItinerary(trip, destination);
+  if (destination.dynamic) return buildDynamicItinerary(trip, destination);
   if (isMultimodal(trip)) return buildMultimodalItinerary(trip, destination);
   const firstPass = buildTravelNodes(trip, destination, 1);
   const requiredLegs = firstPass.metrics.requiredLegs;
@@ -176,12 +176,27 @@ function buildDynamicItinerary(trip, destination) {
     primaryPlan: `Bereik ${gateway.baseName}, rond de voertuigoverdracht af en houd een aankomstbuffer.`,
     rainAlternative: `Ga na aankomst rechtstreeks naar de eerste overnachtingsbasis in ${gateway.baseName}.`
   });
-  const selectedNodes = route.slice(1);
-  for (const node of selectedNodes) {
-    if (days.length >= trip.days - 1) break;
-    const previous = route[route.indexOf(node) - 1];
+  const activities = chooseActivities(trip, destination);
+  const makeStayAtNode = (node, visitIndex = 0) => {
+    const geometry = localHighlightGeometry(node);
+    const distanceKm = geometry.length > 1 ? Math.max(8, Math.round((haversineKm(node.overnightPoint, node.point) || 4) * 2.25)) : 0;
+    const alternativeActivity = activities[(days.length + visitIndex) % Math.max(1, activities.length)];
+    const primaryPlan = visitIndex === 0 || !alternativeActivity ? node.activity : alternativeActivity.title;
+    const rainAlternative = visitIndex === 0 || !alternativeActivity ? node.rainAlternative : alternativeActivity.rainAlternative;
+    return {
+      kind: 'stay', typeLabel: labelFor('stay'), from: node.baseName, to: node.baseName, location: node.baseName,
+      fromPoint: { ...node.overnightPoint, name: node.baseName, role: 'overnight' }, toPoint: { ...node.overnightPoint, name: node.baseName, role: 'overnight' },
+      overnight: node.baseName, distanceKm, roadHours: Number((distanceKm / 45).toFixed(1)), driveHours: Number((distanceKm / 45).toFixed(1)),
+      elapsedHours: Number((distanceKm / 45).toFixed(1)), breakHours: 0, restStops: 0, fuelStops: 0, stopCount: 0, waypoints: [],
+      geometry, routeSource: geometry.length > 1 ? 'local-route-estimate' : 'local-base', activityType: node.tags[0] || 'cultuur',
+      primaryPlan, rainAlternative
+    };
+  };
+  const makeTransferToNode = (previous, node) => {
     const edge = graphEdge(groundTrip, previous, node, destination);
-    days.push({
+    const arrivalActivity = !node.returnGateway && edge.elapsedHours <= Math.max(1, trip.maxDrive - 1.5)
+      ? ` Na aankomst: ${node.activity}` : '';
+    return {
       kind: 'transfer', typeLabel: labelFor('transfer'), from: previous.baseName, to: node.baseName,
       location: node.baseName, fromPoint: { ...previous.overnightPoint, name: previous.baseName, role: 'overnight' },
       toPoint: { ...node.overnightPoint, name: node.baseName, role: node.returnGateway ? 'gateway' : 'overnight' }, overnight: node.baseName,
@@ -189,25 +204,23 @@ function buildDynamicItinerary(trip, destination) {
       breakHours: edge.timing.breakHours, restStops: edge.timing.restStops, fuelStops: edge.timing.fuelStops,
       stopCount: edge.timing.stopCount, waypoints: buildBreakWaypoints(previous.overnightPoint, node.overnightPoint, edge.timing, groundTrip.transport),
       geometry: [previous.overnightPoint, node.overnightPoint], routeSource: 'route-graph-estimate',
-      primaryPlan: `Verplaats de uitvalsbasis naar ${node.baseName}. De graph solver koos deze etappe voor samenhang en beperkte terugweg.`,
+      primaryPlan: `Verplaats de uitvalsbasis van ${previous.baseName} naar ${node.baseName}. De graph solver koos deze etappe voor samenhang en beperkte terugweg.${arrivalActivity}`,
       rainAlternative: `Rijd rechtstreeks naar ${node.baseName} en schrap optionele omwegen bij slecht weer.`,
       exceedsDailyLimit: edge.elapsedHours > trip.maxDrive + .05
-    });
-  }
-  const visitable = route.filter(node => !node.returnGateway);
-  let cursor = 0;
-  while (days.length < trip.days - 1 && visitable.length) {
-    const node = visitable[cursor % visitable.length]; cursor += 1;
-    const geometry = localHighlightGeometry(node);
-    const distanceKm = geometry.length > 1 ? Math.max(8, Math.round((haversineKm(node.overnightPoint, node.point) || 4) * 2.25)) : 0;
-    days.push({
-      kind: 'stay', typeLabel: labelFor('stay'), from: node.baseName, to: node.baseName, location: node.baseName,
-      fromPoint: { ...node.overnightPoint, name: node.baseName, role: 'overnight' }, toPoint: { ...node.overnightPoint, name: node.baseName, role: 'overnight' },
-      overnight: node.baseName, distanceKm, roadHours: Number((distanceKm / 45).toFixed(1)), driveHours: Number((distanceKm / 45).toFixed(1)),
-      elapsedHours: Number((distanceKm / 45).toFixed(1)), breakHours: 0, restStops: 0, fuelStops: 0, stopCount: 0, waypoints: [],
-      geometry, routeSource: geometry.length > 1 ? 'local-route-estimate' : 'local-base', activityType: node.tags[0] || 'cultuur',
-      primaryPlan: node.activity, rainAlternative: node.rainAlternative
-    });
+    };
+  };
+
+  const gatewayNights = Math.max(1, graphPlan.nightAllocation?.[gateway.id] || gateway.minimumNights || 1);
+  for (let index = 1; index < gatewayNights && days.length < trip.days - 1; index += 1) days.push(makeStayAtNode(gateway, index - 1));
+
+  let previous = gateway;
+  for (const node of route.slice(1)) {
+    if (days.length >= trip.days - 1) break;
+    const sameBase = previous.baseName === node.baseName || (haversineKm(previous.overnightPoint, node.overnightPoint) || Infinity) < 2;
+    days.push(sameBase && !node.returnGateway ? makeStayAtNode(node) : makeTransferToNode(previous, node));
+    const allocatedNights = Math.max(1, graphPlan.nightAllocation?.[node.id] || node.minimumNights || 1);
+    for (let index = 1; index < allocatedNights && days.length < trip.days - 1; index += 1) days.push(makeStayAtNode(node, index));
+    previous = node;
   }
   const finalBase = route.at(-1) || gateway;
   days.push({

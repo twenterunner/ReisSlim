@@ -1,4 +1,4 @@
-# ReisSlim 1.1.1 — resilient zero-catalogue travel intelligence
+# ReisSlim 1.1.2 — resilient multi-provider travel intelligence
 
 ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints into realistic road trips and multi-modal journeys. It supports direct trips by car, motorcycle, camper or caravan, plus fly-drive, fly-ride, fly-camper and train/ferry access. The deterministic planner works without a server; optional public data providers enrich destinations, routes, POIs, weather and open-license images.
 
@@ -7,6 +7,8 @@ ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints
 - accepts any typed origin or privacy-aware current location;
 - resolves any typed city, region, country, island or bounded destination using provider identity, type and bounds;
 - discovers provider-backed gateways, settlements, highlights and services, then clusters them into feasible trip regions;
+- keeps blank worldwide discovery usable through independent Photon settlement evidence and Wikipedia GeoSearch when Overpass is unavailable;
+- cancels stale discovery runs so a slow Android response cannot overwrite a newer request;
 - never uses a finite destination catalogue or unrelated fallback in the production proposal flow;
 - creates 6–12 diverse proposals when enough candidates satisfy the hard constraints;
 - permits at most two clearly labelled, bounded stretch ideas;
@@ -20,6 +22,7 @@ ReisSlim is a mobile-first Dutch Progressive Web App that turns hard constraints
 - includes a Travel Readiness dashboard with official source links and explicit unverified states;
 - learns bounded preferences locally, supports private mode and never silently applies conversational changes;
 - builds a constrained highlight/overnight graph, explains omissions and renders selectable route layers per travel day;
+- validates broad-country anchors by provider country evidence and keeps every multi-base day chronologically connected;
 - migrates older saved trips to schema 8 and rebuilds derived data with the current vehicle profile.
 
 Namibia, South Africa, Croatia and Bulgaria exist only as recorded provider-shaped acceptance fixtures. They are not imported by production modules and do not control worldwide coverage.

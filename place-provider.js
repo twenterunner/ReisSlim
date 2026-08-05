@@ -1,18 +1,11 @@
 import { validCoordinate } from './config.js';
 import { haversineKm } from './route-engine.js';
 import { transportId } from './vehicle-intelligence.js';
+import { geocodePlace } from './geocoding-provider.js';
 
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
 const CACHE_PREFIX = 'reisslim.live.v1.';
-
-async function respectNominatimRateLimit() {
-  const previous = Number(globalThis.__reisslimNominatimRequestAt || 0);
-  const waitMs = Math.max(0, 1050 - (Date.now() - previous));
-  if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
-  globalThis.__reisslimNominatimRequestAt = Date.now();
-}
 
 const clone = value => typeof globalThis.structuredClone === 'function'
   ? globalThis.structuredClone(value)
@@ -62,13 +55,15 @@ export async function geocodeOrigin(origin, options = {}) {
   const key = cacheKey('geocode', query.toLocaleLowerCase('nl-NL'));
   const cached = readCache(storage, key, 90 * 24 * 60 * 60 * 1000);
   if (cached) return cached;
-  const url = new URL(options.nominatimUrl || NOMINATIM_URL);
-  url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1', addressdetails: '0' });
   try {
-    await respectNominatimRateLimit();
-    const result = await fetchJson(url, { headers: { accept: 'application/json' } }, 7000, fetchImpl);
-    const match = result?.[0];
-    const point = match ? { lat: Number(match.lat), lon: Number(match.lon), name: query, source: 'OpenStreetMap Nominatim' } : null;
+    const result = await geocodePlace(query, {
+      fetchImpl, storage, nominatimEndpoint: options.nominatimUrl, photonEndpoint: options.photonUrl,
+      nominatimTimeoutMs: options.timeoutMs || 3500, photonTimeoutMs: options.photonTimeoutMs || 5000,
+      signal: options.signal
+    });
+    const point = result.resolution
+      ? { ...result.resolution.point, name: query, source: result.resolution.provider }
+      : null;
     if (!validCoordinate(point)) return null;
     writeCache(storage, key, point);
     return point;

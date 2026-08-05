@@ -17,7 +17,7 @@ if (!manifest.icons?.length) failures.push('Manifest has no icon.');
 if (!worker.includes(`reisslim-v${version}-build-${build}`)) failures.push('Service-worker cache version is inconsistent.');
 if (!worker.includes(`'./app.js?v=${build}'`)) failures.push(`Application shell is missing app.js build ${build}.`);
 if (!html.includes(`type="module" src="app.js?v=${build}"`)) failures.push('index.html does not load the versioned module entrypoint.');
-for (const module of ['config.js', 'itinerary-engine.js', 'multimodal-engine.js', 'travel-readiness.js', 'preference-engine.js', 'assistant-engine.js', 'weather-engine.js', 'image-provider.js']) {
+for (const module of ['config.js', 'geocoding-provider.js', 'discovery-bootstrap-provider.js', 'itinerary-engine.js', 'multimodal-engine.js', 'travel-readiness.js', 'preference-engine.js', 'assistant-engine.js', 'weather-engine.js', 'image-provider.js']) {
   if (!worker.includes(`'./${module}?v=${build}'`)) failures.push(`The service-worker shell does not cache ${module} for build ${build}.`);
 }
 const staleRuntimeImports = [...app.matchAll(/from ['"]\.\/(.+?\.js)(?:\?v=(\d+))?['"]/g)]

@@ -1,24 +1,18 @@
 import { ENGINE_VERSION, validCoordinate } from './config.js';
 import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
+import { geocodePlace, normalizeNominatimPlace } from './geocoding-provider.js';
+import { bootstrapSettlementAnchors, enrichSettlementHighlights } from './discovery-bootstrap-provider.js';
 
-const NOMINATIM_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.nchc.org.tw/api/interpreter'
+  'https://overpass.private.coffee/api/interpreter'
 ];
-const DISCOVERY_SCHEMA = 4;
+const DISCOVERY_SCHEMA = 6;
 const GOLDEN_ANGLE = 137.507764;
-const DISCOVERY_DEADLINE_MS = 12000;
+const DISCOVERY_DEADLINE_MS = 6500;
 
 const clone = value => JSON.parse(JSON.stringify(value));
-async function respectNominatimRateLimit() {
-  const previous = Number(globalThis.__reisslimNominatimRequestAt || 0);
-  const waitMs = Math.max(0, 1050 - (Date.now() - previous));
-  if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
-  globalThis.__reisslimNominatimRequestAt = Date.now();
-}
 const slug = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
 const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
 const pointOf = element => {
@@ -35,19 +29,27 @@ function destinationPoint(origin, distanceKm, bearingDegrees) {
   return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
 }
 
+function halton(index, base) {
+  let fraction = 1; let result = 0; let value = Math.max(1, index);
+  while (value > 0) { fraction /= base; result += fraction * (value % base); value = Math.floor(value / base); }
+  return result;
+}
+
 export function discoverySeeds(trip, cursor = 0, count = 8, resolution = null) {
   const origin = resolveOrigin(trip);
   const bounds = resolution?.bounds;
   if (bounds) {
     const [south, north, west, east] = bounds;
-    const rows = Math.max(2, Math.ceil(Math.sqrt(count)));
+    const firstPass = [[.5, .5], [.2, .2], [.25, .75], [.75, .75]];
     return Array.from({ length: count }, (_, index) => {
-      const row = Math.floor(index / rows); const column = index % rows;
-      const jitter = ((cursor + index) % 5) * .015;
+      const sequence = cursor * count + index;
+      const [latFraction, lonFraction] = cursor === 0 && firstPass[index]
+        ? firstPass[index]
+        : [.08 + halton(sequence + 1, 2) * .84, .08 + halton(sequence + 1, 3) * .84];
       return {
-        lat: south + (north - south) * Math.min(.92, .12 + row / Math.max(1, rows - 1) * .76 + jitter),
-        lon: west + (east - west) * Math.min(.92, .12 + column / Math.max(1, rows - 1) * .76 - jitter),
-        sequence: cursor * count + index,
+        lat: south + (north - south) * latFraction,
+        lon: west + (east - west) * lonFraction,
+        sequence,
         targeted: true
       };
     });
@@ -66,68 +68,37 @@ export function discoverySeeds(trip, cursor = 0, count = 8, resolution = null) {
   });
 }
 
-function parseBounds(value) {
-  const numbers = Array.isArray(value) ? value.map(Number) : [];
-  if (numbers.length !== 4 || numbers.some(number => !Number.isFinite(number))) return null;
-  const [south, north, west, east] = numbers;
-  return south < north && west < east ? [south, north, west, east] : null;
-}
-
 export function normalizeDestinationResolution(query, match) {
-  const point = { lat: Number(match?.lat), lon: Number(match?.lon) };
-  if (!validCoordinate(point)) return null;
-  return {
-    id: `${match.osm_type || 'place'}-${match.osm_id || slug(query)}`,
-    query: String(query || '').trim(),
-    name: match.display_name?.split(',')[0] || String(query || '').trim(),
-    displayName: match.display_name || String(query || '').trim(),
-    geographicType: match.type || match.addresstype || 'place',
-    geographicClass: match.class || 'place',
-    importance: finite(match.importance),
-    point,
-    bounds: parseBounds(match.boundingbox),
-    provider: 'OpenStreetMap Nominatim',
-    providerId: match.osm_id ? `${match.osm_type || 'object'}/${match.osm_id}` : null,
-    sourceUrl: match.osm_id ? `https://www.openstreetmap.org/${match.osm_type || 'node'}/${match.osm_id}` : null,
-    confidence: finite(match.importance) !== null ? 'provider-evidence' : 'limited',
-    fetchedAt: new Date().toISOString()
-  };
+  return normalizeNominatimPlace(query, match);
 }
 
 async function fetchJson(url, options, fetchImpl, timeoutMs) {
-  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new AbortController();
+  const externalSignal = options?.signal;
+  const abort = () => controller.abort();
+  externalSignal?.addEventListener?.('abort', abort, { once: true });
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, { ...options, signal: controller.signal });
     if (!response.ok) throw new Error(`Provider ${response.status}`);
     return await response.json();
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+    externalSignal?.removeEventListener?.('abort', abort);
+  }
 }
 
-export async function resolveDestination(query, { fetchImpl = globalThis.fetch, endpoint = NOMINATIM_ENDPOINT, timeoutMs = 8000, storage: suppliedStorage } = {}) {
-  const value = String(query || '').trim();
-  if (!value || typeof fetchImpl !== 'function') return null;
-  const cacheKey = `reisslim.destination-resolution.v${DISCOVERY_SCHEMA}:${encodeURIComponent(value.toLocaleLowerCase('nl-NL'))}`;
-  let storage = suppliedStorage;
-  if (storage === undefined) {
-    try { storage = globalThis.localStorage || null; } catch { storage = null; }
-  }
-  try {
-    const record = JSON.parse(storage?.getItem(cacheKey) || 'null');
-    if (record?.resolution && Date.now() - record.savedAt < 90 * 24 * 60 * 60 * 1000) {
-      return { ...record.resolution, cached: true, cacheAgeMs: Date.now() - record.savedAt };
-    }
-  } catch { /* destination resolution cache is optional */ }
-  const url = new URL(endpoint);
-  url.search = new URLSearchParams({ q: value, format: 'jsonv2', limit: '3', addressdetails: '1', extratags: '1', namedetails: '1' });
-  try {
-    await respectNominatimRateLimit();
-    const matches = await fetchJson(url, { headers: { accept: 'application/json', 'accept-language': 'nl,en;q=0.8' } }, fetchImpl, timeoutMs);
-    const resolution = normalizeDestinationResolution(value, matches?.[0]);
-    if (resolution) {
-      try { storage?.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), resolution })); } catch { /* optional */ }
-    }
-    return resolution;
-  } catch { return null; }
+export async function resolveDestination(query, options = {}) {
+  const result = await geocodePlace(query, {
+    fetchImpl: options.fetchImpl,
+    storage: options.storage,
+    nominatimEndpoint: options.endpoint,
+    photonEndpoint: options.photonEndpoint,
+    nominatimTimeoutMs: options.timeoutMs,
+    photonTimeoutMs: options.photonTimeoutMs,
+    signal: options.signal
+  });
+  return result.resolution ? { ...result.resolution, geocodingStatus: result.status, geocodingWarnings: result.warnings } : null;
 }
 
 export function recommendAccessMode(trip, resolution) {
@@ -161,30 +132,50 @@ function bboxOf(resolution) {
   return `${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)}`;
 }
 
+function boundaryIsBroad(resolution) {
+  if (!resolution?.bounds) return ['country', 'state', 'region', 'administrative'].includes(String(resolution?.geographicType || '').toLowerCase());
+  const [south, north, west, east] = resolution.bounds;
+  return north - south > 3 || east - west > 4;
+}
+
+function pointWithinBounds(point, bounds) {
+  if (!validCoordinate(point) || !Array.isArray(bounds) || bounds.length !== 4) return true;
+  const [south, north, west, east] = bounds.map(Number);
+  return point.lat >= south && point.lat <= north && point.lon >= west && point.lon <= east;
+}
+
+function anchorMatchesResolution(anchor, resolution) {
+  if (!resolution) return true;
+  const expectedCountry = String(resolution.countryCode || '').trim().toUpperCase();
+  const actualCountry = String(anchor.countryCode || '').trim().toUpperCase();
+  if (expectedCountry && actualCountry && expectedCountry !== actualCountry) return false;
+  return !resolution.bounds || pointWithinBounds(anchor.point, resolution.bounds);
+}
+
 export function buildDiscoveryQueries(trip, cursor = 0, resolution = null) {
   const bbox = bboxOf(resolution);
+  const broad = boundaryIsBroad(resolution);
   const seeds = discoverySeeds(trip, cursor, bbox ? 4 : 3, resolution);
   if (!seeds.length) return [];
-  const settlementClauses = bbox
+  const settlementClauses = bbox && !broad
     ? [
       `nwr["place"="city"]["name"](${bbox});`,
       `nwr["place"="town"]["name"](${bbox});`,
       `nwr["aeroway"="aerodrome"]["name"](${bbox});`
     ]
-    : seeds.map(seed => `nwr(around:65000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)})["place"~"city|town"]["name"];`);
+    : seeds.map(seed => `nwr(around:90000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)})["place"~"city|town|village"]["name"];`);
   const enrichmentClauses = seeds.flatMap(seed => {
-    const around = `around:52000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)}`;
+    const around = `around:36000,${seed.lat.toFixed(4)},${seed.lon.toFixed(4)}`;
     return [
       `nwr(${around})["tourism"~"attraction|viewpoint|museum"]["name"];`,
       `nwr(${around})["boundary"="national_park"]["name"];`,
       `nwr(${around})["leisure"="nature_reserve"]["name"];`,
-      `nwr(${around})["tourism"~"hotel|guest_house|camp_site|caravan_site"]["name"];`,
-      `nwr(${around})["amenity"~"restaurant|cafe|fuel"]["name"];`
+      `nwr(${around})["tourism"~"hotel|guest_house|camp_site|caravan_site"]["name"];`
     ];
   });
   return [
-    { stage: 'anchors', query: `[out:json][timeout:8][maxsize:12582912];\n(\n${settlementClauses.join('\n')}\n);\nout center tags 180;` },
-    { stage: 'enrichment', query: `[out:json][timeout:8][maxsize:12582912];\n(\n${enrichmentClauses.join('\n')}\n);\nout center tags 240;` }
+    { stage: 'anchors', query: `[out:json][timeout:6][maxsize:8388608];\n(\n${settlementClauses.join('\n')}\n);\nout center tags 120;` },
+    { stage: 'enrichment', query: `[out:json][timeout:6][maxsize:8388608];\n(\n${enrichmentClauses.join('\n')}\n);\nout center tags 180;` }
   ];
 }
 
@@ -230,12 +221,45 @@ export function normalizeAnchorElements(payload) {
         : roleOf(tags) === 'highlight' ? 72 : roleOf(tags) === 'accommodation' ? 44 : 36;
     return {
       id, providerId: id, name, point, role: roleOf(tags), tags: evidence, rawTags: tags,
+      countryCode: String(tags['addr:country'] || tags['is_in:country_code'] || tags['ISO3166-1'] || '').trim().toUpperCase() || null,
       importance: Math.min(100, importance + (population ? Math.min(12, Math.log10(Math.max(10, population)) * 2) : 0)),
       confidence: evidence.length || tags.place || tags.aeroway ? 'provider-evidence' : 'limited',
       provider: 'OpenStreetMap Overpass', sourceUrl: `https://www.openstreetmap.org/${element.type}/${element.id}`,
       fetchedAt: new Date().toISOString()
     };
   }).filter(Boolean);
+}
+
+function resolutionAnchor(resolution) {
+  if (!resolution?.point) return null;
+  const geographicType = String(resolution.geographicType || '').toLowerCase();
+  const localTypes = ['city', 'town', 'village', 'municipality', 'locality', 'island', 'national_park', 'park'];
+  if (!localTypes.includes(geographicType) && boundaryIsBroad(resolution)) return null;
+  return {
+    id: `resolution-${slug(resolution.providerId || resolution.id)}`,
+    providerId: resolution.providerId || resolution.id,
+    name: resolution.name,
+    point: resolution.point,
+    role: 'settlement',
+    tags: [],
+    rawTags: { place: geographicType || 'place' },
+    importance: 74,
+    confidence: resolution.confidence || 'limited',
+    provider: resolution.provider,
+    sourceUrl: resolution.sourceUrl,
+    countryCode: resolution.countryCode || null,
+    countryName: resolution.countryName || null,
+    fetchedAt: resolution.fetchedAt || new Date().toISOString()
+  };
+}
+
+function mergeAnchors(...groups) {
+  const merged = [];
+  for (const anchor of groups.flat()) {
+    if (!anchor?.point || merged.some(existing => existing.providerId === anchor.providerId || (existing.role === anchor.role && (haversineKm(existing.point, anchor.point) || Infinity) < 2))) continue;
+    merged.push(anchor);
+  }
+  return merged;
 }
 
 function nearestSettlement(anchor, settlements) {
@@ -259,12 +283,16 @@ function profileFromCluster(trip, resolution, seed, anchors, index, allAnchors =
   const bases = settlements.slice().sort((a, b) => (haversineKm(a.point, seed.point) || Infinity) - (haversineKm(b.point, seed.point) || Infinity)).slice(0, Math.max(2, Math.min(6, Math.ceil(trip.days / 3))));
   if (!bases.some(item => item.id === seed.id)) bases.unshift(seed);
   const localHighlights = anchors.filter(item => item.role === 'highlight');
-  const distantHighlights = allAnchors.filter(item => item.role === 'highlight' && !localHighlights.some(local => local.id === item.id));
-  const highlights = [...localHighlights, ...distantHighlights].sort((a, b) => b.importance - a.importance).slice(0, 16);
+  const localIds = new Set(localHighlights.map(item => item.id));
+  const contextualHighlights = allAnchors.filter(item => item.role === 'highlight' && !localIds.has(item.id) && item.importance >= 65)
+    .sort((a, b) => b.importance - a.importance || (haversineKm(seed.point, a.point) || Infinity) - (haversineKm(seed.point, b.point) || Infinity))
+    .slice(0, 8);
+  const highlights = [...localHighlights.sort((a, b) => b.importance - a.importance), ...contextualHighlights].slice(0, 16);
   const tags = [...new Set([...anchors.flatMap(item => item.tags), ...highlights.flatMap(item => item.tags)])];
   const accommodations = anchors.filter(item => item.role === 'accommodation').length;
   const services = anchors.filter(item => item.role === 'service').length;
   const gateways = anchors.filter(item => item.role === 'gateway');
+  const providerNames = [...new Set(anchors.map(item => item.provider).filter(Boolean))];
   const basePoints = bases.slice(0, 6).map(item => ({ name: item.name, ...item.point, providerId: item.providerId, sourceUrl: item.sourceUrl }));
   const targetPoint = basePoints[0] || seed.point;
   const distanceDirect = origin ? haversineKm(origin, targetPoint) : haversineKm(resolution?.point, targetPoint);
@@ -272,12 +300,15 @@ function profileFromCluster(trip, resolution, seed, anchors, index, allAnchors =
   const distanceKm = Math.max(1, Math.round((distanceDirect || 250) * (multimodal ? 1 : 1.16)));
   const profileHighlights = highlights.map((item, highlightIndex) => {
     const base = nearestSettlement(item, bases) || seed;
+    const contextOnly = !localIds.has(item.id);
+    const distanceFromRegionKm = Math.round(haversineKm(seed.point, item.point) || 0);
     return {
       id: item.id, name: item.name, baseName: base.name, point: item.point, overnightPoint: base.point,
       sequence: highlightIndex + 1, priority: Math.max(4, Math.min(10, Math.round(item.importance / 10))),
-      minimumTripDays: 3 + Math.floor(highlightIndex / 2), minimumNights: highlightIndex < 3 ? 2 : 1,
+      minimumTripDays: 3 + Math.floor(highlightIndex / 2), minimumNights: 1,
       tags: item.tags, activity: activityFrom(item).title, rainAlternative: activityFrom(item).rainAlternative,
-      evidence: `${item.provider} · ${item.providerId}`, gateway: false, remote: false, sourceUrl: item.sourceUrl
+      evidence: `${item.provider} · ${item.providerId}`, gateway: false, remote: false, sourceUrl: item.sourceUrl,
+      contextOnly, distanceFromRegionKm
     };
   });
   profileHighlights.unshift({
@@ -304,12 +335,12 @@ function profileFromCluster(trip, resolution, seed, anchors, index, allAnchors =
     bases: basePoints.length ? basePoints : [{ name: seed.name, ...seed.point }],
     highlights: profileHighlights,
     activities: highlights.slice(0, 8).map(activityFrom),
-    dynamic: true, discoverySource: 'OpenStreetMap Nominatim + Overpass', discoveredAt: new Date().toISOString(),
+    dynamic: true, discoverySource: providerNames.join(' + ') || resolution?.provider || 'Dynamische providerdata', discoveredAt: new Date().toISOString(),
     evidence: {
       anchors: anchors.length, highlights: highlights.length, settlements: settlements.length,
       accommodations, services, gateways: gateways.length, neutralFields: ['weather', 'crowds', ...(family === neutral ? ['family'] : []), ...(motorcycle === neutral ? ['motorcycle'] : []), ...(camper === neutral ? ['camper'] : [])]
     },
-    provider: { name: 'OpenStreetMap', resolutionId: resolution?.providerId || null, sourceUrl: resolution?.sourceUrl || seed.sourceUrl, fetchedAt: new Date().toISOString(), confidence: anchors.length >= 8 ? 'reasonable' : 'limited' },
+    provider: { name: providerNames.join(' + ') || resolution?.provider || 'Dynamische providerdata', resolutionId: resolution?.providerId || null, sourceUrl: resolution?.sourceUrl || seed.sourceUrl, fetchedAt: new Date().toISOString(), confidence: anchors.length >= 8 ? 'reasonable' : 'limited' },
     roadDistanceFactor: 1.16
   };
 }
@@ -324,7 +355,7 @@ export function clusterDestinationRegions(trip, resolution, anchors, { limit = N
     if (!chosenSeeds.some(existing => (haversineKm(existing.point, candidate.point) || 0) < radiusKm * .35)) chosenSeeds.push(candidate);
     if (chosenSeeds.length >= limit) break;
   }
-  if (!chosenSeeds.length && resolution?.point) {
+  if (!chosenSeeds.length && resolution?.point && !boundaryIsBroad(resolution)) {
     chosenSeeds.push({ id: resolution.id, providerId: resolution.providerId || resolution.id, name: resolution.name, point: resolution.point, role: 'settlement', tags: [], importance: 60, confidence: resolution.confidence, provider: resolution.provider, sourceUrl: resolution.sourceUrl });
   }
   return chosenSeeds.map((seed, index) => {
@@ -347,14 +378,18 @@ export function buildDiscoveryCacheKey(trip, { cursor = 0, resolution = null } =
   return `reisslim.destination-discovery.v${DISCOVERY_SCHEMA}:${encodeURIComponent(JSON.stringify(identity))}`;
 }
 
-async function fetchOverpass(query, endpoints, fetchImpl, timeoutMs, deadlineAt) {
+async function fetchOverpass(query, endpoints, fetchImpl, timeoutMs, deadlineAt, { preferredEndpoint = null, signal } = {}) {
   let lastError = null;
-  for (const endpoint of endpoints) {
+  const ordered = preferredEndpoint
+    ? [preferredEndpoint, ...endpoints.filter(endpoint => endpoint !== preferredEndpoint)]
+    : endpoints;
+  for (const endpoint of ordered) {
+    if (signal?.aborted) throw new DOMException('Discovery cancelled', 'AbortError');
     const remainingMs = Math.max(0, deadlineAt - Date.now());
     if (remainingMs < 250) break;
     try {
       const body = new URLSearchParams({ data: query }).toString();
-      const payload = await fetchJson(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8', accept: 'application/json' }, body }, fetchImpl, Math.min(timeoutMs, remainingMs));
+      const payload = await fetchJson(endpoint, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8', accept: 'application/json' }, body, signal }, fetchImpl, Math.min(timeoutMs, remainingMs));
       return { payload, endpoint };
     } catch (error) { lastError = error; }
   }
@@ -362,20 +397,20 @@ async function fetchOverpass(query, endpoints, fetchImpl, timeoutMs, deadlineAt)
 }
 
 function typedDestinationFallback(trip, resolution, excludedIds, warning) {
-  if (!resolution) return [];
+  if (!resolution || boundaryIsBroad(resolution)) return [];
   return clusterDestinationRegions(trip, resolution, [])
     .filter(item => !excludedIds.includes(item.id))
     .map(item => ({
       ...item,
-      summary: `${resolution.displayName} is rechtstreeks door OpenStreetMap Nominatim gevonden. Detailankers zijn tijdelijk niet beschikbaar; deze optie gebruikt daarom alleen geverifieerde bestemmingscoÃ¶rdinaten en neutrale aannames.`,
+      summary: `${resolution.displayName} is rechtstreeks door ${resolution.provider} gevonden. Detailankers zijn tijdelijk niet beschikbaar; deze optie gebruikt daarom alleen geverifieerde bestemmingscoordinaten en neutrale aannames.`,
       pros: ['Getypte bestemming is rechtstreeks gegeocodeerd', 'Geen ongerelateerde catalogusbestemming toegevoegd'],
       cons: [warning || 'POI- en verblijfsverrijking is tijdelijk niet beschikbaar', 'Regio-indeling en beschikbaarheid vragen aanvullende live data'],
       dynamic: true,
       degraded: true,
-      discoverySource: 'OpenStreetMap Nominatim Â· beperkte live modus',
+      discoverySource: `${resolution.provider} - beperkte live modus`,
       evidence: { ...item.evidence, anchors: 1, highlights: 0, settlements: 1, providerWarnings: [warning].filter(Boolean) },
       provider: {
-        name: 'OpenStreetMap Nominatim', resolutionId: resolution.providerId || resolution.id,
+        name: resolution.provider, resolutionId: resolution.providerId || resolution.id,
         sourceUrl: resolution.sourceUrl, fetchedAt: resolution.fetchedAt || new Date().toISOString(), confidence: 'limited'
       }
     }));
@@ -383,48 +418,96 @@ function typedDestinationFallback(trip, resolution, excludedIds, warning) {
 
 export async function discoverDestinationBatch(trip, {
   cursor = 0, excludedIds = [], fetchImpl = globalThis.fetch, endpoints = OVERPASS_ENDPOINTS,
-  storage = globalThis.localStorage, resolution: suppliedResolution = null, timeoutMs = 5000,
-  deadlineMs = DISCOVERY_DEADLINE_MS
+  storage: suppliedStorage, resolution: suppliedResolution = null, timeoutMs = 3500,
+  deadlineMs = DISCOVERY_DEADLINE_MS, signal
 } = {}) {
-  if (typeof fetchImpl !== 'function') return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.' };
-  const resolution = suppliedResolution || (trip.destinationQuery ? await resolveDestination(trip.destinationQuery, { fetchImpl }) : null);
-  if (trip.destinationQuery && !resolution) return { destinations: [], anchors: [], live: false, reason: 'De opgegeven bestemming kon niet dynamisch worden gevonden. Er zijn geen ongerelateerde fallbackreizen gegenereerd.' };
+  let storage = suppliedStorage;
+  if (storage === undefined) {
+    try { storage = globalThis.localStorage || null; } catch { storage = null; }
+  }
+  const resolution = suppliedResolution || (trip.destinationQuery
+    ? await resolveDestination(trip.destinationQuery, { fetchImpl, storage, signal })
+    : null);
+  if (trip.destinationQuery && !resolution) return {
+    destinations: [], anchors: [], live: false, outcome: 'unresolved-destination',
+    reason: 'De opgegeven bestemming kon door geen geocodingprovider worden gevonden. Controleer de spelling of probeer opnieuw.'
+  };
   const accessRecommendation = recommendAccessMode(trip, resolution);
   const stages = buildDiscoveryQueries(trip, cursor, resolution);
-  if (!stages.length) return { destinations: [], anchors: [], live: false, reason: 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.', resolution, accessRecommendation };
   const cacheKey = buildDiscoveryCacheKey(trip, { cursor, resolution });
+  let cacheRecord = null;
   try {
-    const record = JSON.parse(storage?.getItem(cacheKey) || 'null');
-    const maximumAge = record?.degraded ? 30 * 60 * 1000 : 14 * 24 * 60 * 60 * 1000;
-    if (record?.payload && Date.now() - record.savedAt < maximumAge) {
-      const anchors = normalizeAnchorElements(record.payload);
-      const destinations = record.degraded
-        ? typedDestinationFallback(trip, resolution, excludedIds, record.warning)
-        : clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
-      destinations.forEach(item => { item.discoveryCache = { cached: true, ageMs: Date.now() - record.savedAt, key: cacheKey }; });
-      return { destinations, anchors, live: true, cached: true, degraded: Boolean(record.degraded), cacheAgeMs: Date.now() - record.savedAt, source: record.endpoint || 'OpenStreetMap Overpass', warnings: [record.warning].filter(Boolean), resolution, accessRecommendation };
+    cacheRecord = JSON.parse(storage?.getItem(cacheKey) || 'null');
+    const maximumAge = cacheRecord?.degraded ? 30 * 60 * 1000 : 14 * 24 * 60 * 60 * 1000;
+    if (cacheRecord && Date.now() - cacheRecord.savedAt < maximumAge) {
+      const anchors = Array.isArray(cacheRecord.anchors) ? cacheRecord.anchors : normalizeAnchorElements(cacheRecord.payload);
+      const allCandidates = anchors.length
+        ? clusterDestinationRegions(trip, resolution, anchors)
+        : typedDestinationFallback(trip, resolution, [], cacheRecord.warning);
+      const destinations = allCandidates.filter(item => !excludedIds.includes(item.id));
+      destinations.forEach(item => { item.discoveryCache = { cached: true, ageMs: Date.now() - cacheRecord.savedAt, key: cacheKey }; });
+      return {
+        destinations, anchors, live: true, cached: true, degraded: Boolean(cacheRecord.degraded),
+        outcome: destinations.length ? (cacheRecord.degraded ? 'degraded' : 'success') : 'no-unseen-results',
+        reason: destinations.length ? null : 'Alle dynamisch gevonden regio\'s zijn al getoond. Kies Toon meer reisopties later opnieuw of wijzig de zoekrichting.',
+        cacheAgeMs: Date.now() - cacheRecord.savedAt, source: cacheRecord.endpoint || 'Dynamische providercache',
+        warnings: cacheRecord.warnings || [cacheRecord.warning].filter(Boolean), resolution, accessRecommendation
+      };
     }
   } catch { /* exact-query cache is optional */ }
+
+  const directFallback = warning => typedDestinationFallback(trip, resolution, excludedIds, warning);
+  if (!stages.length || typeof fetchImpl !== 'function') {
+    const destinations = directFallback('Live ankerproviders zijn niet beschikbaar.');
+    return destinations.length
+      ? { destinations, anchors: [], live: true, degraded: true, outcome: 'degraded', source: resolution?.provider, warnings: ['Live ankerproviders zijn niet beschikbaar.'], resolution, accessRecommendation }
+      : { destinations: [], anchors: [], live: false, outcome: 'provider-unavailable', reason: 'Dynamische bestemmingontdekking is tijdelijk niet beschikbaar; er zijn geen ongerelateerde reizen toegevoegd.', resolution, accessRecommendation };
+  }
+
+  const seeds = discoverySeeds(trip, cursor, resolution?.bounds ? 4 : 3, resolution);
+  const needsBootstrap = !resolution || boundaryIsBroad(resolution);
+  const bootstrapPromise = needsBootstrap
+    ? bootstrapSettlementAnchors(seeds, { fetchImpl, maxSeeds: resolution?.bounds ? 4 : 3, timeoutMs: Math.min(4500, deadlineMs), signal })
+    : Promise.resolve({ anchors: [], warnings: [], provider: null });
   const deadlineAt = Date.now() + Math.max(1000, deadlineMs);
   const elements = [];
   const usedEndpoints = [];
   const warnings = [];
+  let preferredEndpoint = null;
   for (const stage of stages) {
     try {
-      const { payload, endpoint } = await fetchOverpass(stage.query, endpoints, fetchImpl, timeoutMs, deadlineAt);
+      const { payload, endpoint } = await fetchOverpass(stage.query, endpoints, fetchImpl, timeoutMs, deadlineAt, { preferredEndpoint, signal });
       elements.push(...(payload?.elements || []));
       usedEndpoints.push(endpoint);
+      preferredEndpoint = endpoint;
     } catch (error) {
+      if (signal?.aborted) throw error;
       warnings.push(`${stage.stage}: ${error?.name === 'AbortError' ? 'provider-timeout' : String(error?.message || 'provider-error')}`);
       if (stage.stage === 'anchors') break;
     }
   }
+  const bootstrap = await bootstrapPromise;
+  warnings.push(...bootstrap.warnings);
   const payload = { elements };
-  if (elements.length) {
-    try { storage?.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), endpoint: [...new Set(usedEndpoints)].join(' + '), payload })); } catch { /* optional */ }
+  const resolvedAnchor = resolutionAnchor(resolution);
+  const bootstrapAnchors = bootstrap.anchors.filter(anchor => anchorMatchesResolution(anchor, resolution));
+  const normalizedProviderAnchors = normalizeAnchorElements(payload).filter(anchor => anchorMatchesResolution(anchor, resolution));
+  const boundedProviderAnchors = boundaryIsBroad(resolution) && bootstrapAnchors.length
+    ? normalizedProviderAnchors.filter(anchor => bootstrapAnchors.some(base => (haversineKm(anchor.point, base.point) || Infinity) <= 120))
+    : normalizedProviderAnchors;
+  let anchors = mergeAnchors(boundedProviderAnchors, bootstrapAnchors, resolvedAnchor ? [resolvedAnchor] : []);
+  if (!anchors.some(item => item.role === 'highlight') && anchors.some(item => item.role === 'settlement')) {
+    const wikipedia = await enrichSettlementHighlights(
+      anchors.filter(item => item.role === 'settlement').sort((a, b) => b.importance - a.importance),
+      { fetchImpl, maxBases: trip.days >= 8 ? 3 : 2, timeoutMs: 4000, signal }
+    );
+    anchors = mergeAnchors(anchors, wikipedia.anchors.filter(anchor => anchorMatchesResolution(anchor, resolution)));
+    warnings.push(...wikipedia.warnings);
   }
-  const anchors = normalizeAnchorElements(payload);
-  let destinations = clusterDestinationRegions(trip, resolution, anchors).filter(item => !excludedIds.includes(item.id));
+  const sources = [...new Set(anchors.map(item => item.provider).filter(Boolean))];
+  let allCandidates = clusterDestinationRegions(trip, resolution, anchors);
+  if (!allCandidates.length && resolution) allCandidates = typedDestinationFallback(trip, resolution, [], warnings[0]);
+  let destinations = allCandidates.filter(item => !excludedIds.includes(item.id));
   destinations.forEach(item => {
     item.discoveryCache = { cached: false, ageMs: 0, key: cacheKey };
     if (warnings.length) {
@@ -433,26 +516,43 @@ export async function discoverDestinationBatch(trip, {
       item.cons = [...new Set([...item.cons, 'Een deel van de live verrijking reageerde niet binnen de tijdslimiet'])];
     }
   });
-  if (!destinations.length && resolution) destinations = typedDestinationFallback(trip, resolution, excludedIds, warnings[0]);
+  const degraded = Boolean(warnings.length) || !elements.length;
   if (destinations.length) {
-    if (!anchors.length && resolution) {
-      try {
-        storage?.setItem(cacheKey, JSON.stringify({
-          savedAt: Date.now(), endpoint: 'OpenStreetMap Nominatim', payload: { elements: [] }, degraded: true, warning: warnings[0] || 'Overpass enrichment unavailable'
-        }));
-      } catch { /* optional */ }
-    }
+    try {
+      storage?.setItem(cacheKey, JSON.stringify({
+        savedAt: Date.now(), endpoint: sources.join(' + ') || resolution?.provider || 'Dynamische providerdata',
+        payload, anchors, degraded, warnings
+      }));
+    } catch { /* optional */ }
     return {
-      destinations, anchors, live: true, cached: false, degraded: !anchors.length || Boolean(warnings.length),
-      source: usedEndpoints.length ? [...new Set(usedEndpoints)].join(' + ') : 'OpenStreetMap Nominatim',
+      destinations, anchors, live: true, cached: false, degraded, outcome: degraded ? 'degraded' : 'success',
+      source: sources.join(' + ') || usedEndpoints.join(' + ') || resolution?.provider || 'Dynamische providerdata',
       warnings, resolution, accessRecommendation
     };
   }
+  if (allCandidates.length) return {
+    destinations: [], anchors, live: true, degraded, outcome: 'no-unseen-results',
+    reason: 'Alle dynamisch gevonden regio\'s zijn al getoond; dit is geen providerfout.',
+    warnings, resolution, accessRecommendation
+  };
+  if (cacheRecord && Date.now() - cacheRecord.savedAt < 90 * 24 * 60 * 60 * 1000) {
+    const staleAnchors = Array.isArray(cacheRecord.anchors) ? cacheRecord.anchors : normalizeAnchorElements(cacheRecord.payload);
+    const staleDestinations = clusterDestinationRegions(trip, resolution, staleAnchors).filter(item => !excludedIds.includes(item.id));
+    staleDestinations.forEach(item => {
+      item.degraded = true;
+      item.discoveryCache = { cached: true, stale: true, ageMs: Date.now() - cacheRecord.savedAt, key: cacheKey };
+      item.cons = [...new Set([...item.cons, 'Live providers reageerden niet; exact passende oudere evidence wordt getoond'])];
+    });
+    if (staleDestinations.length) return {
+      destinations: staleDestinations, anchors: staleAnchors, live: true, cached: true, stale: true, degraded: true,
+      outcome: 'degraded', source: cacheRecord.endpoint || 'Exacte oudere providercache', warnings, resolution, accessRecommendation
+    };
+  }
   return {
-    destinations: [], anchors, live: false,
+    destinations: [], anchors, live: false, outcome: 'provider-unavailable',
     reason: resolution
-      ? 'De bestemming is gevonden, maar er kon geen nieuwe selecteerbare regio worden opgebouwd. Er zijn geen ongerelateerde fallbackreizen gegenereerd.'
-      : 'Dynamic destination discovery is currently unavailable. No unrelated fallback trips have been generated.',
+      ? 'De bestemming is gevonden, maar de onafhankelijke ankerproviders konden geen routeerbare plaatsen leveren. Probeer opnieuw.'
+      : 'Dynamische plaatsontdekking reageert tijdelijk niet. Overpass en de onafhankelijke settlementprovider leverden geen routeerbare plaatsen; er zijn geen ongerelateerde reizen toegevoegd.',
     error: warnings[0] || 'provider-error', resolution, accessRecommendation
   };
 }
@@ -463,8 +563,9 @@ export function normalizeDiscoveredDestinations(trip, payload, options = {}) {
 }
 
 export const destinationDiscoveryConfig = Object.freeze({
-  nominatimEndpoint: NOMINATIM_ENDPOINT,
+  geocodingProviders: ['OpenStreetMap Nominatim', 'Photon (OpenStreetMap)'],
   overpassEndpoints: OVERPASS_ENDPOINTS,
+  independentAnchorProviders: ['Photon (OpenStreetMap)', 'Wikipedia GeoSearch'],
   schema: DISCOVERY_SCHEMA,
   attribution: '© OpenStreetMap-bijdragers, ODbL',
   coverage: 'zero-catalogue-global-staged'
