@@ -27,7 +27,7 @@ const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
 
 function endpointLabel(endpoint){
-  if(String(endpoint||'').includes('Nominatim'))return 'OpenStreetMap plaatsendienst';
+  if(String(endpoint||'').toLowerCase().includes('nominatim'))return 'OpenStreetMap plaatsendienst';
   if(String(endpoint||'').includes('kumi.systems'))return 'OpenStreetMap detailserver 2';
   if(String(endpoint||'').includes('overpass-api.de'))return 'OpenStreetMap detailserver 1';
   if(endpoint==='cache')return 'lokale cache';
@@ -52,14 +52,14 @@ function renderLiveDiscoveryProgress(){
   if(p.complete)lines.push(`<li class="done">✓ Live zoeken afgerond in <strong>${elapsedSeconds()} sec</strong></li>`);
   if(p.failed)lines.push(`<li class="failed">✕ Live zoeken afgerond zonder bruikbare live regio’s: ${p.failureReason||'provider gaf geen resultaat'}</li>`);
 
-  box.innerHTML=`<div class="live-progress-head"><div><strong>${p.complete?'Live reisopties gevonden':p.failed?'Live zoeken kon niet worden voltooid':'Live reisopties zoeken…'}</strong><small>${p.complete?'De live resultaten staan nu tussen de voorstellen.':p.failed?'Fallbackresultaten worden nu weer zichtbaar.':'Resultaten verschijnen meteen zodra een zoekronde iets bruikbaars oplevert.'}</small></div><span>${elapsedSeconds()}s</span></div><ul>${lines.join('')}</ul>${p.failed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Probeer live opnieuw</button>':''}`;
+  box.innerHTML=`<div class="live-progress-head"><div><strong>${p.complete?'Live reisopties gevonden':p.failed?'Live uitbreiding tijdelijk beperkt':'Live reisopties zoeken…'}</strong><small>${p.complete?'De live resultaten staan nu tussen de voorstellen.':p.failed?'De bestaande voorstellen blijven beschikbaar; live uitbreiding kan later opnieuw.':'Resultaten verschijnen meteen zodra een zoekronde iets bruikbaars oplevert.'}</small></div><span>${elapsedSeconds()}s</span></div><ul>${lines.join('')}</ul>${p.failed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Probeer live opnieuw</button>':''}`;
   const retry=$('retryLiveDiscoveryBtn');
   if(retry)retry.onclick=()=>discoverLiveOptions({retry:true});
 }
 function startLiveDiscoveryProgress(){
   state.liveDiscoveryStartedAt=Date.now();
   clearInterval(state.liveDiscoveryTimer);
-  state.liveDiscoveryProgress={origin:state.trip.origin,reachKm:null,pass:0,totalPasses:4,candidateElements:0,liveDestinations:0,lastMessage:'Live OpenStreetMap-ontdekking voorbereiden…',complete:false,failed:false};
+  state.liveDiscoveryProgress={origin:state.trip.origin,reachKm:null,pass:0,totalPasses:1,candidateElements:0,liveDestinations:0,lastMessage:'Live OpenStreetMap-ontdekking voorbereiden…',complete:false,failed:false};
   document.body.dataset.liveDiscovery='running';
   renderLiveDiscoveryProgress();
   state.liveDiscoveryTimer=setInterval(renderLiveDiscoveryProgress,1000);
@@ -96,7 +96,7 @@ function handleDiscoveryProgress(event){
   }else if(event.type==='discovery-complete'){
     p.liveDestinations=event.totalDestinations;p.candidateElements=event.candidateElements;p.complete=true;p.failed=false;p.lastMessage=`${event.successfulPasses} van ${event.totalPasses} zoekrondes leverden live data op.`;
   }else if(event.type==='discovery-failure'){
-    p.failed=true;p.complete=false;p.failureReason=event.reason;p.lastMessage='Alle live zoekrondes zijn afgerond.';
+    p.failed=true;p.complete=false;p.failureReason=event.reason;p.lastMessage='Live uitbreiding afgerond; de beschikbare voorstellen blijven actief.';
   }
   renderLiveDiscoveryProgress();
 }

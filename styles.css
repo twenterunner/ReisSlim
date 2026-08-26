@@ -83,3 +83,15 @@
   .priority-item,.pref{min-height:44px!important}
   .priority-item select{height:36px!important;width:104px!important;min-width:104px!important;max-width:104px!important;font-size:.82rem!important}
 }
+
+/* v1.6.8 spacing repairs */
+.current-trip-details{display:grid;gap:6px}
+.current-trip-details div{display:grid!important;grid-template-columns:minmax(92px,auto) 1fr;column-gap:10px;align-items:baseline}
+.current-trip-details span{display:block;color:var(--muted);line-height:1.25}
+.current-trip-details strong{display:block;line-height:1.25;overflow-wrap:anywhere}
+.live-discovery-progress li{line-height:1.35}
+.live-discovery-progress li strong{margin-left:2px}
+@media(max-width:800px){
+  .current-trip-details div{grid-template-columns:88px 1fr;padding:8px 10px!important}
+  .current-trip-details span,.current-trip-details strong{font-size:.9rem}
+}

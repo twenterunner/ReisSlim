@@ -2,11 +2,12 @@ import './ui-feature-flags.js';
 import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
 
+const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
 const DEFAULT_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const GOLDEN_ANGLE=137.507764;
 const DEFAULT_BATCH_SEEDS=4;
 const DEFAULT_RESULT_LIMIT=72;
-const DISCOVERY_PASSES=2;
+const DISCOVERY_PASSES=1;
 const countryNames={
 AL:'Albanië',AD:'Andorra',AT:'Oostenrijk',BY:'Belarus',BE:'België',BA:'Bosnië en Herzegovina',BG:'Bulgarije',
 HR:'Kroatië',CY:'Cyprus',CZ:'Tsjechië',DK:'Denemarken',EE:'Estland',FI:'Finland',FR:'Frankrijk',DE:'Duitsland',
@@ -78,9 +79,59 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
-async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context,controller=new AbortController()){
+
+function nominatimElement(row,seedIndex){
+  if(!row)return null;
+  const lat=Number(row.lat),lon=Number(row.lon),address=row.address||{};
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
+  const name=address.city||address.town||address.village||address.municipality||address.county||String(row.display_name||'').split(',')[0];
+  if(!name)return null;
+  const place=address.city?'city':address.town?'town':'village';
+  return{
+    type:'node',
+    id:Number(row.osm_id)||900000000+seedIndex,
+    lat,lon,
+    tags:{
+      name,
+      place,
+      'is_in:country_code':String(address.country_code||'').toUpperCase(),
+      'is_in:country':String(address.country||'')
+    }
+  };
+}
+async function fetchNominatimSeed(seed,seedIndex,fetchImpl,timeoutMs,onProgress,context){
+  const controller=new AbortController(),startedAt=Date.now();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  const url=new URL(NOMINATIM_REVERSE);
+  url.search=new URLSearchParams({format:'jsonv2',lat:String(seed.lat),lon:String(seed.lon),zoom:'10',addressdetails:'1'});
+  onProgress?.({...context,type:'endpoint-start',endpoint:'OpenStreetMap Nominatim',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,startedAt});
+  try{
+    const response=await fetchImpl(url,{headers:{accept:'application/json'},signal:controller.signal});
+    if(!response.ok)throw new Error(`Nominatim ${response.status}`);
+    const row=await response.json();
+    const element=nominatimElement(row,seedIndex);
+    onProgress?.({...context,type:'endpoint-success',endpoint:'OpenStreetMap Nominatim',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,elapsedMs:Date.now()-startedAt,candidateElements:element?1:0});
+    return element;
+  }catch(error){
+    const timeout=error?.name==='AbortError';
+    onProgress?.({...context,type:'endpoint-failure',endpoint:'OpenStreetMap Nominatim',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    return null;
+  }finally{clearTimeout(timer)}
+}
+async function discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs}){
+  const seeds=discoverySeeds(trip,cursor,DEFAULT_BATCH_SEEDS),elements=[];
+  for(let index=0;index<seeds.length;index++){
+    const element=await fetchNominatimSeed(seeds[index],index,fetchImpl,Math.min(timeoutMs,3200),onProgress,{pass,totalPasses,cursor});
+    if(element)elements.push(element);
+    if(index<seeds.length-1)await new Promise(resolve=>setTimeout(resolve,1050));
+  }
+  return elements;
+}
+
+async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context){
+  const controller=new AbortController();
   const startedAt=Date.now();
-  const timer=setTimeout(()=>controller.abort('timeout'),timeoutMs);
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
   onProgress?.({...context,type:'endpoint-start',endpoint,startedAt});
   try{
     const response=await fetchImpl(endpoint,{
@@ -94,9 +145,8 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
     onProgress?.({...context,type:'endpoint-success',endpoint,elapsedMs:Date.now()-startedAt,candidateElements:payload?.elements?.length||0});
     return{payload,endpoint};
   }catch(error){
-    const raceCancelled=controller.signal.aborted&&controller.signal.reason==='race-won';
-    const timeout=error?.name==='AbortError'&&controller.signal.reason!=='race-won';
-    if(!raceCancelled)onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    const timeout=error?.name==='AbortError';
+    onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
     throw error;
   }finally{
     clearTimeout(timer);
@@ -104,11 +154,9 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
 }
 
 async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=6500,bypassCache=false}){
-  const query=buildDiscoveryQuery(trip,cursor);
   const context={pass,totalPasses,cursor};
-  if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
+  const key=`reisslim.destination-discovery.v11:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
 
-  const key=`reisslim.destination-discovery.v10:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
   if(!bypassCache){
     try{
       const cached=storage?.getItem(key);
@@ -120,26 +168,27 @@ async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,on
     }catch{}
   }else onProgress?.({...context,type:'cache-bypass',endpoint:'live'});
 
-  // Race all configured Overpass mirrors in parallel. The first valid response wins;
-  // remaining requests are cancelled immediately so one slow mirror cannot serially
-  // add another full timeout to the discovery path.
+  const nominatimElements=await discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs});
+  if(nominatimElements.length){
+    return{payload:{elements:nominatimElements},cached:false,endpoint:'OpenStreetMap Nominatim',cacheKey:key};
+  }
+
+  // Emergency fallback only: one lightweight Overpass query, with mirrors raced
+  // in parallel instead of waiting for each public server sequentially.
+  const query=buildDiscoveryQuery(trip,cursor);
+  if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
   const controllers=endpoints.map(()=>new AbortController());
   const attempts=endpoints.map((endpoint,endpointIndex)=>
-    fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length},controllers[endpointIndex])
+    fetchEndpoint(endpoint,query,fetchImpl,Math.min(timeoutMs,3500),onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length},controllers[endpointIndex])
       .then(result=>({result,endpointIndex}))
   );
   try{
     const {result,endpointIndex}=await Promise.any(attempts);
     controllers.forEach((controller,index)=>{if(index!==endpointIndex&&!controller.signal.aborted)controller.abort('race-won')});
     return{payload:result.payload,cached:false,endpoint:result.endpoint,cacheKey:key};
-  }catch(error){
+  }catch{
     controllers.forEach(controller=>{if(!controller.signal.aborted)controller.abort('race-won')});
-    const failures=error?.errors||[];
-    const timedOut=failures.length>0&&failures.every(item=>item?.name==='AbortError');
-    const reason=timedOut
-      ? 'Live ontdekking duurde te lang op alle OpenStreetMap-servers.'
-      : 'Live OpenStreetMap-ontdekking is tijdelijk niet beschikbaar.';
-    return{payload:null,cached:false,reason};
+    return{payload:null,cached:false,reason:'Live plaatsontdekking is tijdelijk beperkt; de beschikbare voorstellen blijven direct bruikbaar.'};
   }
 }
 
@@ -263,5 +312,7 @@ export const destinationDiscoveryConfig=Object.freeze({
   discoveryPasses:DISCOVERY_PASSES,
   resultLimit:DEFAULT_RESULT_LIMIT,
   progressive:true,
-  endpointTimeoutMs:6500
+  primaryProvider:'OpenStreetMap Nominatim',
+  cacheVersion:11,
+  endpointTimeoutMs:3200
 });

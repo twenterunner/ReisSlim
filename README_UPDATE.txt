@@ -1,18 +1,13 @@
-ReisSlim v1.6.6 · Build 1606
+ReisSlim v1.6.8 · Build 1608
 
-AUTO-RECOVERY FOR ZERO-RESULT CACHE
+Fixes:
+- Header/footer revision mismatch: v1.6.7 omitted ui-feature-flags.js and
+  service-worker.js. Build 1608 includes them and versions all runtime files.
+- Destination discovery no longer depends on Overpass as primary. Reachable
+  geographic seeds are reverse-geocoded through OpenStreetMap Nominatim first.
+- Overpass is now only an emergency fallback and its mirrors are raced in parallel.
+- Discovery uses one progressive batch rather than repeated Overpass rounds.
+- Dashboard text spacing repaired (e.g. 'Vertrek Saasveld', 'Start 2026-08-07').
+- Old duplicate service-worker activation handler removed.
 
-Observed in deployed v1.6.4:
-The app could still display "0s · lokale cache · Geen live roadtripregio's"
-on the initial search. v1.6.4 correctly invalidated bad cache entries, but it
-then stopped instead of immediately performing a new live search.
-
-v1.6.6:
-- detects when an initial cached search produced zero usable destinations;
-- automatically starts one fresh live OpenStreetMap discovery pass;
-- advances to a new geographic seed group;
-- bypasses cache for that recovery pass;
-- keeps progress UI live while recovery happens;
-- manual Retry still bypasses cache and uses new seeds.
-
-Upload all files in this ZIP to repository root.
+Upload ALL files from this ZIP to the repository root.

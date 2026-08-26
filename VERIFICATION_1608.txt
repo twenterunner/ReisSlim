@@ -1,0 +1,21 @@
+syntax place-provider.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax itinerary-engine.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax app.js: PASS
+syntax route-topology.js: PASS
+syntax service-worker.js: PASS
+syntax destination-engine.js: PASS
+syntax routing-provider.js: PASS
+Nominatim primary: PASS
+Overpass emergency only: PASS
+single discovery pass: PASS
+cache v11: PASS
+header version 1608: PASS
+footer/index version 1608: PASS
+single service worker activate: PASS
+service worker cache 1608: PASS
+spacing rules present: PASS
+Nominatim normalization acceptance: PASS sample reverse result -> Teststad / DE
+External live Nominatim response requires deployed-network acceptance.
