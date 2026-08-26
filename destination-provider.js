@@ -78,12 +78,195 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
-async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage}){const query=buildDiscoveryQuery(trip,cursor);if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};const key=`reisslim.destination-discovery.v8:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;try{const cached=storage?.getItem(key);if(cached)return{payload:JSON.parse(cached),cached:true}}catch{}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),14000);try{let lastError=null;for(const endpoint of endpoints){try{const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)throw new Error(`Overpass ${response.status}`);const payload=await response.json();try{storage?.setItem(key,JSON.stringify(payload))}catch{}return{payload,cached:false,endpoint}}catch(error){lastError=error}}throw lastError||new Error('Overpass unavailable')}catch(error){return{payload:null,cached:false,reason:error.name==='AbortError'?'Live ontdekking duurde te lang.':'Live ontdekking is tijdelijk niet beschikbaar.'}}finally{clearTimeout(timer)}}
-export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fetchImpl=fetch,endpoints=DEFAULT_ENDPOINTS,storage=globalThis.localStorage}={}){
-  const combined=[];let usedCache=true,lastReason='';
-  for(let pass=0;pass<DISCOVERY_PASSES;pass++){const currentCursor=cursor*DISCOVERY_PASSES+pass,result=await fetchDiscoveryPayload(trip,currentCursor,{fetchImpl,endpoints,storage});usedCache=usedCache&&Boolean(result.cached);if(result.payload?.elements?.length)combined.push(...result.payload.elements);if(result.reason)lastReason=result.reason}
-  if(!combined.length)return{destinations:[],live:false,reason:lastReason||'Geen nieuwe roadtripregio’s gevonden.'};
-  const destinations=normalizeDiscoveredDestinations(trip,{elements:combined},{excludedIds,limit:DEFAULT_RESULT_LIMIT});
-  return{destinations,live:true,cached:usedCache,source:'OpenStreetMap Overpass',passes:DISCOVERY_PASSES,candidateElements:combined.length}
+async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context){
+  const controller=new AbortController();
+  const startedAt=Date.now();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  onProgress?.({...context,type:'endpoint-start',endpoint,startedAt});
+  try{
+    const response=await fetchImpl(endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body:new URLSearchParams({data:query}),
+      signal:controller.signal
+    });
+    if(!response.ok)throw new Error(`Overpass ${response.status}`);
+    const payload=await response.json();
+    onProgress?.({...context,type:'endpoint-success',endpoint,elapsedMs:Date.now()-startedAt,candidateElements:payload?.elements?.length||0});
+    return{payload,endpoint};
+  }catch(error){
+    const timeout=error?.name==='AbortError';
+    onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
 }
-export const destinationDiscoveryConfig=Object.freeze({endpoints:DEFAULT_ENDPOINTS,attribution:'© OpenStreetMap-bijdragers, ODbL',coverage:'Europe + South Africa + Namibia; roadtrip-from-user-origin',batchSeeds:DEFAULT_BATCH_SEEDS,discoveryPasses:DISCOVERY_PASSES,resultLimit:DEFAULT_RESULT_LIMIT});
+
+async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=15000}){
+  const query=buildDiscoveryQuery(trip,cursor);
+  const context={pass,totalPasses,cursor};
+  if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
+
+  const key=`reisslim.destination-discovery.v9:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
+  try{
+    const cached=storage?.getItem(key);
+    if(cached){
+      const payload=JSON.parse(cached);
+      onProgress?.({...context,type:'cache-hit',candidateElements:payload?.elements?.length||0});
+      return{payload,cached:true,endpoint:'cache'};
+    }
+  }catch{}
+
+  let lastError=null;
+  for(let endpointIndex=0;endpointIndex<endpoints.length;endpointIndex++){
+    const endpoint=endpoints[endpointIndex];
+    try{
+      const result=await fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length});
+      try{storage?.setItem(key,JSON.stringify(result.payload))}catch{}
+      return{payload:result.payload,cached:false,endpoint};
+    }catch(error){
+      lastError=error;
+      if(endpointIndex<endpoints.length-1){
+        onProgress?.({...context,type:'endpoint-switch',failedEndpoint:endpoint,nextEndpoint:endpoints[endpointIndex+1],endpointIndex,totalEndpoints:endpoints.length});
+      }
+    }
+  }
+
+  const reason=lastError?.name==='AbortError'
+    ? 'Live ontdekking duurde te lang op alle OpenStreetMap-servers.'
+    : 'Live OpenStreetMap-ontdekking is tijdelijk niet beschikbaar.';
+  return{payload:null,cached:false,reason};
+}
+
+export async function discoverDestinationBatch(
+  trip,
+  {
+    cursor=0,
+    excludedIds=[],
+    fetchImpl=fetch,
+    endpoints=DEFAULT_ENDPOINTS,
+    storage=globalThis.localStorage,
+    onProgress=null,
+    onBatch=null,
+    timeoutMs=15000
+  }={}
+){
+  const combined=[];
+  const emittedIds=new Set();
+  const emitted=[];
+  let usedCache=true,lastReason='',successfulPasses=0;
+
+  onProgress?.({
+    type:'discovery-start',
+    totalPasses:DISCOVERY_PASSES,
+    endpoints:[...endpoints],
+    origin:trip.origin,
+    reachKm:roadtripReachKm(trip)
+  });
+
+  for(let passIndex=0;passIndex<DISCOVERY_PASSES;passIndex++){
+    const pass=passIndex+1;
+    const currentCursor=cursor*DISCOVERY_PASSES+passIndex;
+    onProgress?.({type:'pass-start',pass,totalPasses:DISCOVERY_PASSES,cursor:currentCursor});
+
+    const result=await fetchDiscoveryPayload(trip,currentCursor,{
+      fetchImpl,endpoints,storage,onProgress,pass,totalPasses:DISCOVERY_PASSES,timeoutMs
+    });
+
+    usedCache=usedCache&&Boolean(result.cached);
+    if(result.reason)lastReason=result.reason;
+
+    if(result.payload?.elements?.length){
+      successfulPasses++;
+      combined.push(...result.payload.elements);
+
+      const normalized=normalizeDiscoveredDestinations(
+        trip,
+        {elements:combined},
+        {excludedIds:[...excludedIds,...emittedIds],limit:DEFAULT_RESULT_LIMIT}
+      );
+      const fresh=normalized.filter(item=>!emittedIds.has(item.id));
+      fresh.forEach(item=>{emittedIds.add(item.id);emitted.push(item)});
+
+      onProgress?.({
+        type:'pass-success',
+        pass,
+        totalPasses:DISCOVERY_PASSES,
+        endpoint:result.endpoint,
+        candidateElements:result.payload.elements.length,
+        totalCandidateElements:combined.length,
+        newDestinations:fresh.length,
+        totalDestinations:emitted.length
+      });
+
+      if(fresh.length){
+        await onBatch?.({
+          destinations:fresh,
+          pass,
+          totalPasses:DISCOVERY_PASSES,
+          endpoint:result.endpoint,
+          totalDestinations:emitted.length,
+          totalCandidateElements:combined.length
+        });
+      }
+    }else{
+      onProgress?.({
+        type:'pass-empty',
+        pass,
+        totalPasses:DISCOVERY_PASSES,
+        reason:result.reason||'Deze zoekronde leverde geen bruikbare locaties op.',
+        totalDestinations:emitted.length
+      });
+    }
+
+    // Yield back to the browser so progress text and newly discovered cards paint now.
+    await new Promise(resolve=>setTimeout(resolve,0));
+  }
+
+  if(!emitted.length){
+    onProgress?.({
+      type:'discovery-failure',
+      totalPasses:DISCOVERY_PASSES,
+      successfulPasses,
+      reason:lastReason||'Geen live roadtripregio’s gevonden.'
+    });
+    return{
+      destinations:[],
+      live:false,
+      reason:lastReason||'Geen live roadtripregio’s gevonden.',
+      passes:DISCOVERY_PASSES,
+      successfulPasses,
+      candidateElements:combined.length
+    };
+  }
+
+  onProgress?.({
+    type:'discovery-complete',
+    totalPasses:DISCOVERY_PASSES,
+    successfulPasses,
+    totalDestinations:emitted.length,
+    candidateElements:combined.length
+  });
+
+  return{
+    destinations:emitted,
+    live:true,
+    cached:usedCache,
+    source:'OpenStreetMap Overpass',
+    passes:DISCOVERY_PASSES,
+    successfulPasses,
+    candidateElements:combined.length
+  };
+}
+
+export const destinationDiscoveryConfig=Object.freeze({
+  endpoints:DEFAULT_ENDPOINTS,
+  attribution:'© OpenStreetMap-bijdragers, ODbL',
+  coverage:'Europe + South Africa + Namibia; roadtrip-from-user-origin',
+  batchSeeds:DEFAULT_BATCH_SEEDS,
+  discoveryPasses:DISCOVERY_PASSES,
+  resultLimit:DEFAULT_RESULT_LIMIT,
+  progressive:true,
+  endpointTimeoutMs:15000
+});

@@ -1,26 +1,20 @@
+ReisSlim v1.5.5 / Build 1505 verification
+
 syntax destination-provider.js: PASS
-syntax itinerary-engine.js: PASS
 syntax service-worker.js: PASS
-syntax recommendation-engine.js: PASS
-syntax routing-provider.js: PASS
-syntax gpx-generator.js: PASS
 syntax config.js: PASS
-syntax proposal-engine.js: PASS
-syntax destination-engine.js: PASS
-syntax route-topology.js: PASS
 syntax ui-feature-flags.js: PASS
-syntax destinations.js: PASS
-syntax route-engine.js: PASS
 syntax app.js: PASS
-syntax place-provider.js: PASS
-syntax trip-model.js: PASS
-ReisSlim title: PASS
-no Running Coach HTML: PASS
-no Running Coach app: PASS
-clean app imports: PASS
-cache-busted app: PASS
-cache-busted css: PASS
-ui feature flags loaded: PASS
-manifest ReisSlim: PASS
 revision: PASS
-service worker cache: PASS
+progress panel exists: PASS
+progress events: PASS
+independent endpoint controller per OpenStreetMap server: PASS
+progressive batch callback: PASS
+browser yield between discovery passes: PASS
+app merges successful live batches immediately: PASS
+retry live action present: PASS
+fallback visibility tied to active live-discovery state: PASS
+service-worker cache 1505: PASS
+
+Browser live-provider acceptance: NOT RUN in packaging runtime.
+Reason: external OpenStreetMap provider behavior/CORS/mobile-network timing must be verified in the deployed browser.

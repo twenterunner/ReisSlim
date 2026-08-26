@@ -13,3 +13,12 @@
 .itinerary-optimizer-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.8fr);gap:16px}.optimizer-card{background:var(--surface-2);border-radius:18px;padding:14px}.quality-ring{width:96px;height:96px;border-radius:50%;display:grid;place-content:center;background:#fff}.assistant-card,.readiness-card,.weather-summary,.trust-notice,.inline-warning,.inline-success{background:var(--surface-2);border-radius:14px;padding:11px;margin:10px 0}.assistant-input{display:flex;gap:8px}.assistant-input input{flex:1}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:200;display:grid;grid-template-columns:repeat(5,1fr);padding:7px max(8px,calc((100vw - 700px)/2));padding-bottom:max(7px,env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid var(--line);backdrop-filter:blur(16px)}.nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;background:transparent;color:var(--muted);padding:6px}.nav-item.active{color:var(--brand);background:var(--surface-2)}footer{text-align:center;color:var(--muted);padding:24px 16px 110px;font-size:.78rem}
 @media(max-width:800px){.dashboard-grid,.saved-trips-grid,.inspiration-grid,.card-grid,.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.intro-card{grid-template-columns:1fr}.summary-grid{grid-template-columns:repeat(2,1fr)}.welcome-card{align-items:flex-start;flex-direction:column}.priority-grid{grid-template-columns:1fr}.itinerary-optimizer-grid{grid-template-columns:1fr}.panel,.welcome-card{padding:13px;border-radius:18px}.topbar{padding:10px 14px}}
+
+.live-discovery-progress{margin:10px 0 14px;padding:13px 14px;border:1px solid #cfe0db;border-radius:16px;background:#edf6f3;box-shadow:0 6px 18px rgba(18,63,58,.06)}
+.live-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.live-progress-head strong,.live-progress-head small{display:block}.live-progress-head small{margin-top:3px}
+.live-progress-head>span{min-width:48px;text-align:center;background:#fff;border:1px solid #dce5e2;border-radius:999px;padding:.35rem .5rem;font-weight:800;color:#176b5c}
+.live-discovery-progress ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:5px}
+.live-discovery-progress li{font-size:.88rem;color:#526965}
+.live-discovery-progress li.done{color:#176b5c}.live-discovery-progress li.active{color:#17312e;font-weight:700}.live-discovery-progress li.failed{color:#a83b3b}
+.live-discovery-progress button{margin-top:10px}

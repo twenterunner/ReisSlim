@@ -21,10 +21,82 @@ import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engi
 import { enrichDestinationImages } from './image-provider.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
-const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null};
+const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
+
+function endpointLabel(endpoint){
+  if(String(endpoint||'').includes('kumi.systems'))return 'OpenStreetMap-server 2';
+  if(String(endpoint||'').includes('overpass-api.de'))return 'OpenStreetMap-server 1';
+  if(endpoint==='cache')return 'lokale cache';
+  return 'OpenStreetMap-server';
+}
+function elapsedSeconds(){
+  return state.liveDiscoveryStartedAt?Math.max(0,Math.round((Date.now()-state.liveDiscoveryStartedAt)/1000)):0;
+}
+function renderLiveDiscoveryProgress(){
+  const box=$('liveDiscoveryProgress');
+  if(!box)return;
+  const p=state.liveDiscoveryProgress;
+  if(!p){box.classList.add('hidden');box.innerHTML='';return}
+  box.classList.remove('hidden');
+  const lines=[];
+  if(p.origin)lines.push(`<li class="done">✓ Vertrekpunt <strong>${p.origin}</strong></li>`);
+  if(Number.isFinite(p.reachKm))lines.push(`<li class="done">✓ Zoekbereik bepaald: tot circa <strong>${Math.round(p.reachKm)} km</strong></li>`);
+  if(p.pass)lines.push(`<li class="active">● Zoekronde <strong>${p.pass} van ${p.totalPasses||4}</strong>${p.endpointLabel?` · ${p.endpointLabel}`:''}</li>`);
+  if(p.lastMessage)lines.push(`<li>${p.lastMessage}</li>`);
+  if(Number.isFinite(p.candidateElements)&&p.candidateElements>0)lines.push(`<li class="done">✓ ${p.candidateElements} locaties ontvangen</li>`);
+  if(Number.isFinite(p.liveDestinations)&&p.liveDestinations>0)lines.push(`<li class="done">✓ <strong>${p.liveDestinations} live roadtripregio’s</strong> gevonden en direct toegevoegd</li>`);
+  if(p.complete)lines.push(`<li class="done">✓ Live zoeken afgerond in <strong>${elapsedSeconds()} sec</strong></li>`);
+  if(p.failed)lines.push(`<li class="failed">✕ Live zoeken afgerond zonder bruikbare live regio’s: ${p.failureReason||'provider gaf geen resultaat'}</li>`);
+
+  box.innerHTML=`<div class="live-progress-head"><div><strong>${p.complete?'Live reisopties gevonden':p.failed?'Live zoeken kon niet worden voltooid':'Live reisopties zoeken…'}</strong><small>${p.complete?'De live resultaten staan nu tussen de voorstellen.':p.failed?'Fallbackresultaten worden nu weer zichtbaar.':'Resultaten verschijnen meteen zodra een zoekronde iets bruikbaars oplevert.'}</small></div><span>${elapsedSeconds()}s</span></div><ul>${lines.join('')}</ul>${p.failed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Probeer live opnieuw</button>':''}`;
+  const retry=$('retryLiveDiscoveryBtn');
+  if(retry)retry.onclick=()=>discoverLiveOptions({retry:true});
+}
+function startLiveDiscoveryProgress(){
+  state.liveDiscoveryStartedAt=Date.now();
+  clearInterval(state.liveDiscoveryTimer);
+  state.liveDiscoveryProgress={origin:state.trip.origin,reachKm:null,pass:0,totalPasses:4,candidateElements:0,liveDestinations:0,lastMessage:'Live OpenStreetMap-ontdekking voorbereiden…',complete:false,failed:false};
+  document.body.dataset.liveDiscovery='running';
+  renderLiveDiscoveryProgress();
+  state.liveDiscoveryTimer=setInterval(renderLiveDiscoveryProgress,1000);
+}
+function finishLiveDiscoveryProgress(){
+  clearInterval(state.liveDiscoveryTimer);
+  state.liveDiscoveryTimer=null;
+  delete document.body.dataset.liveDiscovery;
+  renderLiveDiscoveryProgress();
+}
+function handleDiscoveryProgress(event){
+  const p=state.liveDiscoveryProgress||(state.liveDiscoveryProgress={});
+  if(event.type==='discovery-start'){
+    p.origin=event.origin;p.reachKm=event.reachKm;p.totalPasses=event.totalPasses;p.lastMessage='OpenStreetMap-servers worden benaderd…';
+  }else if(event.type==='pass-start'){
+    p.pass=event.pass;p.totalPasses=event.totalPasses;p.endpointLabel='';p.lastMessage=`Zoekgebied ${event.pass} voorbereiden…`;
+  }else if(event.type==='endpoint-start'){
+    p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} doorzoekt steden, natuurgebieden en interessante regio’s…`;
+  }else if(event.type==='endpoint-failure'){
+    p.lastMessage=event.timeout?`${endpointLabel(event.endpoint)} reageerde niet binnen de tijdslimiet.`:`${endpointLabel(event.endpoint)} gaf een fout; volgende bron proberen.`;
+  }else if(event.type==='endpoint-switch'){
+    p.endpointLabel=endpointLabel(event.nextEndpoint);p.lastMessage=`Overschakelen naar ${p.endpointLabel}…`;
+  }else if(event.type==='endpoint-success'){
+    p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} antwoordde in ${(event.elapsedMs/1000).toFixed(1)} sec.`;
+  }else if(event.type==='cache-hit'){
+    p.endpointLabel='lokale cache';p.lastMessage='Een eerdere live zoekronde uit de lokale cache gebruiken.';
+  }else if(event.type==='pass-success'){
+    p.pass=event.pass;p.candidateElements=event.totalCandidateElements;p.liveDestinations=event.totalDestinations;p.lastMessage=event.newDestinations?`${event.newDestinations} nieuwe live regio’s uit ronde ${event.pass} toegevoegd.`:`Ronde ${event.pass} leverde geen nieuwe unieke regio’s op.`;
+  }else if(event.type==='pass-empty'){
+    p.pass=event.pass;p.lastMessage=`Ronde ${event.pass}: ${event.reason}`;
+  }else if(event.type==='discovery-complete'){
+    p.liveDestinations=event.totalDestinations;p.candidateElements=event.candidateElements;p.complete=true;p.failed=false;p.lastMessage=`${event.successfulPasses} van ${event.totalPasses} zoekrondes leverden live data op.`;
+  }else if(event.type==='discovery-failure'){
+    p.failed=true;p.complete=false;p.failureReason=event.reason;p.lastMessage='Alle live zoekrondes zijn afgerond.';
+  }
+  renderLiveDiscoveryProgress();
+}
+
 async function hydrateProposalImages(){if(!state.trip?.liveData||!state.ranked.length)return;await enrichDestinationImages(state.ranked,{maximum:4});renderDestinations(state)}
 function stateForStorage(){return{schemaVersion:STORAGE_SCHEMA_VERSION,engineVersion:ENGINE_VERSION,trip:state.trip,destinationId:state.destination?.destinationId||state.destination?.id||null,destinationProfile:state.destination?.dynamic?state.destination:null,compareIds:state.compareIds,savedProposalIds:state.savedProposalIds,dismissedIds:state.dismissedIds,selectedVariantId:state.selectedVariantId,optimized:state.optimized,plan:state.plan}}
 function exportState(){return{version:VERSION,build:BUILD,engineVersion:ENGINE_VERSION,generatedAt:new Date().toISOString(),trip:state.trip,destination:state.destination?{id:state.destination.id,name:state.destination.name,score:state.destination.score,confidence:state.destination.confidence}:null,plan:state.plan,budget:state.budget,validation:state.validation,planningQuality:state.quality}}
@@ -35,9 +107,72 @@ async function enhanceLiveData(destinationId,originalPlan){const run=++state.rou
 function applyDestination(destination,optimize=false){Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function chooseProposal(destination){learn('select',destination);state.destination=destination;state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId=null;state.plan=null;renderItineraryVariants(state);$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen');showView('itineraryView')}
 function refreshPortfolio(){state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:8,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state)}
-async function discoverLiveOptions({append=false}={}){if(!state.trip.liveData||state.discoveryBusy)return 0;state.discoveryBusy=true;setStatus('Live reisopties zoeken via OpenStreetMap…');try{const result=await discoverDestinationBatch(state.trip,{cursor:state.discoveryCursor,excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds]});state.discoveryCursor++;if(result.destinations?.length){const known=new Set(state.catalog.map(i=>i.id));state.catalog.push(...result.destinations.filter(i=>!known.has(i.id)));refreshPortfolio();void hydrateProposalImages();persistDraft(`${result.destinations.length} live regio’s gevonden`);return result.destinations.length}setStatus(result.reason||'Geen live regio’s gevonden');return 0}finally{state.discoveryBusy=false}}
+async function discoverLiveOptions({append=false,retry=false}={}){
+  if(!state.trip.liveData||state.discoveryBusy)return 0;
+  state.discoveryBusy=true;
+  if(retry){
+    state.discoveryCursor=0;
+    state.catalog=[...destinations];
+    refreshPortfolio();
+  }
+  startLiveDiscoveryProgress();
+  setStatus('Live reisopties zoeken via OpenStreetMap…');
+  try{
+    let addedTotal=0;
+    const result=await discoverDestinationBatch(state.trip,{
+      cursor:state.discoveryCursor,
+      excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
+      timeoutMs:15000,
+      onProgress:handleDiscoveryProgress,
+      onBatch:async batch=>{
+        const known=new Set(state.catalog.map(i=>i.id));
+        const fresh=(batch.destinations||[]).filter(i=>!known.has(i.id));
+        if(!fresh.length)return;
+        state.catalog.push(...fresh);
+        addedTotal+=fresh.length;
+        refreshPortfolio();
+        // Force browser paint before optional image enrichment.
+        await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+        persistDraft(`${addedTotal} live regio’s gevonden — zoeken gaat verder`);
+      }
+    });
+    state.discoveryCursor++;
+
+    if(result.destinations?.length){
+      void hydrateProposalImages();
+      persistDraft(`${result.destinations.length} live regio’s gevonden`);
+    }else{
+      setStatus(result.reason||'Geen live regio’s gevonden');
+    }
+
+    if(state.liveDiscoveryProgress){
+      if(result.live){
+        state.liveDiscoveryProgress.complete=true;
+        state.liveDiscoveryProgress.failed=false;
+      }else{
+        state.liveDiscoveryProgress.failed=true;
+        state.liveDiscoveryProgress.complete=false;
+        state.liveDiscoveryProgress.failureReason=result.reason||'Geen live regio’s gevonden.';
+      }
+    }
+    renderLiveDiscoveryProgress();
+    return result.destinations?.length||0;
+  }catch(error){
+    console.error(error);
+    if(state.liveDiscoveryProgress){
+      state.liveDiscoveryProgress.failed=true;
+      state.liveDiscoveryProgress.failureReason=String(error?.message||error);
+      state.liveDiscoveryProgress.lastMessage='Onverwachte fout tijdens live zoeken.';
+    }
+    renderLiveDiscoveryProgress();
+    return 0;
+  }finally{
+    state.discoveryBusy=false;
+    finishLiveDiscoveryProgress();
+  }
+}
 function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
-function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
+function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
 function initialize(){
   renderPreferenceGrid();renderVehicleControls();$('versionLabel').textContent=`ReisSlim v${VERSION} · Build ${BUILD}`;$('orsApiKey').value=readRoutingSettings().orsApiKey;

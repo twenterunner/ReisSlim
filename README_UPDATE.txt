@@ -1,14 +1,15 @@
-ReisSlim v1.5.4 / Build 1504 — FULL REPAIR
+ReisSlim v1.5.5 / Build 1505
 
-Upload ALL extracted files at repository root and replace existing files.
+Requested live-search UX update:
+- dynamic progress panel with elapsed seconds
+- origin + search radius shown
+- search round 1/4 ... 4/4 shown
+- shows active OSM server
+- shows failover when server 1 fails
+- raw location count + usable live region count
+- first successful live batch appears immediately
+- endpoint-specific timeout controllers
+- retry-live button after genuine failure
+- fallback hidden only while live search is actually running
 
-Acceptance after upload:
-1. index.html contains <title>ReisSlim – roadtripplanner</title>
-2. app.js starts with imports from ./config.js and ./destinations.js
-3. styles.css starts with ReisSlim teal CSS variables
-4. manifest short_name is ReisSlim
-5. config.js says 1.5.4 / 1504
-6. service-worker cache says reisslim-v1.5.4-build-1504
-7. live site header says v1.5.4 · 1504
-
-Do NOT upload the ZIP itself. Extract it first.
+Upload ALL extracted files to the repository root.
