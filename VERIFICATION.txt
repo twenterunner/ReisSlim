@@ -1,13 +1,16 @@
-syntax destination-provider.js: PASS
-syntax app.js: PASS
-syntax config.js: PASS
-syntax service-worker.js: PASS
-syntax ui-feature-flags.js: PASS
+config.js: PASS
+routing-provider.js: PASS
+route-topology.js: PASS
+ui-feature-flags.js: PASS
+app.js: PASS
+service-worker.js: PASS
 revision: PASS
-Nominatim-first discovery: PASS
-old broad discovery fetch removed: PASS
-paced requests: PASS
-progressive batches: PASS
-early useful portfolio: PASS
-new cache: PASS
-Browser live-network acceptance must be confirmed after GitHub Pages deployment.
+loop via controls: PASS
+OSRM vias used: PASS
+preference no submit: PASS
+scroll preserved: PASS
+local rerank only: PASS
+compact controls: PASS
+place formatting: PASS
+cache bump: PASS
+External live road-route geometry must still be verified in the deployed mobile browser.

@@ -22,3 +22,31 @@
 .live-discovery-progress li{font-size:.88rem;color:#526965}
 .live-discovery-progress li.done{color:#176b5c}.live-discovery-progress li.active{color:#17312e;font-weight:700}.live-discovery-progress li.failed{color:#a83b3b}
 .live-discovery-progress button{margin-top:10px}
+
+/* v1.5.8 compact preference controls and mobile spacing */
+.priority-grid{gap:6px}
+.priority-item,.pref{min-height:54px;padding:6px 8px;border-radius:12px;gap:8px}
+.priority-item label{flex:1;min-width:0;gap:8px;font-size:.94rem;line-height:1.15}
+.priority-item input[data-pref]{width:21px;height:21px;min-width:21px;margin:0}
+.priority-item select{width:118px;min-width:118px;max-width:118px;padding:.5rem .55rem;border-radius:11px;font-size:.88rem}
+.place-proposal>span,.place-proposal>strong,.place-proposal>p,.place-proposal>small,.place-proposal>a{display:block}
+.place-proposal>span{font-size:.76rem;color:var(--muted);margin-bottom:2px}
+.place-proposal>strong{font-size:1rem;line-height:1.18;margin-bottom:5px}
+.place-proposal>p{margin:0 0 7px;line-height:1.28}
+.place-proposal>small{margin-top:3px;line-height:1.3}
+.place-proposal>a{margin-top:6px;font-weight:750}
+.recommendation-grid{gap:8px}
+.topbar .icon-button{white-space:nowrap}
+@media(max-width:800px){
+  .topbar{padding:8px 10px}
+  .brand{gap:8px}.brand-mark{width:44px;height:44px;border-radius:13px}
+  .brand strong{font-size:1.05rem;line-height:1.1}.brand small{font-size:.72rem;line-height:1.1}
+  .topbar .icon-button{padding:.68rem .78rem;font-size:.9rem}
+  fieldset{margin:10px 0;padding:10px}
+  .priority-grid{gap:5px}
+  .priority-item,.pref{min-height:50px;padding:5px 7px}
+  .priority-item label{font-size:.91rem}
+  .priority-item select{width:112px;min-width:112px;max-width:112px;padding:.46rem .48rem}
+  .day-card{padding-bottom:11px}.day-card-inner{padding:11px}
+  .place-proposal{padding:9px!important}
+}

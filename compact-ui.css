@@ -1,3 +1,8 @@
 .place-proposal a{display:inline-block;margin-top:6px;font-weight:750}.day-recommendations{margin-top:8px!important}.recommendation-grid{gap:7px!important}.place-proposal{padding:9px!important}.header-revision{align-self:center}.app-shell{padding-top:10px!important;padding-bottom:24px!important}.panel,.welcome-card{padding:15px!important;margin-bottom:10px!important;border-radius:19px!important}@media(max-width:800px){.panel,.welcome-card{padding:13px!important}.app-shell{padding:8px 9px 22px!important}}
 
 .live-discovery-progress{padding:10px 12px!important;margin:8px 0 10px!important}.live-discovery-progress ul{margin-top:7px!important;gap:3px!important}
+
+/* v1.5.8 */
+.priority-item,.pref{padding:5px 7px!important;margin:0!important}
+.priority-grid{gap:5px!important}
+.place-proposal{padding:9px!important}
