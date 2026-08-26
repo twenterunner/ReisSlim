@@ -1,33 +1,41 @@
-# ReisSlim v1.5.0 — preference-driven proposal ranking
+# ReisSlim v1.5.1 — specific places + complete GPX route
 
-This release fixes the case where changing **Natuur / Bergen / Cultuur / Eten /
-Mooie wegen / ...** appeared to produce the same destination proposals.
+This release addresses two hard requirements.
 
-## Root cause
+## 1. Specific stops and accommodation
 
-The preference engine did read the checked boxes, but the ranking logic mainly
-measured whether a destination contained a selected tag at all.
+Generic placeholders such as “lunch stop”, “accommodation” or “rest stop” are
+not treated as recommendations anymore.
 
-For a narrow request such as only **Cultuur**, many fallback destinations have a
-culture tag. They therefore all scored a 100% selected-preference coverage and
-distance/feasibility kept the same places near the top. Diversity logic could
-then further dilute the impact of the selected preference.
+For every planned recommendation point ReisSlim now performs a **targeted live
+OpenStreetMap Overpass lookup** for the exact category:
+- named hotel / guest house / campsite / caravan site for overnight stays;
+- named restaurant/cafe for meal stops;
+- named fuel station or road service area for fuel/rest;
+- named attraction/viewpoint/museum/historic/nature location for activities.
 
-The UI also did not automatically rebuild an already visible portfolio when a
-preference checkbox or priority dropdown changed.
+Search is progressively widened from 6 km to 14 km to 30 km and retries two
+Overpass providers. Candidate selection uses distance, vehicle suitability and
+available evidence such as website, opening hours, cuisine and official stars.
 
-## v1.5.0
+If the provider cannot return a named place, ReisSlim no longer invents a
+generic place and pretends it is specific. Current consumer ratings still require
+checking the supplied Google Maps review link because OpenStreetMap does not
+provide reliable review-star data.
 
-- Preference matching is now the primary preselection criterion.
-- If enough reachable destinations match at least one selected preference,
-  zero-match destinations are removed before expensive scoring.
-- A new **focus purity** factor distinguishes specialist destinations from
-  generic destinations carrying many unrelated tags.
-- Preference weighting has more influence than portfolio diversity.
-- Diversity is retained only as a small tie-break/spread factor.
-- When proposals are already on screen, changing a checkbox or its
-  Nice-to-have / Important / Essential priority automatically submits and
-  reranks the portfolio after a short debounce.
-- "Waarom deze?" includes selected preference match plus focus purity.
+## 2. GPX contains the whole roadtrip
 
-**ReisSlim v1.5.0 · Build 1500**
+The old GPX simply exported whatever geometry happened to be in the plan at the
+moment of export. If background live routing had not completed, that could be
+only the start and destination points.
+
+v1.5.1 makes GPX export self-sufficient:
+- it requests full OSRM road geometry for every outward/return/transfer segment;
+- if a provider request fails, it exports a densely sampled corridor rather than
+  only two points;
+- it creates one continuous GPX `<trk>` covering the complete trip;
+- it additionally writes each day as a GPX `<rte>`;
+- all resolved named restaurants, accommodation and other stops are GPX
+  waypoints with web/map links.
+
+**ReisSlim v1.5.1 · Build 1501**

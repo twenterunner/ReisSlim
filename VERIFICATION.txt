@@ -1,20 +1,14 @@
 syntax config.js: PASS
-syntax proposal-engine.js: PASS
-syntax trip-model.js: PASS
-syntax ui-feature-flags.js: PASS
-syntax destination-provider.js: PASS
-syntax destination-engine.js: PASS
-syntax service-worker.js: PASS
-syntax recommendation-engine.js: PASS
-syntax itinerary-engine.js: PASS
-syntax route-engine.js: PASS
 syntax place-provider.js: PASS
-syntax route-topology.js: PASS
-syntax destinations.js: PASS
-revision: PASS
-match-first preselect: PASS
-focus purity: PASS
-preference dominates diversity: PASS
-auto preference rerank: PASS
-priority changes rerank: PASS
-cache bump: PASS
+syntax gpx-generator.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax service-worker.js: PASS
+release: PASS
+targeted accommodation: PASS
+progressive place radii: PASS
+generic places suppressed: PASS
+GPX live OSRM geometry: PASS
+GPX continuous track: PASS
+GPX daily routes: PASS
+GPX specific waypoints: PASS
+cache: PASS
