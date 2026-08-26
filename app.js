@@ -147,8 +147,11 @@ async function enhanceLiveData(destinationId,originalPlan){
       Object.assign(state,derivePlanState(state.destination,plan));
       renderPlan(state);renderMap(state.plan);
       const routed=Boolean(plan.routing?.live);
+      const loopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
       planLiveBanner(routed?'Stap 1/3 klaar · wegroute gevonden. Stap 2/3 · specifieke stops, eten en verblijf zoeken…':'Wegroute deels/temporair niet live. Stap 2/3 · specifieke plaatsen zoeken…',routed?'working':'error');
-      $('mapDataStatus').textContent=routed?'Live wegroute gevonden · plaatsen zoeken…':'Wegroute nog niet volledig live · plaatsen zoeken…';
+      $('mapDataStatus').textContent=routed
+        ? (loopOverlap!==null?`Live lusroute · ${loopOverlap}% overlap · plaatsen zoeken…`:'Live wegroute gevonden · plaatsen zoeken…')
+        :'Wegroute nog niet volledig live · plaatsen zoeken…';
     }
     plan=await enrichPlanWithPlaces(state.trip,state.destination,plan,{
       placeTimeoutMs:6500,
@@ -166,7 +169,8 @@ async function enhanceLiveData(destinationId,originalPlan){
     Object.assign(state,derivePlanState(state.destination,plan));
     renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);
     const routed=Boolean(plan.routing?.live),places=plan.recommendations?.length||0,weather=Boolean(plan.weather?.live);
-    const parts=[routed?'wegroute':null,places?`${places} specifieke plaatsen`:null,weather?'weer':null].filter(Boolean);
+    const finalLoopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
+    const parts=[routed?(finalLoopOverlap!==null?`lusroute ${finalLoopOverlap}% overlap`:'wegroute'):null,places?`${places} specifieke plaatsen`:null,weather?'weer':null].filter(Boolean);
     $('mapDataStatus').textContent=parts.length?`Live: ${parts.join(', ')}`:'Live bronnen leverden geen bruikbaar resultaat';
     planLiveBanner(parts.length?`Klaar · ${parts.join(' · ')}`:'Live verrijking afgerond zonder bruikbare resultaten',parts.length?'done':'error');
     persistDraft(parts.length?`Live ${parts.join(', ')} opgeslagen`:'Live verrijking afgerond');

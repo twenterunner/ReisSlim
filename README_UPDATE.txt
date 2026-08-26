@@ -1,13 +1,19 @@
-ReisSlim v1.6.0 · Build 1600
+ReisSlim v1.6.1 · Build 1601
 
-This release targets the observed mobile UX issues:
-- live plan enrichment now reports route/POI progress continuously;
-- named-place lookup is Nominatim-first and parallelised, with Overpass only as fallback;
-- specific place searches are prioritised (overnight, food, stop, activity) instead of processing every placeholder sequentially;
-- stale 'offline corridorraming' wording is removed from the visible UI;
-- day-detail headings are bold;
-- hard-condition and preference controls are more compact;
-- proposal intros are rewritten as concise, compelling trip stories with named highlights where ReisSlim has reliable destination knowledge;
-- repetitive match/purity percentages are removed from the proposal introduction.
+Loop-route root-cause correction.
+
+Build 1600 still allowed the road router to reuse too much of the outbound
+corridor. Build 1601 no longer assumes that displaced via points are sufficient.
+
+For every live return leg in a LOOP trip, ReisSlim now:
+1. uses the already-resolved real outbound road geometry as the reference;
+2. requests several genuinely separated return-route candidates (both sides);
+3. measures actual road-geometry overlap against the outbound route;
+4. selects the candidate with the lowest measured overlap;
+5. aims for <=30% overlap excluding the unavoidable start/end zones;
+6. exposes the measured live overlap in the routing status.
+
+The map and GPX use the selected day.geometry, so the chosen low-overlap route
+is also what is exported.
 
 Upload ALL files in this ZIP to the repository root and replace existing files.

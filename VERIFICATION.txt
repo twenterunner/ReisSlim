@@ -1,13 +1,13 @@
-ReisSlim v1.6.0 · Build 1600
-
-Baseline: ReisSlim v1.5.9 · Build 1509.
-Change: stronger loop-return corridor in route-topology.js and routing-provider.js.
-Version/cache references updated consistently to 1.6.0 / 1600.
-
-Verified before packaging:
-- config.js: 1.6.0 / 1600
-- index.html: 1.6.0 / 1600 and asset query build 1600
-- ui-feature-flags.js: 1.6.0 / 1600
-- manifest.webmanifest: build 1600
-- service-worker.js cache: reisslim-v1.6.0-build-1600
-- JavaScript syntax checks passed.
+routing-provider.js: PASS
+app.js: PASS
+config.js: PASS
+service-worker.js: PASS
+ui-feature-flags.js: PASS
+revision: PASS
+actual geometry overlap: PASS
+both loop sides tested: PASS
+stronger alternatives tested: PASS
+acceptance target: PASS
+measured overlap published: PASS
+cache bumped: PASS
+External OSRM acceptance: requires deployed browser/network; algorithm now evaluates the actual returned geometry rather than only the planned control points.
