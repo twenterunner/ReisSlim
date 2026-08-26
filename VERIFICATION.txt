@@ -11,10 +11,10 @@ syntax route-engine.js: PASS
 syntax place-provider.js: PASS
 syntax route-topology.js: PASS
 syntax destinations.js: PASS
-release: PASS
-fallback nonempty: PASS
-actual-origin route calc: PASS
-generated route stops: PASS
-lighter discovery: PASS
-two endpoints: PASS
-cache rev: PASS
+revision: PASS
+known origins bypass network: PASS
+geocode max 3 sec: PASS
+overpass max 4.5 sec: PASS
+3 discovery passes: PASS
+fallback retained: PASS
+cache bump: PASS

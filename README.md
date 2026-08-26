@@ -1,39 +1,29 @@
-# ReisSlim v1.4.7 — origin-based roadtrip planner
+# ReisSlim v1.4.8 — responsiveness fix
 
 ReisSlim plans roadtrips from the start location entered by the user.
 
-## v1.4.7 reliability fix
+## Why v1.4.7 could appear to hang
 
-v1.4.6 could show **0 feasible options** because the static catalogue had been
-made completely empty while the first screen rendered before live OpenStreetMap
-discovery completed. The live Overpass request was also too large, so a timeout
-could leave the portfolio permanently empty.
+The submit workflow waits for `geocodeOrigin()` before showing the final proposal
+portfolio. Even for a built-in origin such as Saasveld, v1.4.7 still called the
+public Nominatim service first. A slow mobile connection or provider delay could
+therefore leave the UI sitting on “Vertrekplaats controleren…” for many seconds.
 
-v1.4.7 fixes that architecture:
+The live destination discovery also allowed comparatively long Overpass waits.
+Although that part runs in the background, it could make the application feel
+unresponsive on a phone.
 
-- live discovery remains the primary expansion mechanism;
-- Overpass searches are smaller (6 geographic seeds per request) and use four
-  staged passes;
-- two Overpass endpoints are tried for resilience;
-- a broad fallback anchor set covers Europe, South Africa and Namibia, so an
-  external API timeout no longer means zero options;
-- every fallback destination is recalculated from the user's actual origin and
-  hard-filtered by realistic roadtrip reach;
-- route distance is now calculated directly from the actual user origin rather
-  than scaling an old Saasveld baseline;
-- generated intermediate travel zones allow multi-day routes even when a fallback
-  anchor has no curated routeStops.
+## v1.4.8
 
-## Coverage
+- Known start locations such as Saasveld are resolved immediately from the local
+  origin catalogue: no network wait.
+- Arbitrary typed origins still use OpenStreetMap Nominatim, but the user-facing
+  geocode wait is capped at 3 seconds.
+- Live destination discovery is still background enrichment.
+- Individual Overpass discovery requests are capped at 4.5 seconds.
+- Discovery uses 3 staged passes instead of 4.
+- The broad Europe / South Africa / Namibia fallback remains available immediately,
+  so live discovery is not required before proposals can be shown.
+- Actual-origin distance calculation from v1.4.7 remains in place.
 
-All European countries are represented by at least one fallback roadtrip anchor,
-plus multiple anchors in South Africa and Namibia. Live OpenStreetMap discovery
-then expands beyond those anchors.
-
-A start in Saasveld only produces locations reachable as a roadtrip from Saasveld.
-A start in Cape Town or Windhoek is treated in exactly the same way from those
-coordinates. No flight is inserted.
-
-## Release
-
-**ReisSlim v1.4.7 · Build 1407**
+**ReisSlim v1.4.8 · Build 1408**
