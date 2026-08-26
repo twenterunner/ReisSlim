@@ -1,7 +1,4 @@
-ReisSlim v1.5.6 / Build 1506
-LIVE DISCOVERY ROOT-CAUSE FIX
-
-Changed destination discovery from broad multi-clause Overpass searches to
-lightweight OpenStreetMap Nominatim reverse lookups at roadtrip-reach seeds.
-
-Upload all files in this ZIP to repository root.
+ReisSlim live road-route hotfix
+Replace routing-provider.js in the repository root.
+Fixes malformed secondary OSRM URL and raises live routing timeout to 25 seconds.
+This file was syntax-checked. Full external network acceptance requires deployment.
