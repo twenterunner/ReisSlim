@@ -12,8 +12,9 @@ syntax place-provider.js: PASS
 syntax route-topology.js: PASS
 syntax destinations.js: PASS
 revision: PASS
-preselect max 24: PASS
-reach prefilter: PASS
-initial cards max 10: PASS
-observer throttled: PASS
+match-first preselect: PASS
+focus purity: PASS
+preference dominates diversity: PASS
+auto preference rerank: PASS
+priority changes rerank: PASS
 cache bump: PASS

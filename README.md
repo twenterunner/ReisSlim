@@ -1,32 +1,33 @@
-# ReisSlim v1.4.9 — proposal-button responsiveness fix
+# ReisSlim v1.5.0 — preference-driven proposal ranking
 
-This release targets the exact freeze reported when pressing **Maak reisvoorstellen**.
+This release fixes the case where changing **Natuur / Bergen / Cultuur / Eten /
+Mooie wegen / ...** appeared to produce the same destination proposals.
 
 ## Root cause
 
-The current submit path performs proposal ranking synchronously on the browser's
-main UI thread. After v1.4.7 added a broad Europe / South Africa / Namibia
-fallback catalogue, every proposal request could score the full catalogue and
-then render 20–30 large destination cards in one DOM update.
+The preference engine did read the checked boxes, but the ranking logic mainly
+measured whether a destination contained a selected tag at all.
 
-That is unnecessary for the first screen and is particularly expensive on a
-mobile browser.
+For a narrow request such as only **Cultuur**, many fallback destinations have a
+culture tag. They therefore all scored a 100% selected-preference coverage and
+distance/feasibility kept the same places near the top. Diversity logic could
+then further dilute the impact of the selected preference.
 
-v1.4.9 changes the workload before the UI is rendered:
+The UI also did not automatically rebuild an already visible portfolio when a
+preference checkbox or priority dropdown changed.
 
-- a cheap geographic + preference pre-filter reduces the expensive scoring set
-  to at most 24 plausible candidates;
-- candidates outside realistic roadtrip reach are removed before full scoring
-  whenever reachable alternatives exist;
-- the initial portfolio is limited to 6–10 cards instead of forcibly rendering
-  20–30 cards;
-- "show more" remains available for additional alternatives;
-- the DOM post-processing observer is animation-frame throttled and temporarily
-  disconnected while it performs its own mutations, preventing avoidable
-  repeated layout work;
-- live OpenStreetMap discovery stays background enrichment and does not need to
-  finish before the first proposals are usable.
+## v1.5.0
 
-## Release
+- Preference matching is now the primary preselection criterion.
+- If enough reachable destinations match at least one selected preference,
+  zero-match destinations are removed before expensive scoring.
+- A new **focus purity** factor distinguishes specialist destinations from
+  generic destinations carrying many unrelated tags.
+- Preference weighting has more influence than portfolio diversity.
+- Diversity is retained only as a small tie-break/spread factor.
+- When proposals are already on screen, changing a checkbox or its
+  Nice-to-have / Important / Essential priority automatically submits and
+  reranks the portfolio after a short debounce.
+- "Waarom deze?" includes selected preference match plus focus purity.
 
-**ReisSlim v1.4.9 · Build 1409**
+**ReisSlim v1.5.0 · Build 1500**

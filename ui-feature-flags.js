@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.4.9',build:'1409'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.5.0',build:'1500'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -16,8 +16,31 @@ function upgradeCards(){
  // Never present unresolved generic placeholders as if they were recommendations.
  document.querySelectorAll('.place-proposal').forEach(card=>{if(card.textContent.includes('categorievoorstel')||card.textContent.includes('wordt live gezocht'))card.style.display='none'})
 }
+
+function enablePreferenceDrivenReplanning(){
+  const grid=document.getElementById('preferenceGrid');
+  const form=document.getElementById('tripForm');
+  const results=document.getElementById('resultsSection');
+  if(!grid||!form||grid.dataset.liveReplan==='1')return;
+  grid.dataset.liveReplan='1';
+  let timer=null;
+  const schedule=()=>{
+    clearTimeout(timer);
+    timer=setTimeout(()=>{
+      if(results && !results.classList.contains('hidden')){
+        const status=document.getElementById('autosaveStatus');
+        if(status)status.textContent='Voorkeuren gewijzigd — voorstellen opnieuw rangschikken…';
+        form.requestSubmit();
+      }
+    },220);
+  };
+  grid.addEventListener('change',event=>{
+    if(event.target.matches('[data-pref],[data-priority]'))schedule();
+  });
+}
+
 function applyReleaseUi(){
- loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();upgradeCards();
+ loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();upgradeCards();enablePreferenceDrivenReplanning();
  let scheduled=false;
  const observer=new MutationObserver(()=>{
    if(scheduled)return;
