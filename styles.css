@@ -249,13 +249,13 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 .home-hero{
   background-image:
     linear-gradient(90deg,rgba(4,42,38,.80) 0%,rgba(4,42,38,.48) 46%,rgba(4,42,38,.18) 100%),
-    url("https://images.squarespace-cdn.com/content/v1/53bae0a6e4b0323f1542724b/1703803512695-JW78TIC8V3E2WL2A5YVK/Lorraine-Spence-Adventure-Rider-Radio-Motorcycle-Podcast-5.jpg")!important;
+    url('assets/home-hero.webp')!important;
   background-size:cover!important;background-position:center!important;
 }
 .planner-hero.clean-photo-hero{
   background-image:
     linear-gradient(90deg,rgba(3,38,34,.88) 0%,rgba(3,38,34,.60) 48%,rgba(3,38,34,.20) 100%),
-    url("https://images.prismic.io/ipone/f374208a-d19d-4549-b674-e43c81e5fb73_DJI_0514.jpg?auto=compress%2Cformat&w=2400")!important;
+    url('assets/planner-hero.webp')!important;
   min-height:430px;background-size:cover!important;background-position:center 54%!important;
   align-items:center!important;
 }
@@ -314,3 +314,34 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 .topbar .brand-static{cursor:default!important;pointer-events:none!important;background:transparent!important;border:0!important;padding:0!important}
 .topbar>button:not(#newTripBtn){display:none!important}
 #newTripBtn{display:inline-flex!important;align-items:center!important;justify-content:center!important}
+
+
+/* v1.7.4 mobile containment + interaction-safe layout */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.app-shell,.app-view,.premium-hero,.panel,#tripForm,.planner-primary-grid,.planner-subsection{width:100%;max-width:100%;min-width:0}
+.app-shell{overflow-x:clip}
+.premium-hero>*{min-width:0}
+.planner-field-card,.planner-field-card *,.field-copy,.subsection-heading>*{min-width:0}
+.planner-field-card input,.planner-field-card select,.planner-field-card textarea{max-width:100%}
+#newTripBtn,#startPlanningBtn,.planner-search-bar button[type="submit"]{pointer-events:auto!important;position:relative;z-index:5}
+.home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('assets/home-hero.webp')!important}
+.planner-hero.clean-photo-hero{background-image:linear-gradient(90deg,rgba(3,38,34,.88) 0%,rgba(3,38,34,.60) 48%,rgba(3,38,34,.20) 100%),url('assets/planner-hero.webp')!important}
+@media(max-width:760px){
+  .app-shell{padding-left:8px!important;padding-right:8px!important}
+  .planner-premium-view{overflow:hidden}
+  .planner-hero.clean-photo-hero{width:100%!important;margin:0!important;min-height:350px!important;padding:20px 16px!important}
+  .planner-hero .hero-copy{max-width:100%!important;width:100%!important}
+  .planner-hero h1{font-size:clamp(2rem,10vw,2.7rem)!important;overflow-wrap:anywhere}
+  .hero-sub{max-width:100%!important}
+  .feature-row{max-width:100%;overflow:hidden}
+  .planner-steps{width:calc(100% - 12px)!important;max-width:calc(100% - 12px)!important;margin:-10px 6px 12px!important;padding:8px 6px!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:3px!important;overflow:hidden}
+  .planner-steps span{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:auto auto auto!important;text-align:center!important;gap:2px!important;min-width:0!important}
+  .planner-steps b{grid-row:auto!important;margin:0 auto 2px!important;width:28px!important;height:28px!important}
+  .planner-steps em{font-size:.65rem!important;white-space:normal;overflow-wrap:anywhere}
+  .planner-steps small{font-size:.54rem!important;line-height:1.1;white-space:normal;overflow-wrap:anywhere}
+  .planner-primary-grid{grid-template-columns:1fr!important}
+  .planner-field-card,.planner-field-card:first-of-type,.planner-field-card:nth-of-type(2){grid-column:1!important;width:100%!important}
+  .premium-preferences{grid-template-columns:1fr 1fr!important;width:100%!important}
+  .planner-search-bar{left:auto!important;right:auto!important;width:100%!important;max-width:100%!important}
+  .planner-search-bar button[type="submit"]{white-space:normal!important;max-width:100%!important}
+}

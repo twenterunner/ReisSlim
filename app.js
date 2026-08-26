@@ -303,6 +303,17 @@ function startNewTrip(){
   }
 }
 
+function setupPremiumPlannerControls(){
+  const topology=$('routeTopology');
+  if(topology){
+    const radios=[...document.querySelectorAll('input[name="routeTopologyUi"]')];
+    const sync=()=>radios.forEach(r=>{r.checked=r.value===topology.value});
+    sync();
+    radios.forEach(r=>r.addEventListener('change',()=>{if(!r.checked)return;topology.value=r.value;topology.dispatchEvent(new Event('change',{bubbles:true}))}));
+    topology.addEventListener('change',sync);
+  }
+}
+
 function initialize(){
   const newTripButton=$('newTripBtn');
   if(newTripButton)newTripButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();startNewTrip()});
