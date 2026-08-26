@@ -1,9 +1,9 @@
-ReisSlim v1.6.1 · Build 1601
+ReisSlim v1.6.2 · Build 1602
 
 Loop-route root-cause correction.
 
 Build 1600 still allowed the road router to reuse too much of the outbound
-corridor. Build 1601 no longer assumes that displaced via points are sufficient.
+corridor. Build 1602 no longer assumes that displaced via points are sufficient.
 
 For every live return leg in a LOOP trip, ReisSlim now:
 1. uses the already-resolved real outbound road geometry as the reference;
