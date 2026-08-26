@@ -1,13 +1,13 @@
-ReisSlim v1.5.8 · Build 1508
+ReisSlim v1.5.9 · Build 1509
 
-Changes:
-- Loop return routing now forces two road-routing via points on a separated return corridor.
-- Multi-leg loop corridor separation increased.
-- Preference changes rerank the existing proposals locally instead of resubmitting the whole form.
-- Preference changes no longer scroll the screen to the proposal section.
-- Preference controls are substantially more compact on mobile.
-- Specific stop/accommodation cards now have proper line breaks and spacing.
-- Header and itinerary spacing tightened on mobile.
-- Live road routing uses the confirmed OSRM hotfix and 25 s timeout.
+This release targets the observed mobile UX issues:
+- live plan enrichment now reports route/POI progress continuously;
+- named-place lookup is Nominatim-first and parallelised, with Overpass only as fallback;
+- specific place searches are prioritised (overnight, food, stop, activity) instead of processing every placeholder sequentially;
+- stale 'offline corridorraming' wording is removed from the visible UI;
+- day-detail headings are bold;
+- hard-condition and preference controls are more compact;
+- proposal intros are rewritten as concise, compelling trip stories with named highlights where ReisSlim has reliable destination knowledge;
+- repetitive match/purity percentages are removed from the proposal introduction.
 
 Upload ALL files in this ZIP to the repository root and replace existing files.
