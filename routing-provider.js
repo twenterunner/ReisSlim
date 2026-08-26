@@ -21,7 +21,7 @@ function loopControlPoints(from,to){
   const dLat=to.lat-from.lat,dLon=(to.lon-from.lon)*Math.cos(midLat),len=Math.hypot(dLat,dLon)||1;
   const perpLat=-dLon/len,perpLon=dLat/len/Math.max(.25,Math.cos(midLat));
   // Force a genuinely different return corridor across the whole leg, not only near destination.
-  const offsetKm=Math.max(35,Math.min(85,direct*.16)),deg=offsetKm/111;
+  const offsetKm=Math.max(55,Math.min(130,direct*.24)),deg=offsetKm/111;
   return[.34,.68].map((progress,index)=>({
     lat:Number((from.lat+(to.lat-from.lat)*progress+perpLat*deg*(index===0?.88:1)).toFixed(5)),
     lon:Number((from.lon+(to.lon-from.lon)*progress+perpLon*deg*(index===0?.88:1)).toFixed(5)),

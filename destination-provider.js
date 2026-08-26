@@ -78,164 +78,195 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
-
-const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
-const DISCOVERY_CACHE_VERSION='v10';
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-
-function cacheRead(storage,key){
-  try{const raw=storage?.getItem(key);if(!raw)return null;const parsed=JSON.parse(raw);return Date.now()-parsed.savedAt<30*24*60*60*1000?parsed.value:null}catch{return null}
-}
-function cacheWrite(storage,key,value){try{storage?.setItem(key,JSON.stringify({savedAt:Date.now(),value}))}catch{}}
-
-function countryCodeFromRow(row){
-  return String(row?.address?.country_code||'').toUpperCase();
-}
-function supportedCountry(code){
-  return Boolean(countryNames[code]);
-}
-function rowName(row){
-  const a=row?.address||{};
-  return a.city||a.town||a.village||a.municipality||a.county||a.state_district||a.state||String(row?.display_name||'').split(',')[0]||null;
-}
-function nominatimElement(row,seed,index){
-  const name=rowName(row);if(!name)return null;
-  const code=countryCodeFromRow(row);
-  if(!supportedCountry(code))return null;
-  const lat=Number(row.lat),lon=Number(row.lon);
-  if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-  return{
-    type:'node',
-    id:Number(row.place_id)||Math.abs(hash(`${name}:${lat}:${lon}:${index}`)),
-    lat,lon,
-    tags:{
-      name,
-      place:row.type==='city'?'city':row.type==='town'?'town':'village',
-      'addr:country':code,
-      'is_in:country_code':code,
-      'is_in:country':row.address?.country||countryNames[code]
-    },
-    _seed:seed
-  };
-}
-async function fetchReverse(seed,fetchImpl,timeoutMs,onProgress,context){
-  const url=new URL(NOMINATIM_REVERSE);
-  url.search=new URLSearchParams({
-    format:'jsonv2',
-    lat:String(seed.lat),
-    lon:String(seed.lon),
-    zoom:'10',
-    addressdetails:'1',
-    layer:'address'
-  });
-  const controller=new AbortController(),startedAt=Date.now();
+async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context){
+  const controller=new AbortController();
+  const startedAt=Date.now();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
-  onProgress?.({...context,type:'endpoint-start',endpoint:'Nominatim',startedAt});
+  onProgress?.({...context,type:'endpoint-start',endpoint,startedAt});
   try{
-    const response=await fetchImpl(url,{headers:{accept:'application/json'},signal:controller.signal});
-    if(!response.ok)throw new Error(`Nominatim ${response.status}`);
-    const row=await response.json();
-    onProgress?.({...context,type:'endpoint-success',endpoint:'Nominatim',elapsedMs:Date.now()-startedAt,candidateElements:row?1:0});
-    return row;
+    const response=await fetchImpl(endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body:new URLSearchParams({data:query}),
+      signal:controller.signal
+    });
+    if(!response.ok)throw new Error(`Overpass ${response.status}`);
+    const payload=await response.json();
+    onProgress?.({...context,type:'endpoint-success',endpoint,elapsedMs:Date.now()-startedAt,candidateElements:payload?.elements?.length||0});
+    return{payload,endpoint};
   }catch(error){
-    onProgress?.({...context,type:'endpoint-failure',endpoint:'Nominatim',elapsedMs:Date.now()-startedAt,timeout:error?.name==='AbortError',error:String(error?.message||error)});
-    return null;
-  }finally{clearTimeout(timer)}
+    const timeout=error?.name==='AbortError';
+    onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
-/*
- Live destination discovery deliberately uses Nominatim reverse lookups rather than
- broad Overpass area queries. The previous query expanded 8 seed points into roughly
- 40 nwr(around:...) clauses per pass and public Overpass instances regularly timed
- those requests out. Reverse geocoding asks one cheap question per seed: which
- named roadtrip region/town is here? Overpass remains available elsewhere for
- detailed POI enrichment after a destination has been selected.
-*/
+async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=15000}){
+  const query=buildDiscoveryQuery(trip,cursor);
+  const context={pass,totalPasses,cursor};
+  if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
+
+  const key=`reisslim.destination-discovery.v9:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
+  try{
+    const cached=storage?.getItem(key);
+    if(cached){
+      const payload=JSON.parse(cached);
+      onProgress?.({...context,type:'cache-hit',candidateElements:payload?.elements?.length||0});
+      return{payload,cached:true,endpoint:'cache'};
+    }
+  }catch{}
+
+  let lastError=null;
+  for(let endpointIndex=0;endpointIndex<endpoints.length;endpointIndex++){
+    const endpoint=endpoints[endpointIndex];
+    try{
+      const result=await fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length});
+      try{storage?.setItem(key,JSON.stringify(result.payload))}catch{}
+      return{payload:result.payload,cached:false,endpoint};
+    }catch(error){
+      lastError=error;
+      if(endpointIndex<endpoints.length-1){
+        onProgress?.({...context,type:'endpoint-switch',failedEndpoint:endpoint,nextEndpoint:endpoints[endpointIndex+1],endpointIndex,totalEndpoints:endpoints.length});
+      }
+    }
+  }
+
+  const reason=lastError?.name==='AbortError'
+    ? 'Live ontdekking duurde te lang op alle OpenStreetMap-servers.'
+    : 'Live OpenStreetMap-ontdekking is tijdelijk niet beschikbaar.';
+  return{payload:null,cached:false,reason};
+}
+
 export async function discoverDestinationBatch(
   trip,
   {
     cursor=0,
     excludedIds=[],
     fetchImpl=fetch,
+    endpoints=DEFAULT_ENDPOINTS,
     storage=globalThis.localStorage,
     onProgress=null,
     onBatch=null,
-    timeoutMs=7000
+    timeoutMs=15000
   }={}
 ){
-  const allSeeds=[];
+  const combined=[];
+  const emittedIds=new Set();
+  const emitted=[];
+  let usedCache=true,lastReason='',successfulPasses=0;
+
+  onProgress?.({
+    type:'discovery-start',
+    totalPasses:DISCOVERY_PASSES,
+    endpoints:[...endpoints],
+    origin:trip.origin,
+    reachKm:roadtripReachKm(trip)
+  });
+
   for(let passIndex=0;passIndex<DISCOVERY_PASSES;passIndex++){
-    allSeeds.push(...discoverySeeds(trip,cursor*DISCOVERY_PASSES+passIndex,DEFAULT_BATCH_SEEDS));
-  }
-  onProgress?.({type:'discovery-start',totalPasses:DISCOVERY_PASSES,endpoints:['Nominatim'],origin:trip.origin,reachKm:roadtripReachKm(trip)});
+    const pass=passIndex+1;
+    const currentCursor=cursor*DISCOVERY_PASSES+passIndex;
+    onProgress?.({type:'pass-start',pass,totalPasses:DISCOVERY_PASSES,cursor:currentCursor});
 
-  const emitted=[],emittedIds=new Set(),excluded=new Set(excludedIds);
-  let candidateElements=0,successfulPasses=0,requestNo=0;
+    const result=await fetchDiscoveryPayload(trip,currentCursor,{
+      fetchImpl,endpoints,storage,onProgress,pass,totalPasses:DISCOVERY_PASSES,timeoutMs
+    });
 
-  for(let passIndex=0;passIndex<DISCOVERY_PASSES;passIndex++){
-    const pass=passIndex+1,seeds=allSeeds.slice(passIndex*DEFAULT_BATCH_SEEDS,(passIndex+1)*DEFAULT_BATCH_SEEDS);
-    onProgress?.({type:'pass-start',pass,totalPasses:DISCOVERY_PASSES,cursor:cursor*DISCOVERY_PASSES+passIndex});
-    const passElements=[];
+    usedCache=usedCache&&Boolean(result.cached);
+    if(result.reason)lastReason=result.reason;
 
-    // Four geographically spread seed samples per pass are enough for a diverse
-    // first portfolio. Remaining seeds are sampled on subsequent "more" requests.
-    const selected=[seeds[0],seeds[2],seeds[4],seeds[6]].filter(Boolean);
-    for(let i=0;i<selected.length;i++){
-      const seed=selected[i],key=`reisslim.destination-discovery.${DISCOVERY_CACHE_VERSION}:${seed.lat.toFixed(3)}:${seed.lon.toFixed(3)}`;
-      let row=cacheRead(storage,key);
-      if(row){
-        onProgress?.({type:'cache-hit',pass,totalPasses:DISCOVERY_PASSES,candidateElements:1});
-      }else{
-        if(requestNo>0)await sleep(1050); // courteous public Nominatim pacing
-        row=await fetchReverse(seed,fetchImpl,timeoutMs,onProgress,{pass,totalPasses:DISCOVERY_PASSES,seedIndex:i+1,totalSeeds:selected.length});
-        requestNo++;
-        if(row)cacheWrite(storage,key,row);
+    if(result.payload?.elements?.length){
+      successfulPasses++;
+      combined.push(...result.payload.elements);
+
+      const normalized=normalizeDiscoveredDestinations(
+        trip,
+        {elements:combined},
+        {excludedIds:[...excludedIds,...emittedIds],limit:DEFAULT_RESULT_LIMIT}
+      );
+      const fresh=normalized.filter(item=>!emittedIds.has(item.id));
+      fresh.forEach(item=>{emittedIds.add(item.id);emitted.push(item)});
+
+      onProgress?.({
+        type:'pass-success',
+        pass,
+        totalPasses:DISCOVERY_PASSES,
+        endpoint:result.endpoint,
+        candidateElements:result.payload.elements.length,
+        totalCandidateElements:combined.length,
+        newDestinations:fresh.length,
+        totalDestinations:emitted.length
+      });
+
+      if(fresh.length){
+        await onBatch?.({
+          destinations:fresh,
+          pass,
+          totalPasses:DISCOVERY_PASSES,
+          endpoint:result.endpoint,
+          totalDestinations:emitted.length,
+          totalCandidateElements:combined.length
+        });
       }
-      const element=row?nominatimElement(row,seed,i):null;
-      if(element){passElements.push(element);candidateElements++}
+    }else{
+      onProgress?.({
+        type:'pass-empty',
+        pass,
+        totalPasses:DISCOVERY_PASSES,
+        reason:result.reason||'Deze zoekronde leverde geen bruikbare locaties op.',
+        totalDestinations:emitted.length
+      });
     }
 
-    const fresh=normalizeDiscoveredDestinations(trip,{elements:passElements},{
-      excludedIds:[...excluded,...emittedIds],limit:DEFAULT_RESULT_LIMIT
-    });
-    fresh.forEach(item=>{emittedIds.add(item.id);emitted.push(item)});
-
-    if(passElements.length)successfulPasses++;
-    onProgress?.({
-      type:passElements.length?'pass-success':'pass-empty',
-      pass,totalPasses:DISCOVERY_PASSES,
-      endpoint:'Nominatim',
-      candidateElements:passElements.length,
-      totalCandidateElements:candidateElements,
-      newDestinations:fresh.length,
-      totalDestinations:emitted.length,
-      reason:passElements.length?'':`Zoekronde ${pass} leverde geen bereikbare plaats op.`
-    });
-    if(fresh.length)await onBatch?.({destinations:fresh,pass,totalPasses:DISCOVERY_PASSES,endpoint:'Nominatim',totalDestinations:emitted.length,totalCandidateElements:candidateElements});
-    await sleep(0);
-
-    // Once a useful portfolio exists, stop background discovery. "Toon meer"
-    // advances the cursor and samples new seed positions.
-    if(emitted.length>=6)break;
+    // Yield back to the browser so progress text and newly discovered cards paint now.
+    await new Promise(resolve=>setTimeout(resolve,0));
   }
 
   if(!emitted.length){
-    const reason='Live OpenStreetMap-plaatsontdekking leverde geen bereikbare regio’s op.';
-    onProgress?.({type:'discovery-failure',totalPasses:DISCOVERY_PASSES,successfulPasses,reason});
-    return{destinations:[],live:false,reason,passes:DISCOVERY_PASSES,successfulPasses,candidateElements};
+    onProgress?.({
+      type:'discovery-failure',
+      totalPasses:DISCOVERY_PASSES,
+      successfulPasses,
+      reason:lastReason||'Geen live roadtripregio’s gevonden.'
+    });
+    return{
+      destinations:[],
+      live:false,
+      reason:lastReason||'Geen live roadtripregio’s gevonden.',
+      passes:DISCOVERY_PASSES,
+      successfulPasses,
+      candidateElements:combined.length
+    };
   }
-  onProgress?.({type:'discovery-complete',totalPasses:DISCOVERY_PASSES,successfulPasses,totalDestinations:emitted.length,candidateElements});
-  return{destinations:emitted,live:true,cached:false,source:'OpenStreetMap Nominatim',passes:DISCOVERY_PASSES,successfulPasses,candidateElements};
+
+  onProgress?.({
+    type:'discovery-complete',
+    totalPasses:DISCOVERY_PASSES,
+    successfulPasses,
+    totalDestinations:emitted.length,
+    candidateElements:combined.length
+  });
+
+  return{
+    destinations:emitted,
+    live:true,
+    cached:usedCache,
+    source:'OpenStreetMap Overpass',
+    passes:DISCOVERY_PASSES,
+    successfulPasses,
+    candidateElements:combined.length
+  };
 }
 
 export const destinationDiscoveryConfig=Object.freeze({
-  endpoints:[NOMINATIM_REVERSE],
+  endpoints:DEFAULT_ENDPOINTS,
   attribution:'© OpenStreetMap-bijdragers, ODbL',
   coverage:'Europe + South Africa + Namibia; roadtrip-from-user-origin',
-  batchSeeds:4,
+  batchSeeds:DEFAULT_BATCH_SEEDS,
   discoveryPasses:DISCOVERY_PASSES,
   resultLimit:DEFAULT_RESULT_LIMIT,
   progressive:true,
-  provider:'OpenStreetMap Nominatim reverse geocoding',
-  endpointTimeoutMs:7000
+  endpointTimeoutMs:15000
 });

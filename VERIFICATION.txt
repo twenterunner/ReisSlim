@@ -1,18 +1,16 @@
-syntax config.js: PASS
-syntax destination-engine.js: PASS
-syntax place-provider.js: PASS
-syntax app.js: PASS
-syntax ui-feature-flags.js: PASS
-syntax itinerary-engine.js: PASS
-syntax service-worker.js: PASS
+config.js: PASS
+routing-provider.js: PASS
+route-topology.js: PASS
+ui-feature-flags.js: PASS
+app.js: PASS
+service-worker.js: PASS
 revision: PASS
-compelling intro: PASS
-Nominatim first: PASS
-place progress events: PASS
-parallel place resolution: PASS
-plan live progress: PASS
-bold day labels: PASS
-compact constraints: PASS
-offline source removed: PASS
+loop via controls: PASS
+OSRM vias used: PASS
+preference no submit: PASS
+scroll preserved: PASS
+local rerank only: PASS
+compact controls: PASS
+place formatting: PASS
 cache bump: PASS
-Live external POI/provider acceptance must be verified after GitHub Pages deployment.
+External live road-route geometry must still be verified in the deployed mobile browser.

@@ -7,50 +7,6 @@ import { resolveOrigin } from './trip-model.js';
 
 const prefReason={natuur:'natuurgebieden en landschappelijke stops',bergen:'bergachtig terrein en hoogteverschil',zwemmen:'water- of zwemmogelijkheden',wandelen:'wandel- en natuurmogelijkheden',kinderen:'gezinsvriendelijke kenmerken',motor:'landschappelijke/bochtige wegpotentie',cultuur:'steden, erfgoed of culturele bezienswaardigheden',eten:'horeca en lokale eetmogelijkheden',kust:'kust- of waterlandschap',budget:'relatief gunstige kosten'};
 const tagScore=(destination,tag,matched=90,unmatched=45)=>destination.tags?.includes(tag)?matched:unmatched;
-
-const prefLabel={natuur:'natuur',bergen:'bergen',zwemmen:'zwemmen',wandelen:'wandelen',kinderen:'gezinsvriendelijkheid',motor:'mooie wegen',cultuur:'cultuur',eten:'eten',kust:'kust',budget:'budget'};
-const knownHighlights=[
-  ['Harz','dichte bossen, het Brocken-massief en bochtige wegen rond de bergdorpen'],
-  ['Dinant','de Maasvallei, de citadel en directe toegang tot de Ardennen'],
-  ['Dolomieten','spectaculaire bergpassen, scherpe rotsmassieven en sterke wandelmogelijkheden'],
-  ['Salzburg','Alpenlandschap, historische stadskern en bergwegen in meerdere richtingen'],
-  ['Annecy','het meer van Annecy, Alpenpassen en een compacte historische stad'],
-  ['Bled','het meer van Bled, de Julische Alpen en korte verbindingen naar bergwegen'],
-  ['Interlaken','meren, hoog-Alpiene panorama’s en toegang tot meerdere bergdalen'],
-  ['Ribe','een historische Deense stad en de Waddenzeekust'],
-  ['Vianden','kasteel, rivierdal en bochtige Luxemburgse binnenwegen'],
-  ['Maastricht','historische binnenstad, heuvelachtig Zuid-Limburg en Bourgondisch eten'],
-  ['Hoge Tatra','compact hooggebergte, wandelroutes en panoramische bergwegen'],
-  ['Brasov','Karpaten, historische stad en bergpassen richting Transsylvanië'],
-  ['Kotor','Baai van Kotor, steile bergen en spectaculaire kust-/bergwegen'],
-  ['Bled','meer, bergen en compacte dagtochten in de Julische Alpen']
-];
-function destinationHighlight(destination){
-  const name=String(destination.name||'').replace(/\s*&\s*omgeving$/i,'');
-  const known=knownHighlights.find(([key])=>name.toLocaleLowerCase('nl-NL').includes(key.toLocaleLowerCase('nl-NL')));
-  if(known)return known[1];
-  const parts=[];
-  if(destination.tags?.includes('bergen'))parts.push('berglandschap');
-  if(destination.tags?.includes('natuur'))parts.push('natuur');
-  if(destination.tags?.includes('motor'))parts.push('mooie/bochtige wegen');
-  if(destination.tags?.includes('wandelen'))parts.push('wandelmogelijkheden');
-  if(destination.tags?.includes('cultuur'))parts.push('cultuur en erfgoed');
-  if(destination.tags?.includes('eten'))parts.push('lokale eetmogelijkheden');
-  if(destination.tags?.includes('kust'))parts.push('kust- of waterlandschap');
-  return parts.slice(0,3).join(', ')||'een afwisselend roadtripprofiel';
-}
-function proposalStory(trip,destination,preference,route,budgetMargin,constraintStatus){
-  const matched=preference.matches.map(id=>prefLabel[id]||id);
-  const matchText=matched.length?matched.slice(0,4).join(', '):'je algemene roadtripvoorwaarden';
-  const stages=Math.max(1,route.requiredLegs||1);
-  const distance=Math.round(route.oneWayDistanceKm||destination.distanceKm||0);
-  const vehicle=trip.transport==='motorcycle'?'motortrip':trip.transport==='motorhome'?'campertrip':trip.transport==='caravan'?'caravanroadtrip':'roadtrip';
-  const highlight=destinationHighlight(destination);
-  if(!constraintStatus.exact)return `${destination.name} heeft inhoudelijk veel potentie — vooral ${highlight} — maar past nu niet volledig binnen je harde grenzen.`;
-  const margin=budgetMargin>=300?` Je houdt naar schatting circa €${Math.round(budgetMargin/50)*50} budgetmarge over.`:'';
-  return `${destination.name} is een sterke ${vehicle}: ${highlight}. Het sluit direct aan op ${matchText}. Vanaf ${trip.origin} is het circa ${distance} km enkele reis, verdeeld over ${stages} reis${stages===1?'etappe':'etappes'}.${margin}`;
-}
-
 function preferenceScore(trip,destination){
   if(!trip.preferences.length)return{score:55,matches:[],coverage:0,essentialMisses:[],reasons:[],purity:0};
   const possible=trip.preferences.reduce((sum,id)=>sum+(trip.preferenceWeights[id]||2),0);
@@ -83,10 +39,9 @@ export function scoreDestination(trip,destination){const month=new Date(`${trip.
  const minimumDays=trip.routeTopology==='open-ended'?Math.max(2,route.requiredLegs+1):constraintStatus.minimumDays,driving=roundScore(100-Math.max(0,route.requiredLegs-1)*15-Math.max(0,minimumDays-trip.days)*15),budgetFit=budgetScore(budget.total,trip.budget),routePotential=roundScore(((tagScore(destination,'natuur')+tagScore(destination,'bergen')+tagScore(destination,'motor'))/3+transport)/2);
  const dimensions={budget:budgetFit,driving,season,transport,family:destination.family*10,motorcycle:destination.motorcycle*10,camper:destination.camper*10,scenery:roundScore((tagScore(destination,'natuur')+tagScore(destination,'bergen')+tagScore(destination,'kust'))/3),walking:tagScore(destination,'wandelen'),swimming:tagScore(destination,'zwemmen'),food:tagScore(destination,'eten',90,55),culture:tagScore(destination,'cultuur',90,50),crowds:destination.crowds*10};
  const intentScore=destinationIntentScore(trip,destination),score=roundScore(preference.score*.56+budgetFit*.12+season*.09+transport*.11+driving*.12+intentScore),matchSentence=preference.reasons.length?preference.reasons.join('; '):'geen specifieke inhoudelijke voorkeur geselecteerd',budgetMargin=Math.max(0,trip.budget-budget.total);
- const story=proposalStory(trip,destination,preference,route,budgetMargin,constraintStatus);
- return{...destination,summary:story,score,dimensions,estimate:budget.total,budget,route,matches:preference.matches,preferenceCoverage:preference.coverage,preferencePurity:preference.purity,preferenceReasons:preference.reasons,essentialMisses:preference.essentialMisses,intentMatch:intentScore>0,minimumDays,feasible:constraintStatus.exact,category:constraintStatus.category,constraintStatus,confidence:route.originKnown?'redelijk':'beperkt',compromises:constraintStatus.violations.map(item=>item.detail),
+ return{...destination,score,dimensions,estimate:budget.total,budget,route,matches:preference.matches,preferenceCoverage:preference.coverage,preferencePurity:preference.purity,preferenceReasons:preference.reasons,essentialMisses:preference.essentialMisses,intentMatch:intentScore>0,minimumDays,feasible:constraintStatus.exact,category:constraintStatus.category,constraintStatus,confidence:route.originKnown?'redelijk':'beperkt',compromises:constraintStatus.violations.map(item=>item.detail),
  cardMetrics:{preference:preference.score,roadtrip:driving,route:routePotential,budget:budgetFit,budgetMargin},
- explanation:story}
+ explanation:constraintStatus.exact?`Je voorkeuren wegen hier direct mee: ${matchSentence}. Gewogen voorkeursmatch ${Math.round(preference.coverage*100)}%; focuszuiverheid ${Math.round(preference.purity*100)}%. Daarnaast past de bestemming binnen je ingestelde roadtripgrenzen.`:`De inhoudelijke match is ${Math.round(preference.coverage*100)}%, maar een harde roadtripvoorwaarde wordt overschreden.`}
 }
 const byMatch=(a,b)=>Number(b.intentMatch)-Number(a.intentMatch)||b.preferenceCoverage-a.preferenceCoverage||b.score-a.score||a.estimate-b.estimate||a.name.localeCompare(b.name,'nl');
 
