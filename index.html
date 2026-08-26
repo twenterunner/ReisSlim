@@ -23,34 +23,38 @@
   </header>
 
   <main class="app-shell">
-    <section id="dashboardView" class="app-view active">
-      <div class="welcome-card">
-        <div>
-          <p class="eyebrow">Jouw reizen</p>
-          <h1>Waar wil je naartoe?</h1>
-          <p>Plan een realistische roadtrip vanaf jouw gekozen vertrekpunt, met live route, specifieke stops, verblijf, budget, kaart en GPX.</p>
+    <section id="dashboardView" class="app-view active premium-dashboard">
+      <section class="home-hero premium-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Jouw avontuur begint hier</p>
+          <h1>Waar brengt jouw volgende <em>roadtrip</em> je naartoe?</h1>
+          <div class="hero-chips"><span>🏍 Motor</span><span>📍 Vanaf jouw vertrekpunt</span><span>✨ Live & persoonlijk</span></div>
+          <div class="hero-actions"><button id="startPlanningBtn" type="button">➤ Start een nieuwe reis</button><button class="hero-secondary" data-go-planner type="button">✦ Verras me</button></div>
         </div>
-        <button id="startPlanningBtn" type="button">Start een reis</button>
-      </div>
-      <section class="dashboard-grid">
-        <article class="panel current-trip-card">
-          <div class="section-heading"><div><p class="eyebrow">Concept</p><h2>Ga verder waar je was</h2></div><span id="draftStatusBadge" class="badge">Automatisch bewaard</span></div>
+        <aside class="hero-glass"><strong>ReisSlim zoekt slimmer</strong><ul><li>✓ Echte routes</li><li>✓ Specifieke stops</li><li>✓ Realistisch budget</li></ul><span>Alles in één roadtrip</span></aside>
+      </section>
+      <section class="dashboard-grid premium-grid">
+        <article class="panel current-trip-card premium-current">
+          <div class="section-heading"><div><p class="eyebrow">Jouw concept</p><h2>Ga verder waar je was</h2></div><span id="draftStatusBadge" class="badge">✓ Automatisch bewaard</span></div>
           <div id="currentTripSummary" class="empty-state">Nog geen reisconcept.</div>
-          <div class="actions"><button id="continueTripBtn" type="button">Verder plannen</button></div>
+          <div class="actions"><button id="continueTripBtn" type="button">Verder plannen →</button></div>
         </article>
-        <article class="panel stats-card">
-          <p class="eyebrow">Overzicht</p><h2>Reisbibliotheek</h2>
-          <div class="stat-grid"><div><strong id="savedTripCount">0</strong><span>opgeslagen reizen</span></div><div><strong id="draftDays">—</strong><span>dagen in concept</span></div><div><strong id="draftBudget">—</strong><span>budget concept</span></div></div>
+        <article class="panel stats-card premium-stats">
+          <p class="eyebrow">Jouw reizen</p><h2>In één oogopslag</h2>
+          <div class="stat-grid"><div><span>🧳</span><strong id="savedTripCount">0</strong><small>Opgeslagen</small></div><div><span>📅</span><strong id="draftDays">—</strong><small>Dagen</small></div><div><span>💶</span><strong id="draftBudget">—</strong><small>Budget</small></div></div>
         </article>
       </section>
-      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Bibliotheek</p><h2>Opgeslagen reizen</h2></div></div><div id="savedTripsList" class="saved-trips-grid"></div></section>
+      <section class="panel inspiration-panel"><div class="section-heading"><div><p class="eyebrow">Laat je inspireren</p><h2>Roadtrips die uitnodigen om te vertrekken</h2></div></div><div class="inspiration-grid">
+        <button class="inspire-card" data-go-planner type="button" style="--bg:url('assets/slovenie.webp')"><span>🏔 Bergen & meren</span><strong>Slovenië</strong><small>Alpenpassen · meren · natuur</small></button>
+        <button class="inspire-card" data-go-planner type="button" style="--bg:url('assets/dolomieten.webp')"><span>🏍 Passen & natuur</span><strong>Dolomieten</strong><small>Bochten · uitzicht · eten</small></button>
+        <button class="inspire-card" data-go-planner type="button" style="--bg:url('assets/harz.webp')"><span>🌲 Dichtbij & groen</span><strong>Harz</strong><small>Boswegen · bergen · korte trip</small></button>
+      </div></section>
+      <section class="panel saved-panel"><div class="section-heading"><div><p class="eyebrow">Bibliotheek</p><h2>Opgeslagen reizen</h2></div></div><div id="savedTripsList" class="saved-trips-grid"></div></section>
     </section>
 
     <section id="plannerView" class="app-view">
-      <section class="panel intro-card">
-        <div><p class="eyebrow">Planner</p><h1>Vertel ons wat voor roadtrip je zoekt</h1><p class="muted">ReisSlim gebruikt je vertrekpunt, harde voorwaarden en voorkeuren om live passende roadtrips te zoeken.</p></div>
-        <div class="autosave-box"><span>Opslag</span><strong>Lokaal op dit apparaat</strong><small id="autosaveStatus" aria-live="polite">Automatisch opslaan actief</small></div>
-      </section>
+      <section class="planner-hero premium-hero"><div class="hero-copy"><p class="eyebrow">Vertel ons jouw reiswensen</p><h1>Plan jouw perfecte <em>roadtrip</em></h1><p>Van vertrekpunt tot droomreis. ReisSlim regelt de rest.</p><div class="feature-row"><span>➤ Live route</span><span>★ Bijzondere stops</span><span>▣ Slimme planning</span><span>€ Realistisch budget</span></div></div><div class="autosave-box hero-save"><span>✓</span><strong>Jouw concept wordt automatisch bewaard</strong><small id="autosaveStatus" aria-live="polite">Automatisch opslaan actief</small></div></section>
+      <div class="planner-steps"><span class="active"><b>1</b> Reisgegevens</span><span><b>2</b> Voorkeuren</span><span><b>3</b> Voorwaarden</span><span><b>4</b> Bevestig</span></div>
       <section class="panel" id="intakeSection">
         <form id="tripForm">
           <div class="form-grid">

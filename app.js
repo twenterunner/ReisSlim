@@ -42,17 +42,29 @@ function renderLiveDiscoveryProgress(){
   const p=state.liveDiscoveryProgress;
   if(!p){box.classList.add('hidden');box.innerHTML='';return}
   box.classList.remove('hidden');
-  const lines=[];
-  if(p.origin)lines.push(`<li class="done">✓ Vertrekpunt <strong>${p.origin}</strong></li>`);
-  if(Number.isFinite(p.reachKm))lines.push(`<li class="done">✓ Zoekbereik bepaald: tot circa <strong>${Math.round(p.reachKm)} km</strong></li>`);
-  if(p.pass)lines.push(`<li class="active">● Zoekronde <strong>${p.pass} van ${p.totalPasses||4}</strong>${p.endpointLabel?` · ${p.endpointLabel}`:''}</li>`);
-  if(p.lastMessage)lines.push(`<li>${p.lastMessage}</li>`);
-  if(Number.isFinite(p.candidateElements)&&p.candidateElements>0)lines.push(`<li class="done">✓ ${p.candidateElements} locaties ontvangen</li>`);
-  if(Number.isFinite(p.liveDestinations)&&p.liveDestinations>0)lines.push(`<li class="done">✓ <strong>${p.liveDestinations} live roadtripregio’s</strong> gevonden en direct toegevoegd</li>`);
-  if(p.complete)lines.push(`<li class="done">✓ Live zoeken afgerond in <strong>${elapsedSeconds()} sec</strong></li>`);
-  if(p.failed)lines.push(`<li class="failed">✕ Live zoeken afgerond zonder bruikbare live regio’s: ${p.failureReason||'provider gaf geen resultaat'}</li>`);
 
-  box.innerHTML=`<div class="live-progress-head"><div><strong>${p.complete?'Live reisopties gevonden':p.failed?'Live uitbreiding tijdelijk beperkt':'Live reisopties zoeken…'}</strong><small>${p.complete?'De live resultaten staan nu tussen de voorstellen.':p.failed?'De bestaande voorstellen blijven beschikbaar; live uitbreiding kan later opnieuw.':'Resultaten verschijnen meteen zodra een zoekronde iets bruikbaars oplevert.'}</small></div><span>${elapsedSeconds()}s</span></div><ul>${lines.join('')}</ul>${p.failed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Probeer live opnieuw</button>':''}`;
+  const searchDone=Boolean(p.complete);
+  const searchFailed=Boolean(p.failed);
+  const resultCount=Number(p.liveDestinations)||0;
+  const sourceText=p.endpointLabel||'OpenStreetMap';
+
+  const lines=[];
+  if(p.origin)lines.push(`<li class="done"><span>✓</span><div><strong>Vertrek</strong><small>${p.origin}</small></div></li>`);
+  if(Number.isFinite(p.reachKm))lines.push(`<li class="done"><span>✓</span><div><strong>Bereik</strong><small>± ${Math.round(p.reachKm)} km</small></div></li>`);
+  if(p.pass){
+    const cls=searchDone?'done':searchFailed?'failed':'active';
+    const symbol=searchDone?'✓':searchFailed?'!':'●';
+    lines.push(`<li class="${cls}"><span>${symbol}</span><div><strong>Live bron</strong><small>${sourceText}${p.totalPasses?` · ronde ${p.pass}/${p.totalPasses}`:''}</small></div></li>`);
+  }
+  if(searchDone){
+    lines.push(`<li class="done"><span>✓</span><div><strong>${resultCount} live regio${resultCount===1?'':'’s'}</strong><small>Toegevoegd aan je voorstellen · ${elapsedSeconds()} sec</small></div></li>`);
+  }else if(searchFailed){
+    lines.push(`<li class="failed"><span>!</span><div><strong>Live uitbreiding beperkt</strong><small>${p.failureReason||'Probeer later opnieuw.'}</small></div></li>`);
+  }else if(p.lastMessage){
+    lines.push(`<li class="active progress-detail"><span>↻</span><div><strong>Bezig</strong><small>${p.lastMessage}</small></div></li>`);
+  }
+
+  box.innerHTML=`<div class="live-progress-head compact"><div><strong>${searchDone?'Live opties klaar':searchFailed?'Live bron tijdelijk beperkt':'Live opties zoeken'}</strong><small>${searchDone?`${resultCount} nieuwe regio${resultCount===1?'':'’s'} toegevoegd`:searchFailed?'Je bestaande voorstellen blijven beschikbaar.':'Nieuwe resultaten verschijnen direct.'}</small></div><span>${elapsedSeconds()}s</span></div><ul class="live-progress-steps">${lines.join('')}</ul>${searchFailed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Opnieuw proberen</button>':''}`;
   const retry=$('retryLiveDiscoveryBtn');
   if(retry)retry.onclick=()=>discoverLiveOptions({retry:true});
 }
@@ -101,7 +113,7 @@ function handleDiscoveryProgress(event){
   renderLiveDiscoveryProgress();
 }
 
-async function hydrateProposalImages(){if(!state.trip?.liveData||!state.ranked.length)return;await enrichDestinationImages(state.ranked,{maximum:4});renderDestinations(state)}
+async function hydrateProposalImages(){if(!state.trip?.liveData||!state.ranked.length)return;await enrichDestinationImages(state.ranked,{maximum:8});renderDestinations(state)}
 function stateForStorage(){return{schemaVersion:STORAGE_SCHEMA_VERSION,engineVersion:ENGINE_VERSION,trip:state.trip,destinationId:state.destination?.destinationId||state.destination?.id||null,destinationProfile:state.destination?.dynamic?state.destination:null,compareIds:state.compareIds,savedProposalIds:state.savedProposalIds,dismissedIds:state.dismissedIds,selectedVariantId:state.selectedVariantId,optimized:state.optimized,plan:state.plan}}
 function exportState(){return{version:VERSION,build:BUILD,engineVersion:ENGINE_VERSION,generatedAt:new Date().toISOString(),trip:state.trip,destination:state.destination?{id:state.destination.id,name:state.destination.name,score:state.destination.score,confidence:state.destination.confidence}:null,plan:state.plan,budget:state.budget,validation:state.validation,planningQuality:state.quality}}
 function persistDraft(message='Automatisch opgeslagen'){try{saveDraft(stateForStorage());setStatus(message)}catch(error){console.error(error);setStatus('Opslaan mislukt')}}
@@ -294,8 +306,24 @@ function initialize(){
     requestAnimationFrame(()=>window.scrollTo({top:scrollY,left:0,behavior:'auto'}));
   });
   $('destinationCards').addEventListener('click',event=>{const select=event.target.closest('[data-select]');if(select){const d=state.ranked.find(i=>i.id===select.dataset.select);if(d)chooseProposal(d)}const dismiss=event.target.closest('[data-dismiss-proposal]');if(dismiss){state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.dismissProposal])];refreshPortfolio()}const save=event.target.closest('[data-save-proposal]');if(save){const id=save.dataset.saveProposal;state.savedProposalIds=state.savedProposalIds.includes(id)?state.savedProposalIds.filter(i=>i!==id):[...state.savedProposalIds,id];renderDestinations(state)}});
-  $('destinationCards').addEventListener('change',event=>{if(!event.target.matches('[data-compare]'))return;const id=event.target.dataset.compare;if(event.target.checked&&!state.compareIds.includes(id)&&state.compareIds.length<4)state.compareIds.push(id);else if(!event.target.checked)state.compareIds=state.compareIds.filter(i=>i!==id);renderComparison(state)});
-  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state)});
+  $('destinationCards').addEventListener('change',event=>{
+    if(!event.target.matches('[data-compare]'))return;
+    const id=event.target.dataset.compare;
+    if(event.target.checked){
+      if(!state.compareIds.includes(id)&&state.compareIds.length<4)state.compareIds.push(id);
+      else if(!state.compareIds.includes(id)&&state.compareIds.length>=4){
+        event.target.checked=false;
+        setStatus('Vergelijk maximaal 4 reisconcepten');
+      }
+    }else state.compareIds=state.compareIds.filter(i=>i!==id);
+    renderDestinations(state);
+    renderComparison(state);
+    persistDraft(state.compareIds.length>=2?`${state.compareIds.length} reizen geselecteerd voor vergelijking`:'Vergelijking bijgewerkt');
+    const section=$('compareSection');
+    if(state.compareIds.length>=2)section?.classList.remove('hidden');
+    window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:state.compareIds.length}}));
+  });
+  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state);persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
   $('moreProposalsBtn').addEventListener('click',async()=>{const more=getMoreProposals(state.trip,state.catalog,state.ranked.map(i=>i.id),portfolioOptions({limit:4,focus:$('proposalFocus').value}));state.ranked.push(...more);renderDestinations(state);if(state.trip.liveData)await discoverLiveOptions({append:true})});
   $('proposalFocus').addEventListener('change',refreshPortfolio);
   $('variantCards').addEventListener('click',event=>{const b=event.target.closest('[data-select-variant]');if(b)applyVariant(b.dataset.selectVariant)});
