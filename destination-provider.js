@@ -118,7 +118,7 @@ async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,on
         return{payload,cached:true,endpoint:'cache',cacheKey:key};
       }
     }catch{}
-  }else onProgress?.({...context,type:'cache-bypass'});
+  }else onProgress?.({...context,type:'cache-bypass',endpoint:'live'});
 
   let lastError=null;
   for(let endpointIndex=0;endpointIndex<endpoints.length;endpointIndex++){

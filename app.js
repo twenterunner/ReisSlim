@@ -85,6 +85,7 @@ function handleDiscoveryProgress(event){
   }else if(event.type==='endpoint-success'){
     p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} antwoordde in ${(event.elapsedMs/1000).toFixed(1)} sec.`;
   }else if(event.type==='cache-hit'){
+    p.sawCache=true;
     p.endpointLabel='lokale cache';p.lastMessage='Eerdere live zoekdata controleren…';
   }else if(event.type==='cache-bypass'){
     p.endpointLabel='live bron';p.lastMessage='Cache overgeslagen; nieuwe OpenStreetMap-data ophalen…';
@@ -199,25 +200,44 @@ async function discoverLiveOptions({append=false,retry=false}={}){
   setStatus('Live reisopties zoeken via OpenStreetMap…');
   try{
     let addedTotal=0;
-    const result=await discoverDestinationBatch(state.trip,{
+    const batchHandler=async batch=>{
+      const known=new Set(state.catalog.map(i=>i.id));
+      const fresh=(batch.destinations||[]).filter(i=>!known.has(i.id));
+      if(!fresh.length)return;
+      state.catalog.push(...fresh);
+      addedTotal+=fresh.length;
+      refreshPortfolio();
+      await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+      persistDraft(`${addedTotal} live regio’s gevonden — zoeken gaat verder`);
+    };
+    let result=await discoverDestinationBatch(state.trip,{
       cursor:state.discoveryCursor,
       excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
       timeoutMs:7000,
       bypassCache:retry,
       onProgress:handleDiscoveryProgress,
-      onBatch:async batch=>{
-        const known=new Set(state.catalog.map(i=>i.id));
-        const fresh=(batch.destinations||[]).filter(i=>!known.has(i.id));
-        if(!fresh.length)return;
-        state.catalog.push(...fresh);
-        addedTotal+=fresh.length;
-        refreshPortfolio();
-        // Force browser paint before optional image enrichment.
-        await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
-        persistDraft(`${addedTotal} live regio’s gevonden — zoeken gaat verder`);
-      }
+      onBatch:batchHandler
     });
     state.discoveryCursor++;
+
+    // If an initial cached search produces zero usable destinations, don't stop
+    // and show an error. Immediately do one genuinely fresh search using a new
+    // seed group. This is the deployed 1605 failure shown as "0s · lokale cache".
+    if(!retry&&!result.destinations?.length&&state.liveDiscoveryProgress?.sawCache){
+      const p=state.liveDiscoveryProgress;
+      p.failed=false;p.complete=false;p.endpointLabel='live bron';
+      p.lastMessage='Cache leverde geen bruikbare regio’s op — automatisch een verse OpenStreetMap-zoekronde starten…';
+      renderLiveDiscoveryProgress();
+      result=await discoverDestinationBatch(state.trip,{
+        cursor:state.discoveryCursor,
+        excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
+        timeoutMs:7000,
+        bypassCache:true,
+        onProgress:handleDiscoveryProgress,
+        onBatch:batchHandler
+      });
+      state.discoveryCursor++;
+    }
 
     if(result.destinations?.length){
       void hydrateProposalImages();

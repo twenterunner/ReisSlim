@@ -8,7 +8,10 @@ destination-provider.js: PASS
 itinerary-engine.js: PASS
 config.js: PASS
 ui-feature-flags.js: PASS
-cache v10: PASS
-bad-cache eviction: PASS
-fresh retry: PASS
-revision 1604: PASS
+cache usage tracked: PASS
+automatic fresh pass: PASS
+fresh pass bypasses cache: PASS
+new seed after cached pass: PASS
+revision: PASS
+cache bump: PASS
+External OpenStreetMap availability requires deployed browser/network acceptance.

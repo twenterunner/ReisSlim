@@ -1,5 +1,5 @@
-export const VERSION = '1.6.4';
-export const BUILD = '1604';
+export const VERSION = '1.6.5';
+export const BUILD = '1605';
 export const ENGINE_VERSION = 26;
 export const STORAGE_SCHEMA_VERSION = 7;
 
