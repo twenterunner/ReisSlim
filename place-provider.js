@@ -138,11 +138,11 @@ async function fetchSpecificCandidates(item,options,fetchImpl,storage){
   const key=cacheKey('specific',rounded);
   const cached=readCache(storage,key,4*24*60*60*1000);
   if(cached?.length)return cached;
-  for(const radius of [6000,14000,30000]){
+  for(const radius of [8000,18000,35000]){
     const query=`[out:json][timeout:7][maxsize:4194304];(${clauseFor(item,radius)});out center tags 100;`;
     for(const endpoint of options.overpassUrls||OVERPASS_ENDPOINTS){
       try{
-        const found=await queryEndpoint(query,endpoint,fetchImpl,options.placeTimeoutMs||6500);
+        const found=await queryEndpoint(query,endpoint,fetchImpl,options.placeTimeoutMs||12000);
         if(found.length){ writeCache(storage,key,found); return found; }
       }catch{}
     }
@@ -180,7 +180,7 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
       if(validCoordinate(item.point))jobs.push({day,item});
     }
   }
-  await mapLimit(jobs,4,async({day,item})=>{
+  await mapLimit(jobs,1,async({day,item})=>{
     const candidates=await fetchSpecificCandidates(item,options,fetchImpl,storage);
     const ranked=candidates
       .map(place=>({place,distanceKm:haversineKm(item.point,place.point)}))

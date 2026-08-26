@@ -14,11 +14,11 @@ syntax route-engine.js: PASS
 syntax place-provider.js: PASS
 syntax trip-model.js: PASS
 revision: PASS
-preference engine included: PASS
-preference auto-rerank: PASS
-Nominatim specific fallback: PASS
-two routing providers: PASS
-single GPX track: PASS
-no straight fallback: PASS
-strict export override: PASS
+live discovery longer: PASS
+routed-car prefix preserved: PASS
+sequential route throttle: PASS
+18 sec routing: PASS
+gpx sequential route: PASS
+place lookup sequential: PASS
+fallback hidden while live: PASS
 cache: PASS
