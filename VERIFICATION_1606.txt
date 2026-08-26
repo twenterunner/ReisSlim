@@ -1,0 +1,15 @@
+ReisSlim v1.6.6 · Build 1606
+Live discovery architecture repair
+
+JS syntax: PASS
+
+Static acceptance checks:
+- obsolete overpass.kumi.systems endpoint absent
+- Private.coffee primary endpoint present
+- max 2 discovery passes
+- 4 seeds/pass
+- lightweight place-only discovery query
+- early return after >=6 usable live regions
+- all JavaScript files pass node --check
+
+External live-service acceptance still depends on the public Overpass service at runtime.

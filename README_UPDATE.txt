@@ -1,4 +1,4 @@
-ReisSlim v1.6.5 · Build 1605
+ReisSlim v1.6.6 · Build 1606
 
 AUTO-RECOVERY FOR ZERO-RESULT CACHE
 
@@ -7,7 +7,7 @@ The app could still display "0s · lokale cache · Geen live roadtripregio's"
 on the initial search. v1.6.4 correctly invalidated bad cache entries, but it
 then stopped instead of immediately performing a new live search.
 
-v1.6.5:
+v1.6.6:
 - detects when an initial cached search produced zero usable destinations;
 - automatically starts one fresh live OpenStreetMap discovery pass;
 - advances to a new geographic seed group;

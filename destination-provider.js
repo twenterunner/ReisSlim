@@ -2,11 +2,11 @@ import './ui-feature-flags.js';
 import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
 
-const DEFAULT_ENDPOINTS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+const DEFAULT_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const GOLDEN_ANGLE=137.507764;
-const DEFAULT_BATCH_SEEDS=8;
+const DEFAULT_BATCH_SEEDS=4;
 const DEFAULT_RESULT_LIMIT=72;
-const DISCOVERY_PASSES=4;
+const DISCOVERY_PASSES=2;
 const countryNames={
 AL:'Albanië',AD:'Andorra',AT:'Oostenrijk',BY:'Belarus',BE:'België',BA:'Bosnië en Herzegovina',BG:'Bulgarije',
 HR:'Kroatië',CY:'Cyprus',CZ:'Tsjechië',DK:'Denemarken',EE:'Estland',FI:'Finland',FR:'Frankrijk',DE:'Duitsland',
@@ -33,8 +33,8 @@ export function discoverySeeds(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){
   const reach=reachFor(trip),radialBands=[.12,.20,.30,.42,.56,.70,.84,.96];
   return Array.from({length:count},(_,index)=>{const sequence=cursor*count+index,bandIndex=(sequence+Math.floor(sequence/radialBands.length))%radialBands.length,jitter=(((sequence*17)%9)-4)*.012,fraction=Math.max(.08,Math.min(.98,radialBands[bandIndex]+jitter)),distanceKm=reach*fraction,bearing=sequence*GOLDEN_ANGLE+(cursor%5)*11.25;return{...destinationPoint(origin,distanceKm,bearing),distanceKm,sequence,ring:bandIndex}})
 }
-function queryClauses(point){const around=point.targeted?30000:36000,lat=point.lat.toFixed(4),lon=point.lon.toFixed(4);return[`nwr(around:${around},${lat},${lon})["place"~"city|town|village"]["name"];`,`nwr(around:${around},${lat},${lon})["boundary"="national_park"]["name"];`,`nwr(around:${around},${lat},${lon})["boundary"="protected_area"]["name"];`,`nwr(around:${around},${lat},${lon})["natural"~"peak|bay|beach|water"]["name"];`,`nwr(around:${around},${lat},${lon})["tourism"~"attraction|resort"]["name"];`].join('')}
-export function buildDiscoveryQuery(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){const seeds=discoverySeeds(trip,cursor,count),clauses=seeds.map(queryClauses).join('\n');return `[out:json][timeout:16][maxsize:33554432];\n(\n${clauses}\n);\nout center 360;`}
+function queryClauses(point){const around=point.targeted?26000:30000,lat=point.lat.toFixed(4),lon=point.lon.toFixed(4);return `nwr(around:${around},${lat},${lon})["place"~"city|town|village"]["name"];`}
+export function buildDiscoveryQuery(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){const seeds=discoverySeeds(trip,cursor,count),clauses=seeds.map(queryClauses).join('\n');return `[out:json][timeout:6][maxsize:4194304];\n(\n${clauses}\n);\nout center 120;`}
 const slug=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,55);
 const hash=value=>[...String(value)].reduce((sum,character)=>((sum*31)+character.charCodeAt(0))>>>0,2166136261);
 const pointOf=element=>Number.isFinite(element.lat)&&Number.isFinite(element.lon)?{lat:element.lat,lon:element.lon}:Number.isFinite(element.center?.lat)&&Number.isFinite(element.center?.lon)?{lat:element.center.lat,lon:element.center.lon}:null;
@@ -103,7 +103,7 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
   }
 }
 
-async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=15000,bypassCache=false}){
+async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=6500,bypassCache=false}){
   const query=buildDiscoveryQuery(trip,cursor);
   const context={pass,totalPasses,cursor};
   if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
@@ -150,7 +150,7 @@ export async function discoverDestinationBatch(
     storage=globalThis.localStorage,
     onProgress=null,
     onBatch=null,
-    timeoutMs=15000,
+    timeoutMs=6500,
     bypassCache=false
   }={}
 ){
@@ -194,6 +194,10 @@ export async function discoverDestinationBatch(
         if(!result.cached&&result.cacheKey){try{storage?.setItem(result.cacheKey,JSON.stringify(result.payload))}catch{}}
         onProgress?.({type:'pass-success',pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,candidateElements:result.payload.elements.length,totalCandidateElements:combined.length,newDestinations:fresh.length,totalDestinations:emitted.length});
         await onBatch?.({destinations:fresh,pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,totalDestinations:emitted.length,totalCandidateElements:combined.length});
+        if(emitted.length>=6){
+          onProgress?.({type:'discovery-complete',totalPasses:DISCOVERY_PASSES,successfulPasses,totalDestinations:emitted.length,candidateElements:combined.length,early:true});
+          return{destinations:emitted,live:true,cached:usedCache,source:'OpenStreetMap Overpass',passes:pass,successfulPasses,candidateElements:combined.length};
+        }
       }else{
         if(result.cached&&result.cacheKey){try{storage?.removeItem(result.cacheKey)}catch{}}
         onProgress?.({type:'pass-empty',pass,totalPasses:DISCOVERY_PASSES,reason:result.cached?'Oude cache leverde geen bruikbare regio’s op en is verwijderd.':'OpenStreetMap antwoordde, maar deze zoekronde leverde geen bruikbare regio’s op.',totalDestinations:emitted.length});
@@ -256,5 +260,5 @@ export const destinationDiscoveryConfig=Object.freeze({
   discoveryPasses:DISCOVERY_PASSES,
   resultLimit:DEFAULT_RESULT_LIMIT,
   progressive:true,
-  endpointTimeoutMs:15000
+  endpointTimeoutMs:6500
 });
