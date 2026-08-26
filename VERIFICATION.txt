@@ -1,16 +1,13 @@
-config.js: PASS
-routing-provider.js: PASS
-route-topology.js: PASS
-ui-feature-flags.js: PASS
-app.js: PASS
-service-worker.js: PASS
-revision: PASS
-loop via controls: PASS
-OSRM vias used: PASS
-preference no submit: PASS
-scroll preserved: PASS
-local rerank only: PASS
-compact controls: PASS
-place formatting: PASS
-cache bump: PASS
-External live road-route geometry must still be verified in the deployed mobile browser.
+ReisSlim v1.6.0 · Build 1600
+
+Baseline: ReisSlim v1.5.9 · Build 1509.
+Change: stronger loop-return corridor in route-topology.js and routing-provider.js.
+Version/cache references updated consistently to 1.6.0 / 1600.
+
+Verified before packaging:
+- config.js: 1.6.0 / 1600
+- index.html: 1.6.0 / 1600 and asset query build 1600
+- ui-feature-flags.js: 1.6.0 / 1600
+- manifest.webmanifest: build 1600
+- service-worker.js cache: reisslim-v1.6.0-build-1600
+- JavaScript syntax checks passed.

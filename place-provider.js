@@ -8,7 +8,7 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter'
 ];
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
-const CACHE_PREFIX = 'reisslim.live.v6.';
+const CACHE_PREFIX = 'reisslim.live.v9.';
 
 const clone = value => typeof globalThis.structuredClone === 'function'
   ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -138,17 +138,20 @@ async function fetchSpecificCandidates(item,options,fetchImpl,storage){
   const key=cacheKey('specific',rounded);
   const cached=readCache(storage,key,4*24*60*60*1000);
   if(cached?.length)return cached;
-  for(const radius of [8000,18000,35000]){
-    const query=`[out:json][timeout:7][maxsize:4194304];(${clauseFor(item,radius)});out center tags 100;`;
+  // Fast path: bounded Nominatim category lookup usually returns a named place
+  // much faster than a broad Overpass radius query.
+  const quick=await fetchNominatimCategory(item,fetchImpl,options.nominatimTimeoutMs||4500);
+  if(quick.length){writeCache(storage,key,quick);return quick;}
+  // Detail fallback: only use Overpass when Nominatim did not produce a suitable name.
+  for(const radius of [8000,18000]){
+    const query=`[out:json][timeout:6][maxsize:4194304];(${clauseFor(item,radius)});out center tags 60;`;
     for(const endpoint of options.overpassUrls||OVERPASS_ENDPOINTS){
       try{
-        const found=await queryEndpoint(query,endpoint,fetchImpl,options.placeTimeoutMs||12000);
+        const found=await queryEndpoint(query,endpoint,fetchImpl,options.placeTimeoutMs||6500);
         if(found.length){ writeCache(storage,key,found); return found; }
       }catch{}
     }
   }
-  const fallback=await fetchNominatimCategory(item,fetchImpl);
-  if(fallback.length){writeCache(storage,key,fallback);return fallback;}
   return [];
 }
 
@@ -163,7 +166,7 @@ async function mapLimit(items,limit,worker){
 function applyLivePlace(item,place,distanceKm,day){
   Object.assign(item,{
     name:place.name,point:place.point,confidence:'named-live-place',
-    source:'OpenStreetMap via Overpass',verified:false,live:true,genericFallback:false,
+    source:place.id?.startsWith('nominatim-')?'OpenStreetMap Nominatim':'OpenStreetMap via Overpass',verified:false,live:true,genericFallback:false,
     detourKm:Number(distanceKm.toFixed(1)),openingHours:place.openingHours,
     websiteUrl:place.website,sourceUrl:place.osmUrl,mapUrl:place.mapUrl,url:place.mapUrl,
     officialStars:place.officialStars,
@@ -176,24 +179,34 @@ function applyLivePlace(item,place,distanceKm,day){
 async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storage){
   const jobs=[];
   for(const day of plan.days||[]){
-    for(const item of day.recommendations||[]){
-      if(validCoordinate(item.point))jobs.push({day,item});
-    }
+    const recommendations=(day.recommendations||[]).filter(item=>validCoordinate(item.point));
+    const picked=[];
+    const add=item=>{if(item&&!picked.includes(item))picked.push(item)};
+    add(recommendations.find(item=>item.type==='accommodation'));
+    add(recommendations.find(item=>item.type==='restaurant'));
+    add(recommendations.find(item=>item.type==='fuel'||item.type==='rest'));
+    add(recommendations.find(item=>item.type==='activity'));
+    jobs.push(...picked.map(item=>({day,item})));
   }
-  await mapLimit(jobs,1,async({day,item})=>{
+  const total=jobs.length;let completed=0,foundCount=0;
+  options.onProgress?.({type:'places-start',total});
+  await mapLimit(jobs,3,async({day,item})=>{
+    options.onProgress?.({type:'place-search',day:day.day,itemType:item.type,itemName:item.name,completed,total,found:foundCount});
     const candidates=await fetchSpecificCandidates(item,options,fetchImpl,storage);
     const ranked=candidates
       .map(place=>({place,distanceKm:haversineKm(item.point,place.point)}))
       .filter(x=>Number.isFinite(x.distanceKm))
       .sort((a,b)=>suitability(b.place,item,trip,b.distanceKm)-suitability(a.place,item,trip,a.distanceKm)||a.distanceKm-b.distanceKm);
-    if(ranked[0])applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);
+    if(ranked[0]){applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);foundCount++;}
+    completed++;
+    options.onProgress?.({type:ranked[0]?'place-found':'place-missing',day:day.day,itemType:item.type,name:ranked[0]?.place?.name||null,completed,total,found:foundCount});
   });
   for(const day of plan.days||[]){
-    // HARD RULE: do not present generic pseudo-recommendations as a selected place.
     day.recommendations=(day.recommendations||[]).filter(item=>item.live&&item.name&&validCoordinate(item.point));
     day.sleepProposal=day.recommendations.find(item=>item.type==='accommodation')||null;
   }
   plan.recommendations=(plan.days||[]).flatMap(day=>day.recommendations||[]);
+  options.onProgress?.({type:'places-complete',completed,total,found:foundCount});
   return plan;
 }
 
