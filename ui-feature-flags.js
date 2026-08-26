@@ -1,3 +1,16 @@
+const REISSLIM_RELEASE = Object.freeze({ version: '1.4.0', build: '1400' });
+
+function addRevisionToHeader() {
+  const brand = document.querySelector('.brand');
+  if (!brand || document.getElementById('headerRevision')) return;
+  const badge = document.createElement('span');
+  badge.id = 'headerRevision';
+  badge.className = 'header-revision';
+  badge.textContent = `v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;
+  badge.style.cssText = 'font-size:11px;font-weight:700;opacity:.82;white-space:nowrap;margin-left:8px;';
+  brand.appendChild(badge);
+}
+
 // Temporary UI feature flags for ReisSlim.
 // Travel Readiness is intentionally hidden in this release and can be restored
 // later without deleting the underlying planning/readiness logic.
@@ -27,7 +40,8 @@ function hideTravelReadiness() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', hideTravelReadiness, { once: true });
+  document.addEventListener('DOMContentLoaded', () => { addRevisionToHeader(); hideTravelReadiness(); }, { once: true });
 } else {
+  addRevisionToHeader();
   hideTravelReadiness();
 }

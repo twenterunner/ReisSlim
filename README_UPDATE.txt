@@ -1,30 +1,28 @@
-ReisSlim expanded destination update
+ReisSlim v1.4.0 / Build 1400
 
-Files in this ZIP:
-- destination-provider.js
-- proposal-engine.js
-- ui-feature-flags.js
+This supersedes the previous ZIP.
 
-Upload all three files to the ROOT of the ReisSlim repository, replacing the two
-existing files with the same names and adding ui-feature-flags.js.
+IMPORTANT: upload ALL files in this ZIP to the repository root.
 
-What changed
-1. Live discovery now uses 16 geographic seeds per pass instead of 8.
-2. One discovery action runs 3 bounded Overpass passes.
-3. Up to 72 live destinations can be returned per discovery action.
-4. Search coverage now includes city/town/village, national parks,
-   protected areas, named peaks/bays/beaches/water, attractions and resorts.
-5. Discovery uses more distance bands and bearings to avoid large geographic gaps.
-6. Spatial de-duplication prevents the enlarged pool from becoming repetitive.
-7. The proposal engine now builds a 20-30 option diverse portfolio internally.
-8. Stronger country/distance/theme diversity prevents one region from dominating.
-9. The engine retains up to 8 useful near-misses internally for later UI use.
-10. 'Show more' still returns a bounded number of new options per tap.
-11. Travel Readiness is hidden from the UI for now. Its underlying logic is not
-    deleted, making it safe to re-enable later.
+Why the previous update could still look unchanged:
+- The previous ZIP did not bump config.js VERSION/BUILD.
+- The service worker cache was still v1.0.0-build-1000 and did not cache the new UI feature file.
+- Therefore an installed/PWA copy could continue serving old modules.
+- This release bumps the cache and adds the new module to the precache list.
 
-Important
-- This is deliberately a minimal-file update. It avoids changing the route,
-  itinerary, budget, vehicle, optimization, storage or export engines.
-- Public Overpass instances are rate-limited. The new discovery logic uses
-  several bounded requests rather than one enormous request.
+Functional update:
+- 16 geographic discovery seeds per pass (was 8).
+- 3 discovery passes per live discovery action.
+- Up to 72 normalized live candidates per action (was 16).
+- Wider OSM feature types: villages, parks/protected areas, peaks, bays, beaches, water, attractions and resorts.
+- Multi-ring geographic coverage and spatial deduplication.
+- Proposal portfolio engine can expose 20-30 diverse candidates internally instead of a tiny shortlist.
+- Stronger diversity by country, distance band and theme.
+- Travel Readiness hidden for now.
+- Revision v1.4.0 · 1400 is shown in the top header.
+- Service worker cache bumped to force deployment refresh.
+
+Verification performed:
+- JavaScript syntax checks for every JS file in this ZIP.
+- Static checks that config VERSION/BUILD, service worker cache and header revision all equal 1.4.0 / 1400.
+- Full browser/live-API acceptance cannot be executed from this offline packaging environment.
