@@ -85,7 +85,9 @@ function handleDiscoveryProgress(event){
   }else if(event.type==='endpoint-success'){
     p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} antwoordde in ${(event.elapsedMs/1000).toFixed(1)} sec.`;
   }else if(event.type==='cache-hit'){
-    p.endpointLabel='lokale cache';p.lastMessage='Een eerdere live zoekronde uit de lokale cache gebruiken.';
+    p.endpointLabel='lokale cache';p.lastMessage='Eerdere live zoekdata controleren…';
+  }else if(event.type==='cache-bypass'){
+    p.endpointLabel='live bron';p.lastMessage='Cache overgeslagen; nieuwe OpenStreetMap-data ophalen…';
   }else if(event.type==='pass-success'){
     p.pass=event.pass;p.candidateElements=event.totalCandidateElements;p.liveDestinations=event.totalDestinations;p.lastMessage=event.newDestinations?`${event.newDestinations} nieuwe live regio’s uit ronde ${event.pass} toegevoegd.`:`Ronde ${event.pass} leverde geen nieuwe unieke regio’s op.`;
   }else if(event.type==='pass-empty'){
@@ -189,7 +191,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
   state.discoveryBusy=true;
   if(retry){
-    state.discoveryCursor=0;
+    state.discoveryCursor=Math.max(1,state.discoveryCursor+1);
     state.catalog=[...destinations];
     refreshPortfolio();
   }
@@ -201,6 +203,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       cursor:state.discoveryCursor,
       excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
       timeoutMs:7000,
+      bypassCache:retry,
       onProgress:handleDiscoveryProgress,
       onBatch:async batch=>{
         const known=new Set(state.catalog.map(i=>i.id));

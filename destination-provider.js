@@ -103,28 +103,29 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
   }
 }
 
-async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=15000}){
+async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=15000,bypassCache=false}){
   const query=buildDiscoveryQuery(trip,cursor);
   const context={pass,totalPasses,cursor};
   if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};
 
-  const key=`reisslim.destination-discovery.v9:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
-  try{
-    const cached=storage?.getItem(key);
-    if(cached){
-      const payload=JSON.parse(cached);
-      onProgress?.({...context,type:'cache-hit',candidateElements:payload?.elements?.length||0});
-      return{payload,cached:true,endpoint:'cache'};
-    }
-  }catch{}
+  const key=`reisslim.destination-discovery.v10:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
+  if(!bypassCache){
+    try{
+      const cached=storage?.getItem(key);
+      if(cached){
+        const payload=JSON.parse(cached);
+        onProgress?.({...context,type:'cache-hit',candidateElements:payload?.elements?.length||0});
+        return{payload,cached:true,endpoint:'cache',cacheKey:key};
+      }
+    }catch{}
+  }else onProgress?.({...context,type:'cache-bypass'});
 
   let lastError=null;
   for(let endpointIndex=0;endpointIndex<endpoints.length;endpointIndex++){
     const endpoint=endpoints[endpointIndex];
     try{
       const result=await fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length});
-      try{storage?.setItem(key,JSON.stringify(result.payload))}catch{}
-      return{payload:result.payload,cached:false,endpoint};
+      return{payload:result.payload,cached:false,endpoint,cacheKey:key};
     }catch(error){
       lastError=error;
       if(endpointIndex<endpoints.length-1){
@@ -149,7 +150,8 @@ export async function discoverDestinationBatch(
     storage=globalThis.localStorage,
     onProgress=null,
     onBatch=null,
-    timeoutMs=15000
+    timeoutMs=15000,
+    bypassCache=false
   }={}
 ){
   const combined=[];
@@ -171,7 +173,7 @@ export async function discoverDestinationBatch(
     onProgress?.({type:'pass-start',pass,totalPasses:DISCOVERY_PASSES,cursor:currentCursor});
 
     const result=await fetchDiscoveryPayload(trip,currentCursor,{
-      fetchImpl,endpoints,storage,onProgress,pass,totalPasses:DISCOVERY_PASSES,timeoutMs
+      fetchImpl,endpoints,storage,onProgress,pass,totalPasses:DISCOVERY_PASSES,timeoutMs,bypassCache
     });
 
     usedCache=usedCache&&Boolean(result.cached);
@@ -187,28 +189,14 @@ export async function discoverDestinationBatch(
         {excludedIds:[...excludedIds,...emittedIds],limit:DEFAULT_RESULT_LIMIT}
       );
       const fresh=normalized.filter(item=>!emittedIds.has(item.id));
-      fresh.forEach(item=>{emittedIds.add(item.id);emitted.push(item)});
-
-      onProgress?.({
-        type:'pass-success',
-        pass,
-        totalPasses:DISCOVERY_PASSES,
-        endpoint:result.endpoint,
-        candidateElements:result.payload.elements.length,
-        totalCandidateElements:combined.length,
-        newDestinations:fresh.length,
-        totalDestinations:emitted.length
-      });
-
       if(fresh.length){
-        await onBatch?.({
-          destinations:fresh,
-          pass,
-          totalPasses:DISCOVERY_PASSES,
-          endpoint:result.endpoint,
-          totalDestinations:emitted.length,
-          totalCandidateElements:combined.length
-        });
+        fresh.forEach(item=>{emittedIds.add(item.id);emitted.push(item)});
+        if(!result.cached&&result.cacheKey){try{storage?.setItem(result.cacheKey,JSON.stringify(result.payload))}catch{}}
+        onProgress?.({type:'pass-success',pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,candidateElements:result.payload.elements.length,totalCandidateElements:combined.length,newDestinations:fresh.length,totalDestinations:emitted.length});
+        await onBatch?.({destinations:fresh,pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,totalDestinations:emitted.length,totalCandidateElements:combined.length});
+      }else{
+        if(result.cached&&result.cacheKey){try{storage?.removeItem(result.cacheKey)}catch{}}
+        onProgress?.({type:'pass-empty',pass,totalPasses:DISCOVERY_PASSES,reason:result.cached?'Oude cache leverde geen bruikbare regio’s op en is verwijderd.':'OpenStreetMap antwoordde, maar deze zoekronde leverde geen bruikbare regio’s op.',totalDestinations:emitted.length});
       }
     }else{
       onProgress?.({

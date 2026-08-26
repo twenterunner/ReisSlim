@@ -1,13 +1,14 @@
-routing-provider.js: PASS
 app.js: PASS
-config.js: PASS
+destination-engine.js: PASS
+place-provider.js: PASS
+route-topology.js: PASS
+routing-provider.js: PASS
 service-worker.js: PASS
+destination-provider.js: PASS
+itinerary-engine.js: PASS
+config.js: PASS
 ui-feature-flags.js: PASS
-revision: PASS
-actual geometry overlap: PASS
-both loop sides tested: PASS
-stronger alternatives tested: PASS
-acceptance target: PASS
-measured overlap published: PASS
-cache bumped: PASS
-External OSRM acceptance: requires deployed browser/network; algorithm now evaluates the actual returned geometry rather than only the planned control points.
+cache v10: PASS
+bad-cache eviction: PASS
+fresh retry: PASS
+revision 1604: PASS
