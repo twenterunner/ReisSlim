@@ -65,39 +65,48 @@ function proposalFromDestination(item, trip, focus, learnedProfile = null) {
     routeCharacter: trip.travelMode !== 'direct' ? `${trip.travelMode} met lokale ${trip.routeTopology === 'open-jaw' ? 'open-jaw route' : 'rondreis'}` : trip.routeStyle === 'scenic' ? 'toeristische route met uitzichtstops' : trip.routeStyle === 'fastest' ? 'efficiënte hoofdroute' : 'gebalanceerde route met zinvolle tussenstops',
     tripShape: `${recommendedBases} uitvalsbasis${recommendedBases === 1 ? '' : 'sen'} · ${trip.days} dagen · ${item.constraintStatus.travelLegs * 2} reisetappes`,
     keyTradeoff: explainTradeoff(item),
-    evidence: [`Offline regioprofiel met ${item.bases.length} geankerde bases`, `${item.routeStops.length} corridorstops voor routeopbouw`, `Voertuigscore ${item.dimensions.transport}/100`],
+    evidence: [`${item.dynamic ? 'Live ontdekt' : 'Offline regioprofiel'} met ${item.bases.length} geankerde bases`, `${item.routeStops.length} corridorstops voor routeopbouw`, `Voertuigscore ${item.dimensions.transport}/100`],
     sourceLabel: item.dynamic ? 'Live ontdekt via OpenStreetMap Overpass; route, plaatsen en weer worden na selectie afzonderlijk gevalideerd' : 'ReisSlim offline regiocatalogus; live route-, plaats- en weerdata wordt na selectie toegevoegd'
   };
 }
 
 export function proposalDifference(left, right) {
   if (!left || !right || left.destinationId === right.destinationId) return 0;
-  const geography = left.country === right.country ? .45 : 1;
-  const distance = Math.min(1, Math.abs(left.distanceKm - right.distanceKm) / 700);
-  const cost = Math.min(1, Math.abs(left.estimate - right.estimate) / 1800);
+  const geography = left.country === right.country ? .42 : 1;
+  const distance = Math.min(1, Math.abs(left.distanceKm - right.distanceKm) / 600);
+  const cost = Math.min(1, Math.abs(left.estimate - right.estimate) / 1600);
   const tags = 1 - overlap(left.tags, right.tags);
   const baseShape = left.recommendedBases === right.recommendedBases ? .25 : 1;
-  return clamp01(geography * .25 + distance * .2 + cost * .15 + tags * .3 + baseShape * .1);
+  return clamp01(geography * .27 + distance * .20 + cost * .13 + tags * .30 + baseShape * .10);
 }
 
 export function nearDuplicate(left, right) {
   if (!left || !right) return false;
   if (left.destinationId === right.destinationId) return true;
-  return band(left.distanceKm, 120) === band(right.distanceKm, 120)
-    && band(left.estimate, 500) === band(right.estimate, 500)
-    && overlap(left.tags, right.tags) >= .8
+  return band(left.distanceKm, 90) === band(right.distanceKm, 90)
+    && band(left.estimate, 400) === band(right.estimate, 400)
+    && overlap(left.tags, right.tags) >= .86
     && left.country === right.country;
 }
 
-export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = [] } = {}) {
+function diversityPenalty(candidate, selected) {
+  if (!selected.length) return 0;
+  const sameCountry = selected.filter(item => item.country === candidate.country).length;
+  const sameDistanceBand = selected.filter(item => band(item.distanceKm, 350) === band(candidate.distanceKm, 350)).length;
+  const sameLeadTag = selected.filter(item => (item.tags?.[0] || '') === (candidate.tags?.[0] || '')).length;
+  return sameCountry * 2.8 + sameDistanceBand * 1.5 + sameLeadTag * .8;
+}
+
+export function selectDiversePortfolio(candidates, { limit = 20, excludedIds = [] } = {}) {
   const excluded = new Set(excludedIds);
   const pool = candidates.filter(item => !excluded.has(item.id) && !excluded.has(item.proposalId));
   const selected = [];
   while (pool.length && selected.length < limit) {
     const ranked = pool.map(candidate => {
       const minDifference = selected.length ? Math.min(...selected.map(existing => proposalDifference(candidate, existing))) : 1;
-      const duplicatePenalty = selected.some(existing => nearDuplicate(candidate, existing)) ? 24 : 0;
-      return { candidate, merit: candidate.portfolioScore * .72 + minDifference * 28 - duplicatePenalty };
+      const duplicatePenalty = selected.some(existing => nearDuplicate(candidate, existing)) ? 32 : 0;
+      const spreadPenalty = diversityPenalty(candidate, selected);
+      return { candidate, merit: candidate.portfolioScore * .68 + minDifference * 32 - duplicatePenalty - spreadPenalty };
     }).sort((a, b) => b.merit - a.merit || b.candidate.score - a.candidate.score || a.candidate.id.localeCompare(b.candidate.id));
     const winner = ranked[0].candidate;
     selected.push(winner);
@@ -106,26 +115,45 @@ export function selectDiversePortfolio(candidates, { limit = 8, excludedIds = []
   return selected;
 }
 
+function nearMisses(ranking, limit = 8) {
+  return ranking.rejected
+    .filter(item => (item.constraintStatus?.violations?.length || 0) <= 2)
+    .slice(0, limit)
+    .map(item => ({
+      destination: item.name,
+      score: item.score,
+      adjustment: item.constraintStatus?.violations?.[0]?.adjustment || 'Kleine aanpassing van de reisvoorwaarden nodig.',
+      detail: item.constraintStatus?.violations?.[0]?.detail || ''
+    }));
+}
+
 export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'balanced', excludedIds = [], preferenceProfile = null } = {}) {
   const ranking = rankDestinationGroups(trip, catalog);
   const requestedMismatch = ranking.rejected.find(item => item.intentMatch) || null;
   const candidates = [...ranking.exact, ...ranking.stretched].map(item => proposalFromDestination(item, trip, focus, preferenceProfile));
-  const visible = selectDiversePortfolio(candidates, { limit: Math.min(12, limit), excludedIds });
+
+  // App v1.3 asked for 8; the engine now deliberately exposes a much broader
+  // first portfolio while "show more" remains bounded by the caller's slice.
+  const portfolioLimit = Math.max(20, Math.min(30, Number(limit || 8) * 3));
+  const visible = selectDiversePortfolio(candidates, { limit: portfolioLimit, excludedIds });
   const exact = visible.filter(item => item.category === 'exact');
-  const stretched = visible.filter(item => item.category === 'stretch').slice(0, 2);
+  const stretched = visible.filter(item => item.category === 'stretch').slice(0, 4);
   const accepted = [...exact, ...stretched];
-  const shortage = accepted.length >= 6 ? null : {
-    requested: 6,
+
+  const shortage = accepted.length >= 12 ? null : {
+    requested: 12,
     available: accepted.length,
-    explanation: `Er zijn ${accepted.length} onderscheidende reizen die nu selecteerbaar zijn. ReisSlim vult de lijst niet aan met dubbelen of plannen buiten je harde voorwaarden.`,
-    relaxations: ranking.closestAdjustments.slice(0, 3)
+    explanation: `Er zijn ${accepted.length} onderscheidende reizen die nu selecteerbaar zijn. ReisSlim vult de lijst niet aan met bijna-dubbelen of duidelijk onhaalbare plannen.`,
+    relaxations: ranking.closestAdjustments.slice(0, 5)
   };
+
   return {
     ...ranking,
     exact: accepted.filter(item => item.category === 'exact'),
     stretched: accepted.filter(item => item.category === 'stretch'),
     visible: accepted,
     candidates,
+    nearMisses: nearMisses(ranking),
     shortage, requestedMismatch,
     focus,
     focusOptions: focusProfiles
@@ -133,5 +161,6 @@ export function buildProposalPortfolio(trip, catalog, { limit = 8, focus = 'bala
 }
 
 export function getMoreProposals(trip, catalog, shownIds, { limit = 4, focus = 'balanced', preferenceProfile = null } = {}) {
-  return buildProposalPortfolio(trip, catalog, { limit, focus, excludedIds: shownIds, preferenceProfile }).visible;
+  // Build from a large pool, but return only the amount explicitly requested.
+  return buildProposalPortfolio(trip, catalog, { limit: Math.max(12, limit), focus, excludedIds: shownIds, preferenceProfile }).visible.slice(0, limit);
 }

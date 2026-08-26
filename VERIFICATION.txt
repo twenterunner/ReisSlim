@@ -1,0 +1,4 @@
+Syntax verification:
+- destination-provider.js: PASS 
+- proposal-engine.js: PASS 
+- ui-feature-flags.js: PASS 
