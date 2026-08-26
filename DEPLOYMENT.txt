@@ -1,4 +1,4 @@
-ReisSlim v1.6.6 · Build 1606
+ReisSlim v1.6.7 · Build 1607
 
 This package addresses the deployment/update problem as well as retaining the
 v1.6.1 loop-route geometry fix.
@@ -8,19 +8,24 @@ Upload EVERY file from this ZIP to the SAME GitHub Pages repository/folder that
 serves ReisSlim. Replace the existing files.
 
 Deployment identity:
-- Header/app version: 1.6.6 / 1606
-- HTML fingerprint: 1.6.6-1606-loopfix
-- Service-worker cache: reisslim-v1.6.6-build-1606
-- JS/CSS references are cache-busted with ?v=1606
+- Header/app version: 1.6.7 / 1607
+- HTML fingerprint: 1.6.7-1607-parallel-discovery
+- Service-worker cache: reisslim-v1.6.7-build-1607
+- JS/CSS references are cache-busted with ?v=1607
 - New service worker calls skipWaiting() and clients.claim()
 - Activation deletes obsolete caches.
 
-After GitHub Pages deploys, opening/reloading ReisSlim should show v1.6.6 · 1606.
+After GitHub Pages deploys, opening/reloading ReisSlim should show v1.6.7 · 1607.
 If it still shows 1.6.0/1600 or 1.6.1/1601, the browser is not receiving the
 new repository files; that is then a deployment/path issue rather than the
 application package.
 
-Build 1606 live-discovery repair:
+Build 1607 live-discovery repair:
+- Overpass mirrors are now started in parallel; first valid response wins.
+- Losing mirror request is cancelled immediately after a winner returns.
+- This removes sequential per-server timeout accumulation.
+
+Previous Build 1606 live-discovery repair:
 - Private.coffee is now primary; obsolete Kumi endpoint removed.
 - Discovery query reduced from 8 seeds x 5 feature families to 4 seed place lookups.
 - Two progressive passes maximum; returns immediately after 6 usable live regions.

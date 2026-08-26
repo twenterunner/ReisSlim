@@ -78,10 +78,9 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
-async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context){
-  const controller=new AbortController();
+async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,context,controller=new AbortController()){
   const startedAt=Date.now();
-  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  const timer=setTimeout(()=>controller.abort('timeout'),timeoutMs);
   onProgress?.({...context,type:'endpoint-start',endpoint,startedAt});
   try{
     const response=await fetchImpl(endpoint,{
@@ -95,8 +94,9 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
     onProgress?.({...context,type:'endpoint-success',endpoint,elapsedMs:Date.now()-startedAt,candidateElements:payload?.elements?.length||0});
     return{payload,endpoint};
   }catch(error){
-    const timeout=error?.name==='AbortError';
-    onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    const raceCancelled=controller.signal.aborted&&controller.signal.reason==='race-won';
+    const timeout=error?.name==='AbortError'&&controller.signal.reason!=='race-won';
+    if(!raceCancelled)onProgress?.({...context,type:'endpoint-failure',endpoint,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
     throw error;
   }finally{
     clearTimeout(timer);
@@ -120,24 +120,27 @@ async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,on
     }catch{}
   }else onProgress?.({...context,type:'cache-bypass',endpoint:'live'});
 
-  let lastError=null;
-  for(let endpointIndex=0;endpointIndex<endpoints.length;endpointIndex++){
-    const endpoint=endpoints[endpointIndex];
-    try{
-      const result=await fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length});
-      return{payload:result.payload,cached:false,endpoint,cacheKey:key};
-    }catch(error){
-      lastError=error;
-      if(endpointIndex<endpoints.length-1){
-        onProgress?.({...context,type:'endpoint-switch',failedEndpoint:endpoint,nextEndpoint:endpoints[endpointIndex+1],endpointIndex,totalEndpoints:endpoints.length});
-      }
-    }
+  // Race all configured Overpass mirrors in parallel. The first valid response wins;
+  // remaining requests are cancelled immediately so one slow mirror cannot serially
+  // add another full timeout to the discovery path.
+  const controllers=endpoints.map(()=>new AbortController());
+  const attempts=endpoints.map((endpoint,endpointIndex)=>
+    fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,{...context,endpointIndex,totalEndpoints:endpoints.length},controllers[endpointIndex])
+      .then(result=>({result,endpointIndex}))
+  );
+  try{
+    const {result,endpointIndex}=await Promise.any(attempts);
+    controllers.forEach((controller,index)=>{if(index!==endpointIndex&&!controller.signal.aborted)controller.abort('race-won')});
+    return{payload:result.payload,cached:false,endpoint:result.endpoint,cacheKey:key};
+  }catch(error){
+    controllers.forEach(controller=>{if(!controller.signal.aborted)controller.abort('race-won')});
+    const failures=error?.errors||[];
+    const timedOut=failures.length>0&&failures.every(item=>item?.name==='AbortError');
+    const reason=timedOut
+      ? 'Live ontdekking duurde te lang op alle OpenStreetMap-servers.'
+      : 'Live OpenStreetMap-ontdekking is tijdelijk niet beschikbaar.';
+    return{payload:null,cached:false,reason};
   }
-
-  const reason=lastError?.name==='AbortError'
-    ? 'Live ontdekking duurde te lang op alle OpenStreetMap-servers.'
-    : 'Live OpenStreetMap-ontdekking is tijdelijk niet beschikbaar.';
-  return{payload:null,cached:false,reason};
 }
 
 export async function discoverDestinationBatch(
