@@ -2,11 +2,11 @@ import './ui-feature-flags.js';
 import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
 
-const DEFAULT_ENDPOINT='https://overpass-api.de/api/interpreter';
+const DEFAULT_ENDPOINTS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
 const GOLDEN_ANGLE=137.507764;
-const DEFAULT_BATCH_SEEDS=16;
+const DEFAULT_BATCH_SEEDS=6;
 const DEFAULT_RESULT_LIMIT=72;
-const DISCOVERY_PASSES=3;
+const DISCOVERY_PASSES=4;
 const countryNames={
 AL:'Albanië',AD:'Andorra',AT:'Oostenrijk',BY:'Belarus',BE:'België',BA:'Bosnië en Herzegovina',BG:'Bulgarije',
 HR:'Kroatië',CY:'Cyprus',CZ:'Tsjechië',DK:'Denemarken',EE:'Estland',FI:'Finland',FR:'Frankrijk',DE:'Duitsland',
@@ -78,12 +78,12 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
-async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoint,storage}){const query=buildDiscoveryQuery(trip,cursor);if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};const key=`reisslim.destination-discovery.v5:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;try{const cached=storage?.getItem(key);if(cached)return{payload:JSON.parse(cached),cached:true}}catch{}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);try{const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)throw new Error(`Overpass ${response.status}`);const payload=await response.json();try{storage?.setItem(key,JSON.stringify(payload))}catch{}return{payload,cached:false}}catch(error){return{payload:null,cached:false,reason:error.name==='AbortError'?'Live ontdekking duurde te lang.':'Live ontdekking is tijdelijk niet beschikbaar.'}}finally{clearTimeout(timer)}}
-export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fetchImpl=fetch,endpoint=DEFAULT_ENDPOINT,storage=globalThis.localStorage}={}){
+async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage}){const query=buildDiscoveryQuery(trip,cursor);if(!query.includes('nwr('))return{payload:null,cached:false,reason:'Geen roadtripbestemmingen binnen het ingestelde bereik.'};const key=`reisslim.destination-discovery.v6:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;try{const cached=storage?.getItem(key);if(cached)return{payload:JSON.parse(cached),cached:true}}catch{}const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);try{let lastError=null;for(const endpoint of endpoints){try{const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)throw new Error(`Overpass ${response.status}`);const payload=await response.json();try{storage?.setItem(key,JSON.stringify(payload))}catch{}return{payload,cached:false,endpoint}}catch(error){lastError=error}}throw lastError||new Error('Overpass unavailable')}catch(error){return{payload:null,cached:false,reason:error.name==='AbortError'?'Live ontdekking duurde te lang.':'Live ontdekking is tijdelijk niet beschikbaar.'}}finally{clearTimeout(timer)}}
+export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fetchImpl=fetch,endpoints=DEFAULT_ENDPOINTS,storage=globalThis.localStorage}={}){
   const combined=[];let usedCache=true,lastReason='';
-  for(let pass=0;pass<DISCOVERY_PASSES;pass++){const currentCursor=cursor*DISCOVERY_PASSES+pass,result=await fetchDiscoveryPayload(trip,currentCursor,{fetchImpl,endpoint,storage});usedCache=usedCache&&Boolean(result.cached);if(result.payload?.elements?.length)combined.push(...result.payload.elements);if(result.reason)lastReason=result.reason}
+  for(let pass=0;pass<DISCOVERY_PASSES;pass++){const currentCursor=cursor*DISCOVERY_PASSES+pass,result=await fetchDiscoveryPayload(trip,currentCursor,{fetchImpl,endpoints,storage});usedCache=usedCache&&Boolean(result.cached);if(result.payload?.elements?.length)combined.push(...result.payload.elements);if(result.reason)lastReason=result.reason}
   if(!combined.length)return{destinations:[],live:false,reason:lastReason||'Geen nieuwe roadtripregio’s gevonden.'};
   const destinations=normalizeDiscoveredDestinations(trip,{elements:combined},{excludedIds,limit:DEFAULT_RESULT_LIMIT});
   return{destinations,live:true,cached:usedCache,source:'OpenStreetMap Overpass',passes:DISCOVERY_PASSES,candidateElements:combined.length}
 }
-export const destinationDiscoveryConfig=Object.freeze({endpoint:DEFAULT_ENDPOINT,attribution:'© OpenStreetMap-bijdragers, ODbL',coverage:'Europe + South Africa + Namibia; roadtrip-from-user-origin',batchSeeds:DEFAULT_BATCH_SEEDS,discoveryPasses:DISCOVERY_PASSES,resultLimit:DEFAULT_RESULT_LIMIT});
+export const destinationDiscoveryConfig=Object.freeze({endpoints:DEFAULT_ENDPOINTS,attribution:'© OpenStreetMap-bijdragers, ODbL',coverage:'Europe + South Africa + Namibia; roadtrip-from-user-origin',batchSeeds:DEFAULT_BATCH_SEEDS,discoveryPasses:DISCOVERY_PASSES,resultLimit:DEFAULT_RESULT_LIMIT});

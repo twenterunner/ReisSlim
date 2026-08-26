@@ -1,49 +1,39 @@
-# ReisSlim v1.4.6 — roadtrip planner
+# ReisSlim v1.4.7 — origin-based roadtrip planner
 
-ReisSlim is a mobile-first roadtrip planning assistant. It plans from the **start location entered by the user** and plans road travel only.
+ReisSlim plans roadtrips from the start location entered by the user.
 
-## Current scope
+## v1.4.7 reliability fix
 
-- Roadtrips only.
-- Start from any user-entered location that OpenStreetMap Nominatim can geocode, or from the browser's current-location coordinates.
-- Live destination discovery from OpenStreetMap around that actual start point.
-- Coverage is not restricted to a short fixed destination catalogue.
-- Intended geographic coverage: **all of Europe, South Africa and Namibia**, subject to realistic road reach from the selected origin.
-- Route types:
-  - **Loop** — return using a substantially different corridor.
-  - **Out and back** — return over the same route.
-  - **Open ended** — finish at the destination instead of returning to the start.
-- Car, motorcycle, motorhome and caravan planning.
-- User preferences materially influence destination ranking.
-- Named live restaurants, accommodation, activities, fuel and rest locations are used when available from OpenStreetMap.
-- Selected named places are added to the map and GPX waypoints.
-- Open-Meteo is used for weather enrichment.
-- OSRM/OpenRouteService can provide live road routing where configured/available.
+v1.4.6 could show **0 feasible options** because the static catalogue had been
+made completely empty while the first screen rendered before live OpenStreetMap
+discovery completed. The live Overpass request was also too large, so a timeout
+could leave the portfolio permanently empty.
 
-## Origin-based discovery
+v1.4.7 fixes that architecture:
 
-The old fixed destination catalogue and obsolete long-distance aviation test fixture have been removed.
+- live discovery remains the primary expansion mechanism;
+- Overpass searches are smaller (6 geographic seeds per request) and use four
+  staged passes;
+- two Overpass endpoints are tried for resilience;
+- a broad fallback anchor set covers Europe, South Africa and Namibia, so an
+  external API timeout no longer means zero options;
+- every fallback destination is recalculated from the user's actual origin and
+  hard-filtered by realistic roadtrip reach;
+- route distance is now calculated directly from the actual user origin rather
+  than scaling an old Saasveld baseline;
+- generated intermediate travel zones allow multi-day routes even when a fallback
+  anchor has no curated routeStops.
 
-A trip starting in Saasveld discovers roadtrip candidates outward from Saasveld. A trip starting in Cape Town discovers roadtrip candidates outward from Cape Town. A trip starting in Windhoek discovers candidates outward from Windhoek. ReisSlim does **not** insert a flight between Europe and southern Africa.
+## Coverage
 
-The practical search radius depends on trip duration, maximum driving time per day, vehicle and route topology.
+All European countries are represented by at least one fallback roadtrip anchor,
+plus multiple anchors in South Africa and Namibia. Live OpenStreetMap discovery
+then expands beyond those anchors.
 
-## Data sources
-
-ReisSlim can use:
-
-- OpenStreetMap Nominatim — geocoding typed start/destination locations.
-- OpenStreetMap Overpass — destination and named-place discovery.
-- OSRM / OpenRouteService — road routing where available.
-- Open-Meteo — weather.
-- Google Maps links — convenient external review lookup for named places. ReisSlim does not invent consumer star ratings when no ratings API is connected.
-
-## Important limitations
-
-Cross-water roadtrips can require ferry-aware routing. ReisSlim must not assume a flight to bridge disconnected regions. Prices, availability, opening hours and review scores should be checked at the linked source.
+A start in Saasveld only produces locations reachable as a roadtrip from Saasveld.
+A start in Cape Town or Windhoek is treated in exactly the same way from those
+coordinates. No flight is inserted.
 
 ## Release
 
-**ReisSlim v1.4.6 · Build 1406**
-
-This release specifically fixes deployment clarity: the ZIP now contains the actual `README.md` used by GitHub, not just a separate `README_UPDATE.txt`.
+**ReisSlim v1.4.7 · Build 1407**

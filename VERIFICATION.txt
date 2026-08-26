@@ -7,14 +7,14 @@ syntax destination-engine.js: PASS
 syntax service-worker.js: PASS
 syntax recommendation-engine.js: PASS
 syntax itinerary-engine.js: PASS
+syntax route-engine.js: PASS
 syntax place-provider.js: PASS
 syntax route-topology.js: PASS
 syntax destinations.js: PASS
-config version: PASS
-header version: PASS
-service worker cache: PASS
-real README included: PASS
-no fly-drive in user README: PASS
-no fly-drive in update README: PASS
-static destinations empty: PASS
-typed-origin geocoder present: PASS
+release: PASS
+fallback nonempty: PASS
+actual-origin route calc: PASS
+generated route stops: PASS
+lighter discovery: PASS
+two endpoints: PASS
+cache rev: PASS
