@@ -1,9 +1,10 @@
-destination-provider.js: PASS 
-proposal-engine.js: PASS 
-ui-feature-flags.js: PASS 
-config.js: PASS 
-service-worker.js: PASS 
-config revision: PASS
-service worker cache revision: PASS
-header revision: PASS
-new UI module precached: PASS
+syntax config.js: PASS
+syntax destination-provider.js: PASS
+syntax proposal-engine.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax service-worker.js: PASS
+revision config: PASS
+revision service worker: PASS
+network-first code: PASS
+expanded discovery retained: PASS
+header revision retained: PASS

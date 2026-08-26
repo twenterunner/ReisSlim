@@ -1,28 +1,45 @@
-ReisSlim v1.4.0 / Build 1400
+ReisSlim v1.4.1 / Build 1401
 
-This supersedes the previous ZIP.
+ROOT CAUSE VERIFIED IN THE CURRENT GITHUB REPOSITORY
+----------------------------------------------------
+The v1.4.0 functional files ARE on GitHub:
+- config.js says VERSION 1.4.0 / BUILD 1400
+- destination-provider.js has 16 seeds, 3 passes and a 72-result limit
+- ui-feature-flags.js exists
+- service-worker.js says v1.4.0-build-1400
 
-IMPORTANT: upload ALL files in this ZIP to the repository root.
+However index.html is still the old deployment shell:
+- styles.css?v=1000
+- app.js?v=1000
+- footer text still says v1.0.0 / Build 1000
+- Travel Readiness markup is still present
 
-Why the previous update could still look unchanged:
-- The previous ZIP did not bump config.js VERSION/BUILD.
-- The service worker cache was still v1.0.0-build-1000 and did not cache the new UI feature file.
-- Therefore an installed/PWA copy could continue serving old modules.
-- This release bumps the cache and adds the new module to the precache list.
+That means the app can continue requesting old cache-keyed code. The previous
+service worker was also cache-first for JS/CSS, so stale modules could survive.
 
-Functional update:
-- 16 geographic discovery seeds per pass (was 8).
-- 3 discovery passes per live discovery action.
-- Up to 72 normalized live candidates per action (was 16).
-- Wider OSM feature types: villages, parks/protected areas, peaks, bays, beaches, water, attractions and resorts.
-- Multi-ring geographic coverage and spatial deduplication.
-- Proposal portfolio engine can expose 20-30 diverse candidates internally instead of a tiny shortlist.
-- Stronger diversity by country, distance band and theme.
-- Travel Readiness hidden for now.
-- Revision v1.4.0 · 1400 is shown in the top header.
-- Service worker cache bumped to force deployment refresh.
+v1.4.1 FIX
+----------
+1. Revision bumped to v1.4.1 / Build 1401.
+2. Service worker now uses NETWORK-FIRST + cache:'reload' for JS, CSS, JSON,
+   modules and workers.
+3. Old ReisSlim caches are deleted on activation.
+4. The header revision remains generated dynamically by ui-feature-flags.js.
+5. Expanded destination discovery from v1.4.0 remains included.
+6. Travel Readiness remains hidden by ui-feature-flags.js.
 
-Verification performed:
-- JavaScript syntax checks for every JS file in this ZIP.
-- Static checks that config VERSION/BUILD, service worker cache and header revision all equal 1.4.0 / 1400.
-- Full browser/live-API acceptance cannot be executed from this offline packaging environment.
+Upload ALL five files in this ZIP to the repository root:
+- config.js
+- destination-provider.js
+- proposal-engine.js
+- ui-feature-flags.js
+- service-worker.js
+
+After GitHub Pages publishes, open the site once in a normal browser tab.
+The new service worker must install/activate; the next app load should show
+v1.4.1 · 1401 in the header.
+
+NOTE
+----
+index.html itself is still old in the repository. v1.4.1 is deliberately made
+robust against that by bypassing stale JS/CSS cache keys. A later cleanup
+release should also update index.html's ?v= query strings and static footer.

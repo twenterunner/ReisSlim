@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE = Object.freeze({ version: '1.4.0', build: '1400' });
+const REISSLIM_RELEASE = Object.freeze({ version: '1.4.1', build: '1401' });
 
 function addRevisionToHeader() {
   const brand = document.querySelector('.brand');
