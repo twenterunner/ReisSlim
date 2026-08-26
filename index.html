@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.7.4-1704-mobile-interaction-fix">
+  <meta name="reisslim-build" content="1.7.5-1705-assistant-poi-photo-fix">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1704">
+  <link rel="manifest" href="manifest.webmanifest?v=1705">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1704">
-  <link rel="stylesheet" href="compact-ui.css?v=1704">
+  <link rel="stylesheet" href="styles.css?v=1705">
+  <link rel="stylesheet" href="compact-ui.css?v=1705">
 </head>
 <body>
   <header class="topbar">
@@ -30,10 +30,8 @@
         <div class="hero-copy">
           <p class="eyebrow">Jouw avontuur begint hier</p>
           <h1>Waar brengt jouw volgende <em>roadtrip</em> je naartoe?</h1>
-          <div class="hero-chips"><span>🏍 Motor</span><span>📍 Vanaf jouw vertrekpunt</span><span>✨ Live & persoonlijk</span></div>
-          <div class="hero-actions"><button id="startPlanningBtn" type="button">➤ Start een nieuwe reis</button><button class="hero-secondary" data-go-planner type="button">✦ Verras me</button></div>
+          <div class="hero-actions"><button id="startPlanningBtn" type="button">➤ Start een nieuwe reis</button></div>
         </div>
-        <aside class="hero-glass"><strong>ReisSlim zoekt slimmer</strong><ul><li>✓ Echte routes</li><li>✓ Specifieke stops</li><li>✓ Realistisch budget</li></ul><span>Alles in één roadtrip</span></aside>
       </section>
       <section class="dashboard-grid premium-grid">
         <article class="panel current-trip-card premium-current">
@@ -213,7 +211,7 @@
         <div id="planWarnings" aria-live="polite"></div>
         <div id="weatherSummary" class="weather-summary"></div>
         <section class="readiness-card hidden"><strong id="readinessScore">—</strong><p id="readinessDisclaimer"></p><div id="readinessList"></div></section>
-        <section class="assistant-card"><p class="eyebrow">ReisSlim Assistant</p><h2>Pas je reis aan in gewone taal</h2><div class="assistant-input"><input id="assistantMessage" placeholder="Bijvoorbeeld: maak de reis rustiger"><button id="assistantPreviewBtn" type="button">Bekijk wijziging</button></div><div id="assistantPreview"></div><div class="actions compact"><button id="assistantApplyBtn" class="hidden" type="button">Bevestig wijziging</button><button id="assistantCancelBtn" class="secondary hidden" type="button">Annuleer</button></div></section>
+        <section class="assistant-card assistant-premium"><p class="eyebrow">ReisSlim Assistant</p><h2>Vertel wat je anders wilt</h2><div class="assistant-examples"><button type="button" data-assistant-example="Maak de reis rustiger en beperk rijden tot 4 uur per dag">Meer rust</button><button type="button" data-assistant-example="Maak de route mooier en geef natuur en bergen meer gewicht">Mooier rijden</button><button type="button" data-assistant-example="Maak de reis goedkoper en verminder hotelwissels">Lagere kosten</button></div><div class="assistant-input"><input id="assistantMessage" placeholder="Bijv. minder rijden, meer cultuur, max 4 uur per dag..."><button id="assistantPreviewBtn" type="button">Bekijk wijziging</button></div><div id="assistantPreview"></div><div class="actions compact"><button id="assistantApplyBtn" class="hidden" type="button">Bevestig wijziging</button><button id="assistantCancelBtn" class="secondary hidden" type="button">Annuleer</button></div></section>
         <p id="gpxNotice" class="trust-notice"></p>
         <div class="itinerary-optimizer-grid">
           <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
@@ -224,7 +222,7 @@
             <div id="optimizationSummary"></div>
             <label>Optimalisatiemodus<select id="optimizationMode"><option value="balanced">Gebalanceerd</option><option value="relaxed">Meer rust</option><option value="value">Lagere kosten</option><option value="active">Meer beleven</option></select></label>
             <div class="optimizer-locks"><strong>Vergrendel</strong><label><input type="checkbox" data-optimizer-lock="route"> Route</label><label><input type="checkbox" data-optimizer-lock="accommodation"> Verblijven</label><label><input type="checkbox" data-optimizer-lock="activities"> Activiteiten</label><label><input type="checkbox" data-optimizer-lock="budget"> Budgetkeuzes</label></div>
-            <div id="optimizationPreview"></div><button id="improveTripBtn" type="button">Bekijk verbeteringen</button><button id="applyOptimizationBtn" class="hidden" type="button">Pas toe</button><button id="rejectOptimizationBtn" class="secondary hidden" type="button">Sluit voorstel</button><button id="undoOptimizeBtn" class="secondary hidden" type="button">Ongedaan maken</button>
+            <div id="optimizationPreview"></div><button id="improveTripBtn" type="button">Verbeter reis</button><button id="applyOptimizationBtn" class="hidden" type="button">Pas verbeteringen toe</button><button id="rejectOptimizationBtn" class="secondary hidden" type="button">Sluit voorstel</button><button id="undoOptimizeBtn" class="secondary hidden" type="button">Ongedaan maken</button>
           </aside>
         </div>
       </section>
@@ -243,9 +241,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.7.4 · Build 1704</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.7.5 · Build 1705</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1704"></script>
-  <script type="module" src="app.js?v=1704"></script>
+  <script src="ui-feature-flags.js?v=1705"></script>
+  <script type="module" src="app.js?v=1705"></script>
 </body>
 </html>

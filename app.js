@@ -363,10 +363,44 @@ function initialize(){
   $('exportJsonBtn').addEventListener('click',()=>state.destination&&downloadJson(exportState(),`${state.destination.id}-${state.trip.startDate}`));
   $('exportGpxBtn').addEventListener('click',async()=>{if(!state.destination)return;$('exportStatus').textContent='Volledige wegroute en waypoints ophalen…';try{const result=await downloadGpx(state.trip,state.destination,state.plan);$('exportStatus').textContent=`GPX klaar: ${result.trackPoints} routepunten · ${result.specificWaypoints} specifieke waypoints.`}catch(error){console.error(error);$('exportStatus').textContent=`GPX mislukt: ${error.message||'live wegroute niet beschikbaar'}`}});
   $('loadDemoBtn').addEventListener('click',()=>{state.trip=normalizeTrip({...defaults(),id:state.trip?.id,preferences:['natuur','bergen','motor'],preferenceWeights:{natuur:3,bergen:3,motor:2}});writeTripForm(state.trip);persistDraft()});
-  $('assistantPreviewBtn').addEventListener('click',()=>{state.assistantPreview=interpretAssistantMessage($('assistantMessage').value,state.trip);$('assistantPreview').textContent=state.assistantPreview.summary||state.assistantPreview.message||'';$('assistantApplyBtn').classList.toggle('hidden',!state.assistantPreview.understood);$('assistantCancelBtn').classList.toggle('hidden',!state.assistantPreview.understood)});
+  $('assistantPreviewBtn').addEventListener('click',()=>{
+    state.assistantPreview=interpretAssistantMessage($('assistantMessage').value,state.trip);
+    $('assistantPreview').innerHTML=state.assistantPreview.understood?`<div class="assistant-result ok"><strong>Voorstel</strong><p>${state.assistantPreview.summary}</p></div>`:`<div class="assistant-result warn">${state.assistantPreview.message||''}</div>`;
+    $('assistantApplyBtn').classList.toggle('hidden',!state.assistantPreview.understood);
+    $('assistantCancelBtn').classList.toggle('hidden',!state.assistantPreview.understood);
+  });
   $('assistantCancelBtn').addEventListener('click',()=>{$('assistantPreview').textContent='';$('assistantApplyBtn').classList.add('hidden');$('assistantCancelBtn').classList.add('hidden')});
-  $('assistantApplyBtn').addEventListener('click',()=>{if(!state.assistantPreview?.understood)return;state.trip=normalizeTrip(applyAssistantPatch(state.trip,state.assistantPreview.patch));writeTripForm(state.trip);if(state.destination)applyDestination(state.destination,false)});
-  $('improveTripBtn').addEventListener('click',()=>{if(!state.plan)return;const locks=Object.fromEntries([...document.querySelectorAll('[data-optimizer-lock]')].map(box=>[box.dataset.optimizerLock,box.checked]));state.optimizationProposal=proposeOptimizations(state.trip,state.destination,state.plan,{mode:$('optimizationMode').value,locks});renderOptimizationPreview(state)});
+  document.querySelectorAll('[data-assistant-example]').forEach(button=>button.addEventListener('click',()=>{
+    $('assistantMessage').value=button.dataset.assistantExample;
+    $('assistantPreviewBtn').click();
+  }));
+  $('assistantMessage').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('assistantPreviewBtn').click()}});
+
+  $('assistantApplyBtn').addEventListener('click',()=>{
+    if(!state.assistantPreview?.understood)return;
+    state.trip=normalizeTrip(applyAssistantPatch(state.trip,state.assistantPreview.patch));
+    writeTripForm(state.trip);
+    if(state.assistantPreview.optimizerMode&&$('optimizationMode'))$('optimizationMode').value=state.assistantPreview.optimizerMode;
+    refreshPortfolio();
+    if(state.destination){
+      const refreshed=state.ranked.find(item=>item.id===state.destination.id)||state.destination;
+      applyDestination(refreshed,false);
+      const locks=Object.fromEntries([...document.querySelectorAll('[data-optimizer-lock]')].map(box=>[box.dataset.optimizerLock,box.checked]));
+      state.optimizationProposal=proposeOptimizations(state.trip,refreshed,state.plan,{mode:state.assistantPreview.optimizerMode||$('optimizationMode').value,locks});
+      renderOptimizationPreview(state);
+    }
+    persistDraft('Assistant-wijziging toegepast');
+    $('assistantPreview').innerHTML='<div class="assistant-result applied">✓ Reis opnieuw opgebouwd met je opdracht.</div>';
+    $('assistantApplyBtn').classList.add('hidden');$('assistantCancelBtn').classList.add('hidden');
+  });
+  $('improveTripBtn').addEventListener('click',()=>{
+    if(!state.plan)return;
+    const locks=Object.fromEntries([...document.querySelectorAll('[data-optimizer-lock]')].map(box=>[box.dataset.optimizerLock,box.checked]));
+    state.optimizationProposal=proposeOptimizations(state.trip,state.destination,state.plan,{mode:$('optimizationMode').value,locks});
+    renderOptimizationPreview(state);
+    setStatus(state.optimizationProposal.meaningful?'Sterkste haalbare verbetercombinatie gevonden':'Geen betekenisvolle verbetering zonder compromissen');
+    $('optimizationPreview')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
   $('applyOptimizationBtn').addEventListener('click',()=>{if(!state.plan||!state.optimizationProposal)return;const ids=[...document.querySelectorAll('[data-optimization-action]:checked')].map(box=>box.dataset.optimizationAction);if(!ids.length)return;state.undoSnapshot=clone({plan:state.plan,budget:state.budget,quality:state.quality,validation:state.validation,constraintStatus:state.constraintStatus});Object.assign(state,applyOptimizationProposal(state.trip,state.destination,state.plan,ids));renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);persistDraft()});
   $('rejectOptimizationBtn').addEventListener('click',()=>{state.optimizationProposal=null;renderOptimizationPreview(state)});
   $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderMap(state.plan)});
