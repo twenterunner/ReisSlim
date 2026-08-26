@@ -1,41 +1,23 @@
-# ReisSlim v1.5.1 — specific places + complete GPX route
+# ReisSlim v1.5.2 — preferences, specific places and full GPX
 
-This release addresses two hard requirements.
+v1.5.2 fixes three regressions/failures seen in v1.5.1.
 
-## 1. Specific stops and accommodation
+## Preferences
+v1.5.1 accidentally replaced the UI feature file that contained automatic
+re-ranking. This release restores it, and also includes the v1.5.0
+match-first/focus-purity ranking files so selecting Culture versus Mountains
+changes the ranked proposal set.
 
-Generic placeholders such as “lunch stop”, “accommodation” or “rest stop” are
-not treated as recommendations anymore.
+## Specific stops/accommodation
+Named place lookup now tries targeted OpenStreetMap Overpass first and bounded
+OpenStreetMap Nominatim category search as a fallback. Only named results are
+shown; generic placeholders are suppressed.
 
-For every planned recommendation point ReisSlim now performs a **targeted live
-OpenStreetMap Overpass lookup** for the exact category:
-- named hotel / guest house / campsite / caravan site for overnight stays;
-- named restaurant/cafe for meal stops;
-- named fuel station or road service area for fuel/rest;
-- named attraction/viewpoint/museum/historic/nature location for activities.
+## Full GPX road route
+GPX export is strict. It obtains full road geometry for each travel leg from two
+OSRM providers and writes one continuous GPX track. It does not silently fall
+back to a straight start-to-destination line. Export status reports route-point
+and specific-waypoint counts, or a visible error when full road geometry cannot
+be obtained.
 
-Search is progressively widened from 6 km to 14 km to 30 km and retries two
-Overpass providers. Candidate selection uses distance, vehicle suitability and
-available evidence such as website, opening hours, cuisine and official stars.
-
-If the provider cannot return a named place, ReisSlim no longer invents a
-generic place and pretends it is specific. Current consumer ratings still require
-checking the supplied Google Maps review link because OpenStreetMap does not
-provide reliable review-star data.
-
-## 2. GPX contains the whole roadtrip
-
-The old GPX simply exported whatever geometry happened to be in the plan at the
-moment of export. If background live routing had not completed, that could be
-only the start and destination points.
-
-v1.5.1 makes GPX export self-sufficient:
-- it requests full OSRM road geometry for every outward/return/transfer segment;
-- if a provider request fails, it exports a densely sampled corridor rather than
-  only two points;
-- it creates one continuous GPX `<trk>` covering the complete trip;
-- it additionally writes each day as a GPX `<rte>`;
-- all resolved named restaurants, accommodation and other stops are GPX
-  waypoints with web/map links.
-
-**ReisSlim v1.5.1 · Build 1501**
+**ReisSlim v1.5.2 · Build 1502**

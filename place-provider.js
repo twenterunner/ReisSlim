@@ -118,6 +118,21 @@ async function queryEndpoint(query,endpoint,fetchImpl,timeoutMs){
   return normalizeOverpassPlaces(await fetchJson(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body},timeoutMs,fetchImpl));
 }
 
+
+async function fetchNominatimCategory(item,fetchImpl,timeoutMs=3500){
+  const qMap={accommodation:['hotel','guest house','camping'],restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area'],service:['fuel'],activity:['museum','attraction','viewpoint']};
+  const queries=qMap[item.type]||qMap.activity,delta=.22,viewbox=[item.point.lon-delta,item.point.lat+delta,item.point.lon+delta,item.point.lat-delta].join(',');
+  for(const q of queries){
+    try{
+      const url=new URL(NOMINATIM_URL);url.search=new URLSearchParams({q,format:'jsonv2',limit:'8',bounded:'1',viewbox,addressdetails:'1',extratags:'1'});
+      const rows=await fetchJson(url,{headers:{accept:'application/json'}},timeoutMs,fetchImpl);
+      const places=(rows||[]).map(row=>{const point={lat:Number(row.lat),lon:Number(row.lon)},name=String(row.name||row.display_name||'').split(',')[0].trim();if(!name||!validCoordinate(point))return null;return{id:`nominatim-${row.place_id}`,type:item.type==='service'?'fuel':item.type,name,point,tags:row.extratags||{},openingHours:row.extratags?.opening_hours||null,website:row.extratags?.website||null,osmUrl:`https://www.openstreetmap.org/${row.osm_type==='node'?'node':row.osm_type==='way'?'way':'relation'}/${row.osm_id}`,mapUrl:mapsSearchUrl(name,point),evidenceScore:1};}).filter(Boolean);
+      if(places.length)return places;
+    }catch{}
+  }
+  return[];
+}
+
 async function fetchSpecificCandidates(item,options,fetchImpl,storage){
   const rounded=`${item.type}:${item.point.lat.toFixed(3)}:${item.point.lon.toFixed(3)}`;
   const key=cacheKey('specific',rounded);
@@ -132,6 +147,8 @@ async function fetchSpecificCandidates(item,options,fetchImpl,storage){
       }catch{}
     }
   }
+  const fallback=await fetchNominatimCategory(item,fetchImpl);
+  if(fallback.length){writeCache(storage,key,fallback);return fallback;}
   return [];
 }
 

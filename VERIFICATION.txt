@@ -1,14 +1,24 @@
-syntax config.js: PASS
-syntax place-provider.js: PASS
-syntax gpx-generator.js: PASS
-syntax ui-feature-flags.js: PASS
+syntax destination-provider.js: PASS
+syntax itinerary-engine.js: PASS
 syntax service-worker.js: PASS
-release: PASS
-targeted accommodation: PASS
-progressive place radii: PASS
-generic places suppressed: PASS
-GPX live OSRM geometry: PASS
-GPX continuous track: PASS
-GPX daily routes: PASS
-GPX specific waypoints: PASS
+syntax recommendation-engine.js: PASS
+syntax routing-provider.js: PASS
+syntax gpx-generator.js: PASS
+syntax config.js: PASS
+syntax proposal-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax route-topology.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax destinations.js: PASS
+syntax route-engine.js: PASS
+syntax place-provider.js: PASS
+syntax trip-model.js: PASS
+revision: PASS
+preference engine included: PASS
+preference auto-rerank: PASS
+Nominatim specific fallback: PASS
+two routing providers: PASS
+single GPX track: PASS
+no straight fallback: PASS
+strict export override: PASS
 cache: PASS

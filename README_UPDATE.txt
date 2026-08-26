@@ -1,9 +1,10 @@
-ReisSlim v1.5.1 / Build 1501
+ReisSlim v1.5.2 / Build 1502
 
-Must-fix release:
-- targeted named stop/accommodation lookup, no generic pseudo-recommendations
-- GPX export fetches full road geometry itself
-- continuous whole-trip track + daily GPX routes + named POI waypoints
-- service-worker cache bumped to 1501
+Fixes:
+- preference re-ranking regression from v1.5.1
+- targeted specific place lookup + Nominatim fallback
+- strict full-road GPX from two OSRM endpoints
+- GPX status shows route-point and specific-waypoint count
+- cache bumped to 1502
 
-Upload ALL files in this ZIP to the deployed repository root.
+Upload ALL files in this ZIP.
