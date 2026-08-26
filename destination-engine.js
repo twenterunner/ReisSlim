@@ -20,6 +20,35 @@ export function scoreDestination(trip,destination){const month=new Date(`${trip.
  explanation:constraintStatus.exact?`Je voorkeuren wegen hier direct mee: ${matchSentence}. Gewogen voorkeursmatch ${Math.round(preference.coverage*100)}%. Daarnaast past de bestemming binnen je ingestelde roadtripgrenzen.`:`De inhoudelijke match is ${Math.round(preference.coverage*100)}%, maar een harde roadtripvoorwaarde wordt overschreden.`}
 }
 const byMatch=(a,b)=>Number(b.intentMatch)-Number(a.intentMatch)||b.preferenceCoverage-a.preferenceCoverage||b.score-a.score||a.estimate-b.estimate||a.name.localeCompare(b.name,'nl');
-export function rankDestinationGroups(trip,destinationList){const scored=destinationList.map(destination=>scoreDestination(trip,destination)),exact=scored.filter(item=>item.category==='exact').sort(byMatch),stretched=scored.filter(item=>item.category==='stretch').sort((a,b)=>a.constraintStatus.stretchPenalty-b.constraintStatus.stretchPenalty||byMatch(a,b)).slice(0,STRETCH_LIMITS.visibleProposals),rejected=scored.filter(item=>item.category==='rejected').sort((a,b)=>a.constraintStatus.violations.length-b.constraintStatus.violations.length||byMatch(a,b));return{exact,stretched,rejected,visible:[...exact,...stretched],closestAdjustments:closestAdjustments(rejected)}}
+
+function cheapCatalogPreselect(trip, destinationList, maximum = 24) {
+  const origin = resolveOrigin(trip);
+  const selectedPrefs = new Set(trip.preferences || []);
+  const weightFor = id => Number(trip.preferenceWeights?.[id] || 2);
+  const productiveSpeed = trip.transport === 'motorcycle' ? 72 : trip.transport === 'caravan' ? 62 : trip.transport === 'motorhome' ? 66 : 78;
+  const outboundDays = trip.routeTopology === 'open-ended'
+    ? Math.max(1, Number(trip.days || 3) - 1)
+    : Math.max(1, Math.floor((Number(trip.days || 3) - 1) / 2));
+  const reachKm = Math.max(250, Number(trip.maxDrive || 5) * productiveSpeed * outboundDays * 1.12);
+
+  const scored = (destinationList || []).map((destination, index) => {
+    const point = destination.bases?.[0];
+    const directKm = origin && point ? haversineKm(origin, point) : null;
+    const estimatedRoadKm = Number.isFinite(directKm) ? directKm * 1.18 : Number(destination.distanceKm || 99999);
+    const withinReach = estimatedRoadKm <= reachKm;
+    const tagScore = (destination.tags || []).reduce((sum, tag) => sum + (selectedPrefs.has(tag) ? weightFor(tag) : 0), 0);
+    const intent = String(trip.destinationQuery || '').trim().toLocaleLowerCase('nl-NL');
+    const haystack = `${destination.name || ''} ${destination.country || ''} ${(destination.tags || []).join(' ')}`.toLocaleLowerCase('nl-NL');
+    const intentBonus = intent && haystack.includes(intent) ? 50 : 0;
+    const proximity = Number.isFinite(estimatedRoadKm) ? Math.max(0, 30 - estimatedRoadKm / 120) : 0;
+    return { destination, index, withinReach, merit: tagScore * 18 + intentBonus + proximity };
+  });
+
+  const reachable = scored.filter(item => item.withinReach);
+  const pool = reachable.length ? reachable : scored;
+  return pool.sort((a, b) => b.merit - a.merit || a.index - b.index).slice(0, maximum).map(item => item.destination);
+}
+
+export function rankDestinationGroups(trip,destinationList){const preselected=cheapCatalogPreselect(trip,destinationList,24),scored=preselected.map(destination=>scoreDestination(trip,destination)),exact=scored.filter(item=>item.category==='exact').sort(byMatch),stretched=scored.filter(item=>item.category==='stretch').sort((a,b)=>a.constraintStatus.stretchPenalty-b.constraintStatus.stretchPenalty||byMatch(a,b)).slice(0,STRETCH_LIMITS.visibleProposals),rejected=scored.filter(item=>item.category==='rejected').sort((a,b)=>a.constraintStatus.violations.length-b.constraintStatus.violations.length||byMatch(a,b));return{exact,stretched,rejected,visible:[...exact,...stretched],closestAdjustments:closestAdjustments(rejected)}}
 export function rankDestinations(trip,destinationList){return rankDestinationGroups(trip,destinationList).visible}
 export const scoreInRange=score=>clamp(score)===score;

@@ -12,9 +12,8 @@ syntax place-provider.js: PASS
 syntax route-topology.js: PASS
 syntax destinations.js: PASS
 revision: PASS
-known origins bypass network: PASS
-geocode max 3 sec: PASS
-overpass max 4.5 sec: PASS
-3 discovery passes: PASS
-fallback retained: PASS
+preselect max 24: PASS
+reach prefilter: PASS
+initial cards max 10: PASS
+observer throttled: PASS
 cache bump: PASS

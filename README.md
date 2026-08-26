@@ -1,29 +1,32 @@
-# ReisSlim v1.4.8 — responsiveness fix
+# ReisSlim v1.4.9 — proposal-button responsiveness fix
 
-ReisSlim plans roadtrips from the start location entered by the user.
+This release targets the exact freeze reported when pressing **Maak reisvoorstellen**.
 
-## Why v1.4.7 could appear to hang
+## Root cause
 
-The submit workflow waits for `geocodeOrigin()` before showing the final proposal
-portfolio. Even for a built-in origin such as Saasveld, v1.4.7 still called the
-public Nominatim service first. A slow mobile connection or provider delay could
-therefore leave the UI sitting on “Vertrekplaats controleren…” for many seconds.
+The current submit path performs proposal ranking synchronously on the browser's
+main UI thread. After v1.4.7 added a broad Europe / South Africa / Namibia
+fallback catalogue, every proposal request could score the full catalogue and
+then render 20–30 large destination cards in one DOM update.
 
-The live destination discovery also allowed comparatively long Overpass waits.
-Although that part runs in the background, it could make the application feel
-unresponsive on a phone.
+That is unnecessary for the first screen and is particularly expensive on a
+mobile browser.
 
-## v1.4.8
+v1.4.9 changes the workload before the UI is rendered:
 
-- Known start locations such as Saasveld are resolved immediately from the local
-  origin catalogue: no network wait.
-- Arbitrary typed origins still use OpenStreetMap Nominatim, but the user-facing
-  geocode wait is capped at 3 seconds.
-- Live destination discovery is still background enrichment.
-- Individual Overpass discovery requests are capped at 4.5 seconds.
-- Discovery uses 3 staged passes instead of 4.
-- The broad Europe / South Africa / Namibia fallback remains available immediately,
-  so live discovery is not required before proposals can be shown.
-- Actual-origin distance calculation from v1.4.7 remains in place.
+- a cheap geographic + preference pre-filter reduces the expensive scoring set
+  to at most 24 plausible candidates;
+- candidates outside realistic roadtrip reach are removed before full scoring
+  whenever reachable alternatives exist;
+- the initial portfolio is limited to 6–10 cards instead of forcibly rendering
+  20–30 cards;
+- "show more" remains available for additional alternatives;
+- the DOM post-processing observer is animation-frame throttled and temporarily
+  disconnected while it performs its own mutations, preventing avoidable
+  repeated layout work;
+- live OpenStreetMap discovery stays background enrichment and does not need to
+  finish before the first proposals are usable.
 
-**ReisSlim v1.4.8 · Build 1408**
+## Release
+
+**ReisSlim v1.4.9 · Build 1409**
