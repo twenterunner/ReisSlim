@@ -1,34 +1,30 @@
-ReisSlim v1.4.4 / Build 1404
+ReisSlim v1.4.6 / Build 1406
 
-Main fixes
-1. "Waarom deze?" now explicitly explains the preferences that matched:
-   e.g. culture -> cities/heritage/cultural sights; mountains -> mountainous terrain;
-   nice roads -> scenic/curvy-road potential; food -> horeca/local food options.
-   The weighted preference match is still shown, but now with actual reasons.
+ROOT CAUSE OF THE PREVIOUS 'NOT UPDATING' REPORT
+------------------------------------------------
+The GitHub main branch was checked after the v1.4.5 ZIP was supplied:
+- config.js was still v1.4.4 / Build 1404
+- README_UPDATE.txt was still v1.4.4
+- README.md was still the old v1.0 multimodal documentation
 
-2. The four proposal metrics are made more decision-useful in the UI:
-   Voorkeursmatch, Roadtripfit, Seizoenfit and Voertuig/routefit, each with a
-   qualitative interpretation such as "zeer sterk" / "sterk" / "redelijk".
+Therefore the v1.4.5 files had not actually replaced the files in `main`.
 
-3. Route topology now has exactly three roadtrip choices:
-   - Lus — andere route terug
-   - Heen & terug — dezelfde route
-   - Open einde — eindig op bestemming
-   Flight/multimodal modes remain disabled.
+There was also a packaging mistake: previous packages updated
+README_UPDATE.txt, but the GitHub repository landing page displays README.md.
+v1.4.6 includes and replaces the real README.md.
 
-4. Loop duplication reduced:
-   - return corridor offset is dynamic (75–190 km depending on trip scale)
-   - loop overlap uses a tighter 15 km overlap threshold
-   - out-and-back deliberately reuses the same corridor
-   - open-ended does not return to the start
+HOW TO UPDATE
+-------------
+1. Extract this ZIP first.
+2. In GitHub, open the branch that actually deploys the site.
+3. Upload the EXTRACTED FILES, not the ZIP itself.
+4. Choose replace/overwrite for files with the same names.
+5. Commit the upload.
+6. Confirm in GitHub itself that config.js begins with:
+      VERSION = '1.4.6'
+      BUILD = '1406'
+   and README.md starts with:
+      # ReisSlim v1.4.6
+7. Only then refresh the GitHub Pages app.
 
-5. Specific stops/accommodation:
-   - generic placeholders are no longer shown as recommendations
-   - travel days include a lunch recommendation around the mid-route point
-   - accommodation is searched at the overnight point
-   - live place search uses named OSM results only
-   - search radius increased and queries are chunked across route anchors
-   - two Overpass endpoints are tried for resilience
-   - only live named places are exported as recommendation points
-
-Upload all files in this ZIP to the deployed repository root.
+This ZIP contains files at root level, with no enclosing folder.

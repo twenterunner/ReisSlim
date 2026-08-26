@@ -1,15 +1,30 @@
 import { validCoordinate } from './config.js';
 import { haversineKm } from './route-engine.js';
 import { transportId } from './vehicle-intelligence.js';
+const NOMINATIM_URL='https://nominatim.openstreetmap.org/search';
 const OVERPASS_ENDPOINTS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-const WEATHER_URL='https://api.open-meteo.com/v1/forecast',CACHE_PREFIX='reisslim.live.v3.';
+const WEATHER_URL='https://api.open-meteo.com/v1/forecast',CACHE_PREFIX='reisslim.live.v4.';
 const clone=value=>typeof globalThis.structuredClone==='function'?globalThis.structuredClone(value):JSON.parse(JSON.stringify(value));
 function defaultStorage(){try{return globalThis.localStorage||null}catch{return null}}
 function cacheKey(namespace,input){let hash=2166136261;for(const character of String(input)){hash^=character.charCodeAt(0);hash=Math.imul(hash,16777619)}return`${CACHE_PREFIX}${namespace}.${(hash>>>0).toString(36)}`}
 function readCache(storage,key,maxAgeMs){if(!storage)return null;try{const record=JSON.parse(storage.getItem(key));return record&&Date.now()-record.savedAt<=maxAgeMs?record.value:null}catch{return null}}
 function writeCache(storage,key,value){if(!storage)return;try{storage.setItem(key,JSON.stringify({savedAt:Date.now(),value}))}catch{}}
 async function fetchJson(url,options,timeoutMs,fetchImpl){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetchImpl(url,{...options,signal:controller.signal});if(!response.ok)throw new Error(`Live databron antwoordde met ${response.status}.`);return response.json()}finally{clearTimeout(timeout)}}
-export async function geocodeOrigin(){return null}
+export async function geocodeOrigin(origin,options={}){
+  const query=String(origin||'').trim(),fetchImpl=options.fetchImpl||globalThis.fetch;
+  if(!query||typeof fetchImpl!=='function')return null;
+  const storage=options.storage===undefined?defaultStorage():options.storage,key=cacheKey('geocode',query.toLocaleLowerCase('nl-NL'));
+  const cached=readCache(storage,key,90*24*60*60*1000);if(cached)return cached;
+  const url=new URL(options.nominatimUrl||NOMINATIM_URL);
+  url.search=new URLSearchParams({q:query,format:'jsonv2',limit:'1',addressdetails:'1'});
+  try{
+    const result=await fetchJson(url,{headers:{accept:'application/json'}},8000,fetchImpl),match=result?.[0];
+    if(!match)return null;
+    const point={lat:Number(match.lat),lon:Number(match.lon),name:String(match.display_name||query),countryCode:String(match.address?.country_code||'').toUpperCase(),country:String(match.address?.country||''),source:'OpenStreetMap Nominatim'};
+    if(!validCoordinate(point))return null;
+    writeCache(storage,key,point);return point;
+  }catch{return null}
+}
 function uniqueAnchors(plan){const candidates=[];for(const day of plan.days||[]){if(validCoordinate(day.fromPoint))candidates.push(day.fromPoint);for(const waypoint of day.waypoints||[])if(validCoordinate(waypoint))candidates.push(waypoint);if(validCoordinate(day.toPoint)&&!(day.kind==='return'&&day.toPoint.role==='return'))candidates.push(day.toPoint)}const unique=[];for(const point of candidates){if(!unique.some(item=>haversineKm(item,point)<2))unique.push({lat:point.lat,lon:point.lon});if(unique.length>=18)break}return unique}
 function queryFor(points){const clauses=points.flatMap(point=>{const around=`around:18000,${Number(point.lat).toFixed(5)},${Number(point.lon).toFixed(5)}`;return[`nwr(${around})["tourism"~"^(hotel|guest_house|hostel|motel|camp_site|caravan_site)$"]["name"];`,`nwr(${around})["amenity"~"^(restaurant|cafe|fast_food|fuel|charging_station)$"]["name"];`,`nwr(${around})["tourism"~"^(attraction|viewpoint|museum|zoo|theme_park|gallery)$"]["name"];`,`nwr(${around})["historic"]["name"];`,`nwr(${around})["highway"~"^(rest_area|services)$"]["name"];`];});return`[out:json][timeout:18][maxsize:16777216];(${clauses.join('')});out center tags;`}
 export function buildOverpassQueries(plan,chunkSize=4){const anchors=uniqueAnchors(plan),queries=[];for(let i=0;i<anchors.length;i+=chunkSize)queries.push(queryFor(anchors.slice(i,i+chunkSize)));return queries}

@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.4.4',build:'1404'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.4.6',build:'1406'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -18,3 +18,17 @@ function upgradeCards(){
 }
 function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();upgradeCards();const observer=new MutationObserver(()=>upgradeCards());observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();
+
+function removeObsoleteFlyDriveCopy(){
+  const rx=/fly[ -]?(drive|ride|camper)|flydrive|vlucht\s*\+|vliegen|multimodaal/gi;
+  document.querySelectorAll('option,small,p,span,label,legend').forEach(node=>{
+    const txt=(node.textContent||'').trim();
+    if(!txt||!rx.test(txt)){rx.lastIndex=0;return}
+    rx.lastIndex=0;
+    if(node.tagName==='OPTION'){node.remove();return}
+    if(!node.querySelector('input,select,button,a')){
+      node.textContent=txt.replace(rx,'roadtrip').replace(/\s{2,}/g,' ').trim();
+    }
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',removeObsoleteFlyDriveCopy,{once:true});else removeObsoleteFlyDriveCopy();
