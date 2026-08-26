@@ -1,26 +1,26 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.7.2-1702-faithful-premium-layout">
+  <meta name="reisslim-build" content="1.7.3-1703-new-trip-header-fix">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1702">
+  <link rel="manifest" href="manifest.webmanifest?v=1703">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1702">
-  <link rel="stylesheet" href="compact-ui.css?v=1702">
+  <link rel="stylesheet" href="styles.css?v=1703">
+  <link rel="stylesheet" href="compact-ui.css?v=1703">
 </head>
 <body>
   <header class="topbar">
-    <button id="brandBtn" class="brand" type="button" aria-label="Naar dashboard">
+    <div id="brandBtn" class="brand brand-static" aria-label="ReisSlim">
       <span class="brand-mark">R</span>
       <span><strong>ReisSlim</strong><small>Global travel assistant</small></span>
-    </button>
+    </div>
     <button id="newTripBtn" class="icon-button" type="button">＋ Nieuwe reis</button>
   </header>
 
@@ -243,9 +243,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.7.2 · Build 1702</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.7.3 · Build 1703</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1702"></script>
-  <script type="module" src="app.js?v=1702"></script>
+  <script src="ui-feature-flags.js?v=1703"></script>
+  <script type="module" src="app.js?v=1703"></script>
 </body>
 </html>

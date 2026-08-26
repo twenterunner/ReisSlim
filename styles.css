@@ -84,7 +84,7 @@
   .priority-item select{height:36px!important;width:104px!important;min-width:104px!important;max-width:104px!important;font-size:.82rem!important}
 }
 
-/* v1.7.2 spacing repairs */
+/* v1.7.3 spacing repairs */
 .current-trip-details{display:grid;gap:6px}
 .current-trip-details div{display:grid!important;grid-template-columns:minmax(92px,auto) 1fr;column-gap:10px;align-items:baseline}
 .current-trip-details span{display:block;color:var(--muted);line-height:1.25}
@@ -97,7 +97,7 @@
 }
 
 
-/* v1.7.2 premium visual system */
+/* v1.7.3 premium visual system */
 :root{
   --premium-ink:#173833;
   --premium-muted:#60746f;
@@ -174,7 +174,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 }
 
 
-/* v1.7.2 visual-first cleanup */
+/* v1.7.3 visual-first cleanup */
 .live-discovery-progress{padding:12px!important}
 .live-progress-head.compact{margin-bottom:8px}
 .live-progress-steps{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;margin:0!important;padding:0!important}
@@ -232,7 +232,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .proposal-pictogram-strip span{min-height:54px}
   .compare-dock{bottom:78px}
 }
-/* v1.7.2 premium visual redesign */
+/* v1.7.3 premium visual redesign */
 :root{--premium:#07584f;--premium2:#0b7567;--mint:#d9f8e9;--ink:#173b38}
 .premium-hero{position:relative;overflow:hidden;border-radius:30px;min-height:390px;padding:34px;color:white;background-size:cover;background-position:center;box-shadow:0 18px 44px rgba(12,66,59,.18)}
 .home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('assets/home-hero.webp')}
@@ -245,11 +245,11 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 #plannerView #intakeSection{border:0;box-shadow:0 14px 36px rgba(20,60,55,.1)}#plannerView .form-grid>label,#plannerView .vehicle-profile-panel,#plannerView fieldset{border-radius:18px}#plannerView input,#plannerView select,#plannerView textarea{border-radius:14px}#plannerView .check-option{min-height:58px;border-radius:16px}#plannerView button[type=submit]{min-height:58px;font-size:1.08rem;background:linear-gradient(90deg,var(--premium),var(--premium2))}
 @media(max-width:720px){.premium-hero{min-height:430px;padding:24px 20px;border-radius:24px}.premium-hero h1{font-size:2.6rem}.planner-hero{display:block}.hero-glass{display:none}.hero-save{margin-top:22px;min-width:0}.premium-grid{grid-template-columns:1fr}.inspiration-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.inspire-card{min-width:78vw;scroll-snap-align:start}.planner-steps{margin:-12px 8px 12px;padding:10px 8px}.planner-steps span{font-size:.72rem;display:block;text-align:center}.planner-steps b{margin:0 auto 4px}.feature-row{gap:6px}.feature-row span{font-size:.78rem;padding:7px 9px}}
 
-/* v1.7.2 faithful premium planner layout */
+/* v1.7.3 faithful premium planner layout */
 .home-hero{
   background-image:
     linear-gradient(90deg,rgba(4,42,38,.80) 0%,rgba(4,42,38,.48) 46%,rgba(4,42,38,.18) 100%),
-    url("https://images.squarespace-cdn.com/content/v1/53bae0a6e4b0323f1542724b/1702803512695-JW78TIC8V3E2WL2A5YVK/Lorraine-Spence-Adventure-Rider-Radio-Motorcycle-Podcast-5.jpg")!important;
+    url("https://images.squarespace-cdn.com/content/v1/53bae0a6e4b0323f1542724b/1703803512695-JW78TIC8V3E2WL2A5YVK/Lorraine-Spence-Adventure-Rider-Radio-Motorcycle-Podcast-5.jpg")!important;
   background-size:cover!important;background-position:center!important;
 }
 .planner-hero.clean-photo-hero{
@@ -308,3 +308,9 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .planner-search-bar{grid-template-columns:1fr auto;bottom:70px}.planner-search-bar>div{display:none}.planner-search-bar #loadDemoBtn{display:none}
   .vehicle-profile-panel{grid-template-columns:1fr!important}.more-options-grid{grid-template-columns:1fr}
 }
+
+/* v1.7.3 header cleanup */
+.topbar{grid-template-columns:minmax(0,1fr) auto!important}
+.topbar .brand-static{cursor:default!important;pointer-events:none!important;background:transparent!important;border:0!important;padding:0!important}
+.topbar>button:not(#newTripBtn){display:none!important}
+#newTripBtn{display:inline-flex!important;align-items:center!important;justify-content:center!important}
