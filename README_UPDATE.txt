@@ -1,18 +1,18 @@
-ReisSlim v1.7.0 · Build 1700
+ReisSlim v1.7.2 · Build 1702
 
-VISUAL-FIRST / MAP INTERACTION / COMPARISON FIX
+Faithful implementation of the approved visual concepts.
 
-- Live discovery progress reduced to four compact visual steps.
-- Completed search round now receives a ✓ instead of remaining an active bullet.
-- Proposal cards use more photos (up to 8), pictogram strength strips and short
-  bullet highlights instead of long visible paragraphs.
-- Long proposal summaries are visually clamped; detailed evidence remains available.
-- Comparison selection is hardened, persisted and surfaced through a floating
-  compare dock when 2-4 proposals are selected.
-- GPX POIs are now large numbered map pins, not small dots.
-- POI list and map are interactive: tap a POI row to zoom to it, highlight its
-  marker and open its labelled popup.
-- Every day route retains a distinct route colour; POI category and day are both
-  encoded visually.
+- Planner layout now follows the concept much more closely.
+- Real photographic hero backgrounds are used, not composited UI screenshots.
+- Travel basics use compact visual cards with real dropdowns and inputs.
+- Route shape uses large radio-card controls while preserving the underlying select.
+- Preferences use compact visual tiles with importance dropdowns.
+- Hard constraints are presented as modern toggle cards.
+- Vehicle details move into a progressive disclosure section.
+- Strong sticky 'Zoek mijn roadtrip' CTA.
+- Hero summary updates live as form values change.
+- Existing functional element IDs and planning logic are preserved.
 
-Upload ALL files in this ZIP to the repository root.
+External hero photography:
+- Planner: IPONE Alpes Adventure MotoFestival image.
+- Dashboard: Adventure Rider Radio mountain-lake motorcycle image.

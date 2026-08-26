@@ -1,0 +1,20 @@
+place-provider.js: PASS
+destination-provider.js: PASS
+config.js: PASS
+itinerary-engine.js: PASS
+ui-feature-flags.js: PASS
+app.js: PASS
+route-topology.js: PASS
+service-worker.js: PASS
+destination-engine.js: PASS
+map-view.js: PASS
+routing-provider.js: PASS
+planner radio controls: PASS
+real photo planner hero: PASS
+real photo dashboard hero: PASS
+dropdowns preserved: PASS
+preferences dropdowns preserved: PASS
+radio synced to select: PASS
+revision: PASS
+cache: PASS
+Runtime visual acceptance requires deployment on the target mobile browser.

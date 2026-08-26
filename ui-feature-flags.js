@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.0',build:'1700'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.2',build:'1702'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -162,3 +162,10 @@ function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadin
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();
 
 window.addEventListener('reisslim:compare-updated',()=>setTimeout(enhanceComparisonUi,0));
+
+function syncPremiumRouteRadios(){
+  const select=document.getElementById('routeTopology');
+  document.querySelectorAll('input[name="routeTopologyUi"]').forEach(r=>r.checked=r.value===select?.value);
+}
+new MutationObserver(()=>syncPremiumRouteRadios()).observe(document.body,{subtree:true,childList:true});
+document.addEventListener('change',event=>{if(event.target?.id==='routeTopology')syncPremiumRouteRadios()});
