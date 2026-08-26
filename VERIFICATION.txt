@@ -11,14 +11,16 @@ syntax route-topology.js: PASS
 syntax ui-feature-flags.js: PASS
 syntax destinations.js: PASS
 syntax route-engine.js: PASS
+syntax app.js: PASS
 syntax place-provider.js: PASS
 syntax trip-model.js: PASS
+ReisSlim title: PASS
+no Running Coach HTML: PASS
+no Running Coach app: PASS
+clean app imports: PASS
+cache-busted app: PASS
+cache-busted css: PASS
+ui feature flags loaded: PASS
+manifest ReisSlim: PASS
 revision: PASS
-live discovery longer: PASS
-routed-car prefix preserved: PASS
-sequential route throttle: PASS
-18 sec routing: PASS
-gpx sequential route: PASS
-place lookup sequential: PASS
-fallback hidden while live: PASS
-cache: PASS
+service worker cache: PASS

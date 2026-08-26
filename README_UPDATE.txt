@@ -1,17 +1,14 @@
-ReisSlim v1.5.3 / Build 1503
+ReisSlim v1.5.4 / Build 1504 — FULL REPAIR
 
-Root causes addressed:
-- app displays fallback before async live discovery completes
-- routed-car URL incorrectly dropped /routed-car/ prefix
-- route legs were requested in parallel despite public service rate guidance
+Upload ALL extracted files at repository root and replace existing files.
 
-Fixes:
-- live-first visible proposal UX
-- 4 discovery passes, 8 seeds/pass, longer timeout
-- correct routed-car URL
-- sequential 1.1 s throttled routing
-- 18 s routing timeout per leg
-- sequential longer specific-place lookups
-- GPX uses same live road geometry strategy
+Acceptance after upload:
+1. index.html contains <title>ReisSlim – roadtripplanner</title>
+2. app.js starts with imports from ./config.js and ./destinations.js
+3. styles.css starts with ReisSlim teal CSS variables
+4. manifest short_name is ReisSlim
+5. config.js says 1.5.4 / 1504
+6. service-worker cache says reisslim-v1.5.4-build-1504
+7. live site header says v1.5.4 · 1504
 
-Upload ALL files in this ZIP.
+Do NOT upload the ZIP itself. Extract it first.

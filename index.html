@@ -1,488 +1,155 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
-<meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
-<meta name="theme-color" content="#07111D"><title>AI Running Coach</title>
-<link rel="manifest" href="manifest.webmanifest?v=50679"><link rel="stylesheet" href="styles.css?v=50679">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=50679">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=50679">
-<link rel="icon" href="favicon.ico?v=50679">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=50679">
-<meta property="og:image" content="github-banner.png">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<style id="mobileNavBottomLock">
-@media (max-width: 900px), (pointer: coarse){
-  :root{
-    --mobile-nav-height:88px;
-    --mobile-nav-safe-bottom:env(safe-area-inset-bottom, 0px);
-  }
-  html,body{max-width:100%;overflow-x:hidden;}
-
-  #nav{
-    position:fixed !important;
-    left:0 !important;
-    right:0 !important;
-    top:auto !important;
-    bottom:0 !important;
-    width:100vw !important;
-    max-width:none !important;
-    min-height:var(--mobile-nav-height) !important;
-    margin:0 !important;
-    transform:none !important;
-    border-radius:0 !important;
-    box-sizing:border-box !important;
-    z-index:10000 !important;
-    padding-bottom:var(--mobile-nav-safe-bottom) !important;
-    display:grid !important;
-    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
-    align-items:stretch !important;
-  }
-  #nav > button{min-width:0 !important;width:100% !important;}
-  #nav .desktopSecondary{display:none !important;}
-  #moreNavBtn{
-    display:flex !important;
-    visibility:visible !important;
-    opacity:1 !important;
-    grid-column:5 !important;
-  }
-
-  #mainContent{
-    width:100% !important;
-    max-width:100% !important;
-    box-sizing:border-box !important;
-    padding-bottom:calc(var(--mobile-nav-height) + var(--mobile-nav-safe-bottom) + 20px) !important;
-    overflow-x:hidden !important;
-  }
-  .page{max-width:100% !important;box-sizing:border-box !important;}
-
-  /* The secondary menu is a docked extension of the bottom bar. */
-  #moreNav{
-    position:fixed !important;
-    left:8px !important;
-    right:8px !important;
-    top:auto !important;
-    bottom:calc(var(--mobile-nav-height) + var(--mobile-nav-safe-bottom)) !important;
-    width:auto !important;
-    max-width:none !important;
-    max-height:calc(100dvh - var(--mobile-nav-height) - var(--mobile-nav-safe-bottom) - 8px) !important;
-    margin:0 !important;
-    padding:10px !important;
-    overflow-y:auto !important;
-    overscroll-behavior:contain !important;
-    box-sizing:border-box !important;
-    z-index:10001 !important;
-    transform:none !important;
-    border-bottom-left-radius:0 !important;
-    border-bottom-right-radius:0 !important;
-  }
-  #moreNav.hidden{display:none !important;}
-  #moreNav:not(.hidden){
-    display:grid !important;
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-    gap:8px !important;
-  }
-  #moreNav > button{
-    min-width:0 !important;
-    width:100% !important;
-    margin:0 !important;
-  }
-
-  .modal,.dialog,.sheet{
-    max-width:calc(100vw - 16px) !important;
-    max-height:calc(100dvh - 16px) !important;
-    overflow:auto !important;
-    box-sizing:border-box !important;
-  }
-  canvas,svg,img{max-width:100%;}
-}
-
-@media (orientation: landscape) and (max-height: 650px) and (pointer: coarse){
-  :root{--mobile-nav-height:68px;}
-
-  #nav{
-    min-height:68px !important;
-    height:68px !important;
-    padding:2px 6px env(safe-area-inset-bottom, 0px) !important;
-    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
-  }
-  #nav > button{
-    min-height:58px !important;
-    height:58px !important;
-    padding:3px 2px !important;
-    border-radius:10px !important;
-  }
-  #nav .navIcon{margin:0 auto 1px !important;}
-  #nav .navIcon svg{width:23px !important;height:23px !important;}
-  #nav .navLabel{font-size:11px !important;line-height:1 !important;white-space:nowrap !important;}
-  #moreNavBtn{display:flex !important;grid-column:5 !important;}
-
-  #mainContent{
-    padding-left:14px !important;
-    padding-right:14px !important;
-    padding-bottom:calc(68px + env(safe-area-inset-bottom, 0px) + 12px) !important;
-  }
-  .topbar{min-height:56px !important;padding:6px 14px !important;}
-  .topbar .logo{width:40px !important;height:40px !important;}
-  .topbar .brand-copy h1{font-size:19px !important;line-height:1.05 !important;}
-  .topbar .brand-copy p{font-size:10.5px !important;line-height:1.15 !important;}
-  .sectionTitle,.progressPageTitle{margin-top:8px !important;margin-bottom:10px !important;}
-  .sectionTitle h2,.progressPageTitle h2{font-size:clamp(27px,5vw,40px) !important;line-height:1.05 !important;}
-  .page{width:100% !important;max-width:none !important;}
-  .grid2,.metricCharts{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
-
-  #moreNav{
-    left:8px !important;
-    right:8px !important;
-    bottom:calc(68px + env(safe-area-inset-bottom, 0px)) !important;
-    max-height:calc(100dvh - 76px) !important;
-    padding:8px !important;
-  }
-  #moreNav:not(.hidden){
-    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
-    gap:6px !important;
-  }
-  #moreNav > button{
-    min-height:54px !important;
-    padding:6px 4px !important;
-  }
-
-  .modal,.dialog,.sheet{
-    width:min(760px,calc(100vw - 16px)) !important;
-    max-width:calc(100vw - 16px) !important;
-    max-height:calc(100dvh - 16px) !important;
-  }
-}
-</style>
-
-<style id="shoe-simplified-layout-v15672">
-.shoeKeyDashboardSimplified{display:grid;gap:18px;min-width:0}
-.shoeActiveShoesTile,.shoeGraphOnlyTile{background:linear-gradient(145deg,#075468 0%,#073c50 52%,#062c3d 100%);border:1px solid rgba(40,214,219,.42);border-radius:18px;overflow:hidden;box-shadow:none;min-width:0}
-.shoeActiveShoesStatic{padding:20px 16px 16px}
-.shoeActiveSummaryHead{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 4px 14px}.shoeActiveSummaryHead small,.shoeGraphOnlyHead small{display:block;color:#70e9dd;font-size:12px;font-weight:900;letter-spacing:.09em;margin-bottom:5px}.shoeActiveSummaryHead b,.shoeGraphOnlyHead b{display:block;font-size:22px;line-height:1.15}.shoeActiveSummaryHead span,.shoeGraphOnlyHead span{display:block;color:#c6d9df;font-size:14px;margin-top:5px}
-.shoeActiveSummaryRows{display:grid;gap:10px}.shoeActiveSummaryRow{appearance:none;width:100%;text-align:left;color:inherit;font:inherit;display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:14px;padding:13px;border-radius:16px;background:rgba(2,32,43,.28);border:1px solid rgba(45,218,224,.20);cursor:pointer;min-width:0}.shoeActiveSummaryRow:active{transform:translateY(1px)}
-.shoeActiveSummaryPhoto{position:relative;display:flex;width:92px;height:58px;align-items:center;justify-content:center;overflow:visible;flex:0 0 auto}.shoeActiveSummaryPhoto img{width:100%;height:100%;object-fit:contain;object-position:center;filter:drop-shadow(0 6px 8px rgba(0,0,0,.28))}.shoeActiveSummaryPhoto .shoePhotoFallbackInner{display:none!important}.shoeActiveSummaryPhoto.imageFailed .shoePhotoFallbackInner{display:grid!important;position:absolute;inset:0;place-items:center}
-.shoeActiveSummaryName{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.shoeActiveSummaryName b{font-size:16px;line-height:1.2}.shoeActiveSummaryName span{color:#c5d4d9;font-size:12px;white-space:nowrap}.shoeMileageLifeBar{height:12px;background:rgba(255,255,255,.10);border-radius:999px;overflow:hidden;margin-top:9px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}.shoeMileageLifeBar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#35e2d0,#68e7bb)}.shoeActiveSummaryRow.warning .shoeMileageLifeBar i{background:linear-gradient(90deg,#f2c45b,#f09d4d)}.shoeActiveSummaryRow.critical .shoeMileageLifeBar i{background:linear-gradient(90deg,#ff8a68,#ff637f)}.shoeActiveSummaryMeta{display:flex;justify-content:space-between;gap:10px;margin-top:7px;color:#a9bdc4;font-size:12px}.shoeActiveSummaryMeta strong{color:#eef8f8}
-.shoeGraphOnlyHead{padding:20px 20px 4px}.shoeGraphOnlyTile .shoeChartWrap{margin:10px 14px 14px;max-width:calc(100% - 28px);min-width:0;overflow:hidden!important;box-sizing:border-box}.shoeGraphOnlyTile .shoeChartRaceDate{margin-top:0}.shoeGraphOnlyTile .shoeProgrammeChart svg{width:100%!important;max-width:100%!important;overflow:hidden!important;box-sizing:border-box}
-@media(max-width:520px){.shoeActiveSummaryRow{grid-template-columns:76px minmax(0,1fr);gap:10px}.shoeActiveSummaryPhoto{width:76px;height:50px}.shoeActiveSummaryName{align-items:flex-start;flex-direction:column;gap:2px}.shoeActiveSummaryName span{white-space:normal}.shoeActiveShoesStatic,.shoeGraphOnlyHead{padding-left:16px;padding-right:16px}}
-</style>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#123f3a">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>ReisSlim – roadtripplanner</title>
+  <link rel="manifest" href="manifest.webmanifest?v=1504">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css?v=1504">
+  <link rel="stylesheet" href="compact-ui.css?v=1504">
 </head>
 <body>
-<style id="startupLoaderCriticalCss">
-#appStartupLoader{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;background:rgba(7,17,29,.82);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);transition:opacity .22s ease,visibility .22s ease}
-#appStartupLoader.done{opacity:0;visibility:hidden;pointer-events:none}
-#appStartupLoader .startupLoaderCard{width:154px;min-height:112px;box-sizing:border-box;padding:14px 12px 12px;border-radius:18px;background:#09202a;border:1px solid rgba(77,224,209,.25);box-shadow:0 12px 35px rgba(0,0,0,.34);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;color:#f3fbff}
-#appStartupLoader .startupRunnerTrack{position:relative;width:92px;height:48px;overflow:hidden}
-#appStartupLoader .startupRunner{position:absolute;left:5px;top:2px;width:44px;height:44px;display:grid;place-items:center;animation:startupRunTravel .82s ease-in-out infinite alternate}
-#appStartupLoader .startupRunner img{display:block;width:42px!important;height:42px!important;max-width:42px!important;max-height:42px!important;object-fit:cover;border-radius:10px;animation:startupRunBob .24s ease-in-out infinite alternate;box-shadow:0 0 12px rgba(77,224,209,.22)}
-#appStartupLoader .startupTrail{position:absolute;left:6px;right:6px;bottom:2px;height:2px;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(77,224,209,.75),transparent);animation:startupTrailPulse .5s ease-in-out infinite alternate}
-#appStartupLoader strong{font-size:13px;line-height:1.2;letter-spacing:.01em}
-#appStartupLoader small{display:none}
-@keyframes startupRunTravel{from{transform:translateX(0)}to{transform:translateX(38px)}}
-@keyframes startupRunBob{from{transform:translateY(2px) rotate(-2deg)}to{transform:translateY(-2px) rotate(2deg)}}
-@keyframes startupTrailPulse{from{opacity:.35;transform:scaleX(.72)}to{opacity:1;transform:scaleX(1)}}
-@media (prefers-reduced-motion:reduce){#appStartupLoader .startupRunner,#appStartupLoader .startupRunner img,#appStartupLoader .startupTrail{animation-duration:1.8s}}
-</style>
-<div id="appStartupLoader" class="appStartupLoader" role="status" aria-live="polite" aria-label="Loading AI Running Coach">
-  <div class="startupLoaderCard">
-    <div class="startupRunnerTrack" aria-hidden="true">
-      <span class="startupRunner"><img src="icon-192.png?v=50679" alt=""></span>
-      <span class="startupTrail"></span>
-    </div>
-    <strong>Preparing training data…</strong>
-  </div>
-</div>
+  <header class="topbar">
+    <button id="brandBtn" class="brand" type="button" aria-label="Naar dashboard">
+      <span class="brand-mark">R</span>
+      <span><strong>ReisSlim</strong><small>Global travel assistant</small></span>
+    </button>
+    <button id="newTripBtn" class="icon-button" type="button">＋ Nieuwe reis</button>
+  </header>
 
-<a class="skipLink" href="#mainContent">Skip to main content</a>
-<header class="topbar">
-  <div class="brand"><img class="logo" src="icon-192.png?v=50679" alt="AI Running Coach logo"><div class="brand-copy"><h1>AI Running Coach</h1><p>Race-specific adaptive planning · v15.6.79 · build 50679</p></div></div>
-  <button id="installBtn" class="install hidden">Install</button>
-</header>
-<nav id="nav" aria-label="Primary navigation"></nav>
-<div id="moreNav" class="moreNav hidden" aria-label="More destinations"></div>
-<main id="mainContent" tabindex="-1">
-<div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <main class="app-shell">
+    <section id="dashboardView" class="app-view active">
+      <div class="welcome-card">
+        <div>
+          <p class="eyebrow">Jouw reizen</p>
+          <h1>Waar wil je naartoe?</h1>
+          <p>Plan een realistische roadtrip vanaf jouw gekozen vertrekpunt, met live route, specifieke stops, verblijf, budget, kaart en GPX.</p>
+        </div>
+        <button id="startPlanningBtn" type="button">Start een reis</button>
+      </div>
+      <section class="dashboard-grid">
+        <article class="panel current-trip-card">
+          <div class="section-heading"><div><p class="eyebrow">Concept</p><h2>Ga verder waar je was</h2></div><span id="draftStatusBadge" class="badge">Automatisch bewaard</span></div>
+          <div id="currentTripSummary" class="empty-state">Nog geen reisconcept.</div>
+          <div class="actions"><button id="continueTripBtn" type="button">Verder plannen</button></div>
+        </article>
+        <article class="panel stats-card">
+          <p class="eyebrow">Overzicht</p><h2>Reisbibliotheek</h2>
+          <div class="stat-grid"><div><strong id="savedTripCount">0</strong><span>opgeslagen reizen</span></div><div><strong id="draftDays">—</strong><span>dagen in concept</span></div><div><strong id="draftBudget">—</strong><span>budget concept</span></div></div>
+        </article>
+      </section>
+      <section class="panel"><div class="section-heading"><div><p class="eyebrow">Bibliotheek</p><h2>Opgeslagen reizen</h2></div></div><div id="savedTripsList" class="saved-trips-grid"></div></section>
+      <section class="panel">
+        <div class="section-heading"><div><p class="eyebrow">Inspiratie</p><h2>Populaire richtingen</h2></div></div>
+        <div class="inspiration-grid">
+          <button class="inspiration-card" data-inspire="Slovenië" type="button"><span>🏔️</span><strong>Slovenië</strong><small>Meren, bergen en mooie wegen</small></button>
+          <button class="inspiration-card" data-inspire="Dolomieten" type="button"><span>🏍️</span><strong>Dolomieten</strong><small>Passen, natuur en eten</small></button>
+          <button class="inspiration-card" data-inspire="Harz" type="button"><span>🌲</span><strong>Harz</strong><small>Dichtbij en geschikt voor een korte roadtrip</small></button>
+        </div>
+      </section>
+    </section>
 
-<section id="dashboard" class="page progressPage">
-  <div class="progressPageTitle"><div class="progressPictogram" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/><path d="M4 8l6-4 6 6 5-5"/></svg></div><div><span class="pageEyebrow">ATHLETE TRAJECTORY</span><h2>Progress</h2><p>Is the training working, and are you becoming ready for your race?</p></div></div>
-  <div class="hero outlookHero progressHero">
-    <div class="outlookHeroIntro"><span id="phaseBadge" class="badge"></span><h2 id="raceTitle"></h2><p id="raceSubtitle"></p><div id="trackStatus" class="trackStatus"></div></div>
-    <div class="outlookComparison" aria-label="Race readiness trajectory"><article class="outlookCard currentOutlook"><span>Current race capability</span><strong id="currentProbability">—</strong><b id="currentProbabilityLabel">—</b><small id="currentPrediction">—</small><small id="currentRange">—</small></article><div class="outlookArrow" aria-hidden="true">→</div><article class="outlookCard projectedOutlook"><span>Expected programme outcome</span><strong id="projectedProbability">—</strong><b id="projectedProbabilityLabel">—</b><small id="projectedPrediction">—</small><small id="projectedRange">—</small></article></div>
-    <div id="outlookGain" class="outlookGain"></div><p class="outlookAssumption"></p>
-  </div>
+    <section id="plannerView" class="app-view">
+      <section class="panel intro-card">
+        <div><p class="eyebrow">Planner</p><h1>Vertel ons wat voor roadtrip je zoekt</h1><p class="muted">ReisSlim gebruikt je vertrekpunt, harde voorwaarden en voorkeuren om live passende roadtrips te zoeken.</p></div>
+        <div class="autosave-box"><span>Opslag</span><strong>Lokaal op dit apparaat</strong><small id="autosaveStatus" aria-live="polite">Automatisch opslaan actief</small></div>
+      </section>
+      <section class="panel" id="intakeSection">
+        <form id="tripForm">
+          <div class="form-grid">
+            <label class="wide">Naam van deze reis<input id="tripName" maxlength="60" placeholder="Bijvoorbeeld: Motortrip Harz"></label>
+            <label>Vertrekplaats<input id="origin" value="Saasveld" list="originOptions" autocomplete="address-level2" required><small>Vrije invoer; live geocoding wordt lokaal gecachet.</small><button id="useLocationBtn" class="secondary inline-control" type="button">Gebruik mijn huidige locatie</button></label>
+            <datalist id="originOptions"><option>Saasveld</option><option>Amsterdam</option><option>Rotterdam</option><option>Utrecht</option><option>Eindhoven</option><option>Groningen</option><option>Maastricht</option><option>Zwolle</option><option>Enschede</option><option>Hengelo</option><option>Almelo</option><option>Arnhem</option><option>Nijmegen</option></datalist>
+            <label>Gewenste bestemming of richting<input id="destinationQuery" placeholder="Leeg = live ontdekken vanaf vertrekpunt"><small>Bijvoorbeeld Alpen, kust, Namibië of verras me.</small></label>
+            <label>Startdatum<input id="startDate" type="date" required></label>
+            <label>Aantal dagen<input id="days" type="number" min="3" max="60" value="10" required></label>
+            <label>Totale budget (€)<input id="budget" type="number" min="500" step="100" value="3500" required></label>
+            <label>Volwassenen<input id="adults" type="number" min="1" max="8" value="2" required></label>
+            <label>Kinderen<input id="children" type="number" min="0" max="8" value="0" required></label>
+            <input id="travelMode" type="hidden" value="direct">
+            <label>Voertuig<select id="transport"><option value="car">Auto</option><option value="motorcycle">Motor</option><option value="motorhome">Camper / motorhome</option><option value="caravan">Auto met caravan</option></select></label>
+            <label>Routevorm<select id="routeTopology"><option value="loop">Lus — andere route terug</option><option value="out-and-back">Heen & terug — dezelfde route</option><option value="open-ended">Open einde — eindig op bestemming</option></select></label>
+            <label>Reistempo<select id="tripPace"><option value="relaxed">Rustig</option><option value="balanced" selected>Gebalanceerd</option><option value="active">Actief</option></select></label>
+            <label>Max. totale reistijd per dag<input id="maxDrive" type="number" min="2" max="10" step="0.5" value="5" required></label>
+            <div id="vehicleProfilePanel" class="vehicle-profile-panel wide">
+              <div><p class="eyebrow">Voertuigprofiel</p><strong id="vehicleProfileTitle">Auto</strong><small id="vehicleProfileSummary"></small></div>
+              <label>Routestijl<select id="routeStyle"><option value="balanced">Gebalanceerd</option><option value="fastest">Snelste</option><option value="scenic">Toeristisch</option></select></label>
+              <label>Actieradius (km)<input id="fuelRangeKm" type="number" min="100" max="1500" step="10" value="650" required></label>
+              <label class="vehicle-dimension-field">Maximumsnelheid (km/u)<input id="vehicleMaxSpeedKmh" type="number" min="60" max="130" step="5" value="100"></label>
+              <label class="vehicle-dimension-field">Totale hoogte (m)<input id="vehicleHeightM" type="number" min="1.8" max="4.5" step="0.05" value="3.1"></label>
+              <label class="vehicle-dimension-field">Totale lengte (m)<input id="vehicleLengthM" type="number" min="4" max="20" step="0.1" value="7.2"></label>
+              <label class="vehicle-dimension-field">Totaalgewicht (kg)<input id="vehicleWeightKg" type="number" min="1500" max="20000" step="50" value="3500"></label>
+            </div>
+            <label>Max. accommodatiewissels<input id="maxChanges" type="number" min="0" max="20" value="5" required></label>
+            <label>Accommodatieniveau<select id="comfort"><option value="budget">Budget</option><option value="mid" selected>Middenklasse</option><option value="comfort">Comfort</option></select></label>
+            <div class="constraint-options wide">
+              <label class="check-option"><input id="strictBudget" type="checkbox" checked><span><strong>Budget is een harde grens</strong></span></label>
+              <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong></span></label>
+              <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong></span></label>
+              <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Beperkte stretch-ideeën toestaan</strong></span></label>
+              <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer gebruiken</strong><small>ReisSlim mag langer zoeken om live resultaten te krijgen.</small></span></label>
+              <label class="check-option"><input id="remoteTravel" type="checkbox"><span><strong>Afgelegen / expeditieroute</strong></span></label>
+              <label class="check-option"><input id="privateMode" type="checkbox"><span><strong>Privémodus</strong></span></label>
+            </div>
+            <details class="integration-settings wide"><summary>Optionele live route voor camper en caravan</summary><label>OpenRouteService API-sleutel<input id="orsApiKey" type="password" autocomplete="off"><small>Alleen lokaal opgeslagen.</small></label></details>
+          </div>
+          <fieldset><legend>Wat is belangrijk?</legend><p class="muted priority-help">Selecteer voorkeuren en geef aan hoe zwaar ze meetellen.</p><div id="preferenceGrid" class="preference-grid priority-grid"></div></fieldset>
+          <label class="full-width">Extra wensen<textarea id="notes" rows="3" placeholder="Bijvoorbeeld: mooie motorwegen, veel natuur, specifieke cultuurstops..."></textarea></label>
+          <p id="formError" class="form-error hidden" role="alert"></p>
+          <div class="actions"><button type="submit">Maak reisvoorstellen</button><button type="button" id="loadDemoBtn" class="secondary">Laad voorbeeld</button></div>
+        </form>
+      </section>
+      <section id="resultsSection" class="hidden">
+        <section class="panel"><div class="section-heading"><div><p class="eyebrow">Stap 1</p><h2>Reisportfolio</h2></div><span id="resultCount" class="badge"></span></div><div class="portfolio-toolbar"><label>Focus<select id="proposalFocus"><option value="balanced">Beste mix</option><option value="closer">Dichterbij</option><option value="cheaper">Voordeliger</option><option value="surprising">Meer verrassend</option><option value="family">Gezinsvriendelijk</option><option value="scenic">Mooiste route</option></select></label><button id="moreProposalsBtn" class="secondary" type="button">Toon meer reisopties</button></div><div id="portfolioNotice" class="portfolio-notice" aria-live="polite"></div><div id="destinationCards" class="card-grid"></div></section>
+        <section id="compareSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Vergelijking</p><h2>Vergelijk reisconcepten</h2></div><button id="clearCompareBtn" class="secondary" type="button">Wis selectie</button></div><div id="comparisonTable" class="comparison-wrap"></div></section>
+      </section>
+    </section>
 
-  <section class="progressSection level1"><div class="progressSectionHead"><span>01</span><div><small>RACE READINESS</small><h3>Are you moving toward the target?</h3><p>Historical model estimates versus the fixed target.</p></div></div><article class="panel predictionPanel"><div id="predictionSummary" class="predictionSummary"></div><canvas id="predictionChart" width="1000" height="340" role="img" aria-label="Predicted race-time trend chart">Predicted race-time trend.</canvas><div id="predictionChartMount" class="progressChartMount" aria-hidden="true"></div></article></section>
+    <section id="itineraryView" class="app-view">
+      <section id="variantSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Stap 2</p><h1>Kies de opbouw van je reis</h1></div></div><div id="variantCards" class="variant-grid"></div></section>
+      <section id="planSection" class="panel hidden">
+        <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div id="planWarnings" aria-live="polite"></div>
+        <div id="weatherSummary" class="weather-summary"></div>
+        <section class="readiness-card hidden"><strong id="readinessScore">—</strong><p id="readinessDisclaimer"></p><div id="readinessList"></div></section>
+        <section class="assistant-card"><p class="eyebrow">ReisSlim Assistant</p><h2>Pas je reis aan in gewone taal</h2><div class="assistant-input"><input id="assistantMessage" placeholder="Bijvoorbeeld: maak de reis rustiger"><button id="assistantPreviewBtn" type="button">Bekijk wijziging</button></div><div id="assistantPreview"></div><div class="actions compact"><button id="assistantApplyBtn" class="hidden" type="button">Bevestig wijziging</button><button id="assistantCancelBtn" class="secondary hidden" type="button">Annuleer</button></div></section>
+        <p id="gpxNotice" class="trust-notice"></p>
+        <div class="itinerary-optimizer-grid">
+          <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
+          <aside id="optimizerSection" class="optimizer-card hidden">
+            <div class="section-heading"><div><p class="eyebrow">Trip Optimizer</p><h2>Reiskwaliteit</h2></div><span class="beta-badge">BETA</span></div>
+            <div class="quality-hero"><div class="quality-ring"><strong id="qualityScore">—</strong><span>/100</span></div><div><strong id="qualityVerdict">Nog niet berekend</strong></div></div>
+            <p id="qualityDisclaimer"></p><div id="qualityDimensions"></div><div id="qualityDeductions"></div><div class="recommendation-box"><h3>Topaanbevelingen</h3><ol id="qualityRecommendations"></ol></div>
+            <div id="optimizationSummary"></div>
+            <label>Optimalisatiemodus<select id="optimizationMode"><option value="balanced">Gebalanceerd</option><option value="relaxed">Meer rust</option><option value="value">Lagere kosten</option><option value="active">Meer beleven</option></select></label>
+            <div class="optimizer-locks"><strong>Vergrendel</strong><label><input type="checkbox" data-optimizer-lock="route"> Route</label><label><input type="checkbox" data-optimizer-lock="accommodation"> Verblijven</label><label><input type="checkbox" data-optimizer-lock="activities"> Activiteiten</label><label><input type="checkbox" data-optimizer-lock="budget"> Budgetkeuzes</label></div>
+            <div id="optimizationPreview"></div><button id="improveTripBtn" type="button">Bekijk verbeteringen</button><button id="applyOptimizationBtn" class="hidden" type="button">Pas toe</button><button id="rejectOptimizationBtn" class="secondary hidden" type="button">Sluit voorstel</button><button id="undoOptimizeBtn" class="secondary hidden" type="button">Ongedaan maken</button>
+          </aside>
+        </div>
+      </section>
+      <section id="noPlanItinerary" class="panel empty-view"><h2>Nog geen reis gekozen</h2><p>Maak eerst reisvoorstellen en kies daarna een bestemming.</p><button data-go-planner type="button">Naar planner</button></section>
+    </section>
 
-  <section class="progressReviewSlot" aria-label="Longitudinal training review"><article class="panel coachAssessmentPanel"><div id="assessmentText"></div></article></section>
+    <section id="mapView" class="app-view"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart & waypoints</h1></div><span id="mapDataStatus" class="badge">Live data laden</span></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming.</p><p class="trust-notice">ReisSlim probeert de echte wegroute en specifieke plaatsen live op te halen.</p></section></section>
+    <section id="budgetView" class="app-view"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Kosten</p><h1>Budget</h1></div></div><div id="budgetSummary" class="summary-grid"></div><div id="budgetBreakdown"></div><details id="budgetAssumptions"></details><h2>Controlepunten</h2><div id="validationList"></div></section></section>
+  </main>
 
-  <section class="progressSection"><div class="progressSectionHead"><span>02</span><div><small>FITNESS & CAPABILITY</small><h3>Can you produce more for the same physiological cost?</h3><p>Comparable physiological evidence, not raw pace across unrelated sessions.</p></div></div><article class="panel fitnessMetricGroup"><div id="metricKpis" class="kpis"></div></article><div id="progressRecords"></div><div class="grid2 metricCharts"><article class="panel"><div class="panelHead"><div><h3>Efficiency factor</h3><p class="muted compact">Joules of running power per heartbeat · compare similar sessions</p></div></div><canvas id="efficiencyChart" width="1000" height="380" role="img" aria-label="Efficiency factor trend chart">Efficiency factor trend.</canvas><div id="efficiencyChartMount" class="progressChartMount" aria-hidden="true"></div></article><article class="panel"><div class="panelHead"><div><h3>Aerobic durability</h3><p class="muted compact">Power-based cardiac drift on suitable continuous runs · lower is better</p></div></div><canvas id="driftChart" width="1000" height="380" role="img" aria-label="Power-based cardiac drift trend chart">Power-based cardiac drift trend.</canvas><div id="driftChartMount" class="progressChartMount" aria-hidden="true"></div></article></div><details class="panel modelDetails"><summary>Metrics by comparable run type</summary><div id="metricTypeSummary"></div></details></section>
+  <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+    <button class="nav-item active" data-view="dashboardView" type="button"><span>⌂</span><small>Dashboard</small></button>
+    <button class="nav-item" data-view="plannerView" type="button"><span>✦</span><small>Planner</small></button>
+    <button class="nav-item" data-view="itineraryView" type="button"><span>☷</span><small>Reisplan</small></button>
+    <button class="nav-item" data-view="mapView" type="button"><span>⌖</span><small>Kaart</small></button>
+    <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
+  </nav>
 
-  <section class="progressSection"><div class="progressSectionHead"><span>03</span><div><small>ENDURANCE & DURABILITY</small><h3>Can you sustain running better and for longer?</h3><p>Long-run progression and verified endurance exposure.</p></div></div><article class="panel progressChartPanel"><div class="panelHead progressChartHead"><div><h3>Long-run progression</h3><span class="muted">Planned versus completed</span></div><div id="longRunSummary" class="chartMetric"></div></div><canvas id="longRunChart" width="1000" height="340" role="img" aria-label="Planned and completed long-run progression chart">Planned and completed long-run distance.</canvas><div id="longRunChartMount" class="progressChartMount" aria-hidden="true"></div></article></section>
-
-  <section class="progressSection"><div class="progressSectionHead"><span>04</span><div><small>TRAINING LOAD & CONSISTENCY</small><h3>Are you tolerating the programme?</h3><p>Weekly exposure, completion and planned progression.</p></div></div><div id="kpis" class="kpis"></div><article class="panel progressChartPanel"><div class="panelHead progressChartHead"><div><h3>Weekly distance</h3><span class="muted">Planned versus completed</span></div><div id="weeklyDistanceSummary" class="chartMetric"></div></div><canvas id="volumeChart" width="1000" height="340" role="img" aria-label="Weekly planned and completed distance chart">Weekly planned and completed distance.</canvas><div id="volumeChartMount" class="progressChartMount" aria-hidden="true"></div></article></section>
-
-  <section class="progressSection"><div class="progressSectionHead"><span>05</span><div><small>WORKOUT EXECUTION</small><h3>Are you getting better at delivering the intended stimulus?</h3><p>Recent scored sessions aggregated over time.</p></div></div><div id="progressExecution"></div></section>
-
-  <section class="progressSection"><div class="progressSectionHead"><span>06</span><div><small>ADAPTIVE LEARNING</small><h3>What is the model learning about you?</h3><p>Accumulated Pace & Power and Distance & Load evidence.</p></div></div><div id="progressAdaptationHome"></div><div id="personalResponseModel"></div><div id="modelValidation"></div><div id="decisionHistory"></div></section>
-
-  <div class="hidden" aria-hidden="true"><div id="currentPreparationScore"></div><div id="evidenceBadge"></div><div id="pillarCards"></div></div>
-</section>
-
-<section id="today" class="page active">
-  <div class="sectionTitle"><div><h2>Today</h2><p id="todayDate"></p></div></div>
-  <div id="todayCard"></div>
-  <div id="todayCoach"></div>
-</section>
-
-<section id="plan" class="page">
-  <div class="sectionTitle"><div><span class="pageEyebrow">PROGRAMME</span><h2>Training plan</h2><p>Race-specific structure, weekly prescription and adaptation.</p></div></div>
-  <div id="planProgrammeHeader"></div>
-  <section class="planSection promotedTimelinePanel">
-    <div class="planSectionHead"><div><span>PROGRAMME TIMELINE</span><h3>Build to race day</h3><p>Training phases, current position, taper and key endurance milestones.</p></div></div>
-    <div id="raceTimeline"></div>
-    <details class="planIntensityFoldout">
-    <summary><span><b>Training intensity distribution</b><small>Where the planned distance goes</small></span></summary>
-    <div class="planIntensityFoldoutBody"><div id="planIntensity"></div></div>
-  </details>
-</section>
-  <div class="planWeekNavWrap">
-    <div class="weekNav"><button id="prevWeek" aria-label="Previous week">‹</button><button id="thisWeek">Current week</button><button id="nextWeek" aria-label="Next week">›</button></div>
-    <div id="weekHeader"></div>
-  </div>
-  <section class="planSection planWeekSection">
-    <div class="planSectionHead"><div><span>THIS WEEK</span><h3 id="planWeekTitle">Weekly schedule</h3><p>Tap one day to open the complete prescription. Only one workout opens at a time.</p></div></div>
-    <div id="planCards"></div>
-  </section>
-  <section class="planSection">
-    <div class="planSectionHead"><div><span>PLAN ADAPTATION</span><h3>What the model is changing</h3><p>Prescription consequences first; detailed evidence stays behind foldouts.</p></div></div>
-    <div id="weeklyReview"></div>
-  </section>
-
-
-</section>
-
-<section id="runs" class="page">
-  <div id="logHero"></div>
-
-  <section class="logActionCard">
-    <div class="logActionIntro">
-      <span class="logActionIcon" aria-hidden="true"></span>
-      <div><small>ADD TRAINING</small><h3>Import or add a run</h3><p>FIT/CSV gives the richest analysis. Manual entry remains available when a file is not.</p></div>
-    </div>
-    <div class="logActionButtons">
-      <label class="primary filePick logImportButton" for="activityFile">Import FIT / CSV</label>
-      <button id="manualRunBtn" class="secondary logManualButton" type="button">Add manually</button>
-    </div>
-    <input id="activityFile" type="file" accept=".fit,.csv,application/octet-stream,application/vnd.ant.fit,text/csv">
-  </section>
-
-  <div id="importPreview" class="hidden"></div>
-  <div id="manualRun" class="hidden"></div>
-
-  <div class="logSectionHead">
-    <div><small>RECENT RUNS</small><h3>Training history</h3><p>Open a session to see execution, interval fit, personal comparison and what the model learned.</p></div>
-  </div>
-  <div id="runList"></div>
-
-  <details class="logDataGuide">
-    <summary><span><b>Data quality & manual fields</b><small>RPE, pain, HRV and calculated metrics</small></span></summary>
-    <div class="guideGrid">
-      <div><b>RPE 1–10</b><p><strong>1–2:</strong> very easy · <strong>3–4:</strong> easy/conversational · <strong>5–6:</strong> moderate · <strong>7:</strong> marathon effort · <strong>8:</strong> threshold · <strong>9:</strong> very hard · <strong>10:</strong> maximal.</p></div>
-      <div><b>Pain 0–10</b><p><strong>0:</strong> none · <strong>1–2:</strong> awareness only · <strong>3–4:</strong> mild discomfort · <strong>5–6:</strong> affects mechanics · <strong>7–10:</strong> stop or seek assessment.</p></div>
-      <div><b>Garmin HRV</b><p>Previous-night Overnight Average in milliseconds. It contributes to temporary recovery context, not directly to learned Pace & Power.</p></div>
-      <div><b>Calculated automatically</b><p>Pace, efficiency, W/kg and—when the data supports it—power-based cardiac drift and interval-level execution.</p></div>
-    </div>
-  </details>
-</section>
-
-<section id="shoes" class="page shoesPage"><div id="shoesContent"></div></section>
-
-<section id="assessments" class="page">
-  <div class="sectionTitle"><div><h2>Fitness assessments</h2><p>Valid assessments update future targets only.</p></div><button id="addAssessmentBtn" class="primary small">+ Add result</button></div>
-  <div id="assessmentForm" class="hidden"></div>
-  <div id="assessmentList"></div>
-</section>
-
-<section id="coach" class="page">
-  <div class="sectionTitle"><div><h2>Coach report</h2><p>Tailored conclusions, priorities and actions backed by verifiable plan and training data.</p></div></div>
-  <div id="coachTop" class="kpis"></div>
-  <article class="panel"><h3>Evidence-based coaching assessment</h3><div id="fullAssessment"></div></article>
-  <article class="panel"><h3>Verification standard</h3><p>The coach uses only configured goals, generated plan data, logged runs, valid assessments, Garmin HRV and pain entries. Missing information is treated as missing rather than guessed. Model-calibrated predictions are labelled separately from directly observed evidence.</p></article>
-</section>
-
-
-<section id="injury" class="page injuryRunnerPage">
-  <div class="sectionTitle injuryRunnerPageTitle"><div><span class="pageEyebrow">RETURN TO RUN</span><h2>Injury & rehab</h2><p>Criteria-based rehabilitation, functional progression and return to unrestricted running.</p></div><button id="addInjuryBtn" class="primary small">+ Add injury</button></div>
-  <div id="injuryIntro"></div>
-  <div id="injuryList"></div>
-</section>
-
-<section id="recovery" class="page recoveryPage">
-  <div class="sectionTitle recoveryPageTitle"><div><span class="pageEyebrow">RECOVERY</span><h2>Recovery</h2></div></div>
-
-  <section class="recoverySection" aria-labelledby="recoveryStatusTitle">
-    <div class="recoverySectionHead"><span>01</span><div><small>RECOVERY STATUS</small><h3 id="recoveryStatusTitle">Current recovery status</h3><p>Your present readiness and whether recovery is temporarily moderating training.</p></div></div>
-    <div id="recoveryStatus"></div>
-  </section>
-
-  <section class="recoverySection recoveryMeaningSection" aria-labelledby="recoveryMeaningTitle">
-    <div class="recoverySectionHead"><span>02</span><div><small>WHAT THIS MEANS</small><h3 id="recoveryMeaningTitle">Recovery interpretation</h3><p>The most important evidence-backed conclusions for your training.</p></div></div>
-    <div id="recoveryMeaning"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryDriversTitle">
-    <div class="recoverySectionHead"><span>03</span><div><small>WHAT IS DRIVING RECOVERY?</small><h3 id="recoveryDriversTitle">Current recovery evidence</h3><p>The inputs currently influencing readiness, interpreted against your own data.</p></div></div>
-    <div id="recoveryDrivers"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryHrvTitle">
-    <div class="recoverySectionHead"><span>04</span><div><small>HRV VS YOUR BASELINE</small><h3 id="recoveryHrvTitle">Personal recovery signal</h3><p>Previous-night Garmin HRV compared with your own evolving baseline.</p></div></div>
-    <div id="recoveryHrv"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryPainTitle">
-    <div class="recoverySectionHead"><span>05</span><div><small>PAIN &amp; PHYSICAL RESTRICTION</small><h3 id="recoveryPainTitle">Is pain limiting training?</h3><p>Recent pain evidence and any active rehabilitation constraint.</p></div></div>
-    <div id="recoveryPain"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryAbsorptionTitle">
-    <div class="recoverySectionHead"><span>06</span><div><small>TRAINING ABSORPTION</small><h3 id="recoveryAbsorptionTitle">Are you handling the work?</h3><p>Existing athlete-specific observations after demanding sessions and rising training exposure.</p></div></div>
-    <div id="recoveryAbsorption"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryLoadTitle">
-    <div class="recoverySectionHead"><span>07</span><div><small>LOAD VS RECOVERY</small><h3 id="recoveryLoadTitle">Training exposure in recovery context</h3><p>Training and recovery observations aligned in time without implying causation.</p></div></div>
-    <div id="recoveryLoad"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryCapabilityTitle">
-    <div class="recoverySectionHead"><span>08</span><div><small>TEMPORARY VS LEARNED</small><h3 id="recoveryCapabilityTitle">Recovery modifier and learned capability</h3><p>Separate what you have learned to tolerate from temporary recovery context.</p></div></div>
-    <div id="recoveryCapability"></div>
-  </section>
-
-  <section class="recoverySection" aria-labelledby="recoveryHistoryTitle">
-    <div class="recoverySectionHead"><span>09</span><div><small>RECOVERY HISTORY</small><h3 id="recoveryHistoryTitle">Has recovery been stable?</h3><p>Recent readiness relative to the neutral 1.000 reference.</p></div></div>
-    <div id="recoveryHistory"></div>
-  </section>
-</section>
-<section id="race" class="page raceDayPage">
-  <div class="raceDayPageTitle"><div class="raceDayPictogram" aria-hidden="true"></div><div><span class="pageEyebrow">RACE EXECUTION</span><h2>Race day</h2><p>Turn the programme's existing race model into a clear execution plan.</p></div></div>
-
-  <section class="raceDaySection raceDayLevel1" aria-labelledby="raceStatusTitle">
-    <div class="raceDaySectionHead"><span>01</span><div><small>RACE STATUS</small><h3 id="raceStatusTitle">What performance are you prepared for?</h3><p>Current estimate, target relationship and readiness in one view.</p></div></div>
-    <div id="raceStatus"></div>
-  </section>
-
-  <section class="raceDaySection raceDayLevel1" aria-labelledby="raceExecutionTitle">
-    <div class="raceDaySectionHead"><span>02</span><div><small>EXECUTION SUMMARY</small><h3 id="raceExecutionTitle">How should you run this race?</h3><p>The race plan translated into a few actions you can use at the start line.</p></div></div>
-    <div id="raceExecution"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="racePacingTitle">
-    <div class="raceDaySectionHead"><span>03</span><div><small>PACING STRATEGY</small><h3 id="racePacingTitle">What pace should you actually run?</h3><p>Target, current estimate and the existing three-part race execution pattern.</p></div></div>
-    <div id="racePacing"></div>
-  </section>
-
-  <section id="racePowerSection" class="raceDaySection" aria-labelledby="racePowerTitle">
-    <div class="raceDaySectionHead"><span>04</span><div><small>POWER & HEART RATE</small><h3 id="racePowerTitle">What physiological targets are already available?</h3><p>Only the race targets already present in the app are shown.</p></div></div>
-    <div id="racePower"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceEffortTitle">
-    <div class="raceDaySectionHead"><span>05</span><div><small>EFFORT THROUGH THE RACE</small><h3 id="raceEffortTitle">How should the race feel as it progresses?</h3><p>Use effort as context when instantaneous pace becomes noisy.</p></div></div>
-    <div id="raceEffort"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceFuelTitle">
-    <div class="raceDaySectionHead"><span>06</span><div><small>FUEL & HYDRATION</small><h3 id="raceFuelTitle">Use the strategy already practised in training</h3><p>Existing race-day fuelling and fluid guidance from the app.</p></div></div>
-    <div id="raceFuel"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceEvidenceTitle">
-    <div class="raceDaySectionHead"><span>07</span><div><small>WHY THIS STRATEGY</small><h3 id="raceEvidenceTitle">What supports the recommendation?</h3><p>The most relevant athlete-specific evidence, without recreating Progress.</p></div></div>
-    <div id="raceEvidence"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceEnduranceTitle">
-    <div class="raceDaySectionHead"><span>08</span><div><small>ENDURANCE CONTEXT</small><h3 id="raceEnduranceTitle">How well supported is the final part of the race?</h3><p>Long-run and durability evidence already calculated elsewhere in the app.</p></div></div>
-    <div id="raceEndurance"></div>
-  </section>
-
-  <section id="raceConstraintSection" class="raceDaySection hidden" aria-labelledby="raceConstraintTitle">
-    <div class="raceDaySectionHead"><span>09</span><div><small>CURRENT CONSTRAINTS</small><h3 id="raceConstraintTitle">Is anything changing how you should approach the race?</h3><p>Temporary recovery or rehabilitation context only when it is relevant.</p></div></div>
-    <div id="raceConstraints"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceLearningTitle">
-    <div class="raceDaySectionHead"><span>10</span><div><small>ADAPTIVE MODEL CONFIDENCE</small><h3 id="raceLearningTitle">How much has the app learned about you?</h3><p>Current pathway factors and evidence coverage behind the race estimate.</p></div></div>
-    <div id="raceLearning"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceCheckpointTitle">
-    <div class="raceDaySectionHead"><span>11</span><div><small>RACE CHECKPOINTS</small><h3 id="raceCheckpointTitle">Where should target time place you?</h3><p>Simple cumulative checkpoints derived from the existing constant target pace.</p></div></div>
-    <div id="raceCheckpoints"></div>
-  </section>
-
-  <section class="raceDaySection" aria-labelledby="raceDetailTitle">
-    <div class="raceDaySectionHead"><span>12</span><div><small>MODEL DETAIL</small><h3 id="raceDetailTitle">Detailed race model</h3><p>Prediction confidence and model context behind the visible strategy.</p></div></div>
-    <div id="raceModelDetail"></div>
-  </section>
-</section>
-
-<section id="settings" class="page">
-  <div class="settingsPageTitle"><div class="settingsPictogram">⚙</div><div><span class="settingsEyebrow">PROGRAMME CONFIGURATION</span><h2>Settings</h2><p>Understand what drives your programme and change only the inputs you control.</p></div></div>
-  <article class="settingsSection"><div class="settingsSectionHead"><span>01</span><div><small>ATHLETE & RACE SETUP</small><h3>What is this programme built around?</h3><p>Your goal event and the athlete inputs used by the existing model.</p></div></div><div id="settingsGrid" class="settingsGroups"></div><button id="saveSettings" class="primary full">Preview and rebuild future plan</button><button id="undoSettingsBtn" type="button" class="secondary full hidden">Undo last plan rebuild</button></article>
-  <article class="settingsSection"><div class="settingsSectionHead"><span>02</span><div><small>TRAINING STRUCTURE</small><h3>When can you train?</h3><p>Availability and the long-run day used when the plan is rebuilt.</p></div></div><div id="daysGrid"></div></article>
-  <article class="settingsSection"><div class="settingsSectionHead"><span>03</span><div><small>ADAPTIVE MODEL</small><h3>Is the configured plan structurally sound?</h3><p>Plan Health validates the programme structure without duplicating Progress.</p></div></div><div class="settingsNested"><div class="panelHead"><div><h3>Plan Health</h3><p class="muted compact">Structure score, calculation and recommendations for the configured plan.</p></div><button id="planHealthBtn" class="secondary">Validate plan</button></div><div id="planHealthContent"></div></div></article>
-  <article class="settingsSection"><div class="settingsSectionHead"><span>04</span><div><small>DATA & IMPORTS</small><h3>Manage your local training data</h3><p>Back up, restore or export data. Destructive actions remain clearly separated.</p></div></div><div class="settingsNested"><div class="buttonRow settingsDataActions"><button id="backupBtn">Download backup</button><label for="restoreFile" class="buttonLike">Restore backup</label><input id="restoreFile" type="file" accept=".json"><button id="undoRestoreBtn" type="button" class="secondary hidden">Undo last restore</button><button id="exportBtn">Export runs CSV</button></div><div class="settingsDangerZone"><b>Reset local app data</b><p>Use only when you intend to remove the current local programme and history.</p><button id="resetBtn" class="danger">Reset app</button></div></div></article>
-  <article class="settingsSection"><div class="settingsSectionHead"><span>05</span><div><small>APP & MODEL INFORMATION</small><h3>Which version is running?</h3><p>Reference information for this local build.</p></div></div><div class="settingsNested settingsAppInfo"><div><small>APP VERSION</small><strong>v15.6.79</strong></div><div><small>BUILD</small><strong>50679</strong></div><div><small>DATA</small><strong>Stored locally</strong></div><div><small>ACTIVITY STORAGE</small><strong>Compact derived evidence</strong></div><div><small>EXPECTED CAPACITY</small><strong>≈250–350+ imported sessions</strong><span>Device dependent · a 150-session programme is comfortably within the expected range.</span></div></div><details id="modelDiagnostics" class="settingsNested modelDiagnostics"><summary><div><small>MODEL INTEGRITY</small><b>Checking…</b><span>Read-only consistency diagnostics</span></div></summary></details></article>
-</section>
-</main>
-<footer class="appFooter"><span>AI Running Coach</span><small>v15.6.79 · build 50679</small></footer>
-
-<div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="AI Running Coach dialog" tabindex="-1"><div class="modalCard"><button id="closeModal" class="close" type="button" aria-label="Close dialog">×</button><div id="modalContent"></div></div></div>
-
-<div id="onboarding" class="onboarding hidden" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
-  <form id="onboardingForm" class="onboardingCard" novalidate>
-    <div class="onboardingIntro"><span class="badge">First-time setup</span><h2 id="onboardingTitle">Build your plan from your data</h2><p>Confirm the essentials before any coaching or probability is shown. You can change these later in Settings.</p></div>
-    <div id="onboardingErrors" class="formErrors hidden" role="alert" tabindex="-1"></div>
-    <fieldset><legend><i>1</i> Goal event</legend><div class="formGrid">
-      <div class="field"><label for="obRaceName">Race name</label><input id="obRaceName" required maxlength="100" value="Goal Race"></div>
-      <div class="field"><label for="obRaceDate">Race date</label><input id="obRaceDate" type="date" required></div>
-      <div class="field"><label for="obRaceDistance">Race distance (km)</label><input id="obRaceDistance" type="number" inputmode="decimal" min="0.1" max="200" step="0.1" required value="42.195"></div>
-      <div class="field"><label for="obTargetTime">Target time (H:MM:SS or M:SS)</label><input id="obTargetTime" inputmode="numeric" required value="4:15:00"></div>
-    </div></fieldset>
-    <fieldset><legend><i>2</i> Current training</legend><div class="formGrid">
-      <div class="field"><label for="obCurrentWeekly">Current weekly distance (km)</label><input id="obCurrentWeekly" type="number" inputmode="decimal" min="0" max="250" step="0.1" required value="35"></div>
-      <div class="field"><label for="obCurrentLongest">Current longest run (km)</label><input id="obCurrentLongest" type="number" inputmode="decimal" min="0" max="200" step="0.1" required value="18"></div>
-      <div class="field"><label for="obBodyWeight">Body weight (kg)</label><input id="obBodyWeight" type="number" inputmode="decimal" min="25" max="250" step="0.1" required value="70"></div>
-    </div></fieldset>
-    <fieldset><legend><i>3</i> Recent baseline</legend><div class="formGrid">
-      <div class="field"><label for="obTestDistance">Recent test distance (km)</label><input id="obTestDistance" type="number" inputmode="decimal" min="0.1" max="200" step="0.1" required value="5"></div>
-      <div class="field"><label for="obTestTime">Recent test time (M:SS or H:MM:SS)</label><input id="obTestTime" inputmode="numeric" required value="25:15"></div>
-      <div class="field"><label for="obThresholdHr">Threshold heart rate (bpm)</label><input id="obThresholdHr" type="number" inputmode="numeric" min="60" max="240" required value="168"></div>
-      <div class="field"><label for="obCriticalPower">Critical power (W)</label><input id="obCriticalPower" type="number" inputmode="decimal" min="50" max="1500" required value="300"></div>
-    </div></fieldset>
-    <label class="onboardingConsent"><input id="obConfirm" type="checkbox" required><span>I confirm these are my values. Coaching estimates are decision support, not medical advice.</span></label>
-    <button class="primary full" type="submit">Review and create my plan</button>
-  </form>
-</div>
-<script src="app.js?v=50679"></script>
-</body></html>
+  <footer><p><span id="versionLabel">ReisSlim v1.5.4 · Build 1504</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="ui-feature-flags.js?build=1504"></script>
+  <script type="module" src="app.js?build=1504"></script>
+</body>
+</html>
