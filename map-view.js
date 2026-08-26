@@ -5,33 +5,67 @@ let map;
 let activeLayers=[];
 let layerControl;
 let activeBounds=[];
+let poiMarkers=[];
 
 const dayColors=['#176b5c','#3b72a8','#7a5dc7','#c95e42','#c58b2b','#2f7d62','#9a5b8f','#4a92b5','#8a6a36','#a84f66','#557a46','#8059a8'];
 const poiColors={accommodation:'#e6a53b',restaurant:'#c95e42',activity:'#7a5dc7',fuel:'#2f7d62',rest:'#4a92b5',service:'#7d6845'};
-const poiLabels={accommodation:'Overnachten',restaurant:'Eten',activity:'Activiteit',fuel:'Brandstof',rest:'Ruststop',service:'Service'};
+const poiIcons={accommodation:'🛏',restaurant:'🍽',activity:'★',fuel:'⛽',rest:'☕',service:'🔧'};
+const poiLabels={accommodation:'Overnachten',restaurant:'Eten',activity:'Bezienswaardigheid',fuel:'Brandstof',rest:'Ruststop',service:'Service'};
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 function safeUrl(value){try{const url=new URL(String(value||''));return['http:','https:'].includes(url.protocol)?url.href:''}catch{return''}}
-function clearLayers(){activeLayers.forEach(item=>item.remove());activeLayers=[];if(layerControl){layerControl.remove();layerControl=null}}
+function clearLayers(){activeLayers.forEach(item=>item.remove());activeLayers=[];poiMarkers=[];if(layerControl){layerControl.remove();layerControl=null}}
 function addOverlay(name){const group=L.layerGroup().addTo(map);activeLayers.push(group);return[name,group]}
 function dayColor(day){return dayColors[(Math.max(1,Number(day)||1)-1)%dayColors.length]}
 function proposalLinks(item){const links=[];const mapUrl=safeUrl(item.mapUrl||item.url),website=safeUrl(item.websiteUrl),source=safeUrl(item.sourceUrl);if(mapUrl)links.push(`<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Kaart & reviews</a>`);if(website&&website!==mapUrl)links.push(`<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Website</a>`);if(source&&source!==mapUrl&&source!==website)links.push(`<a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">OSM-bron</a>`);return links.length?`<br>${links.join(' · ')}`:''}
+
+function poiIcon(item,index,focused=false){
+  const color=poiColors[item.type]||'#697d78',day=dayColor(item.day);
+  return L.divIcon({
+    className:'reisslim-poi-icon-wrap',
+    html:`<div class="reisslim-poi-pin ${focused?'focused':''}" style="--poi:${color};--day:${day}"><span>${poiIcons[item.type]||'•'}</span><b>${index+1}</b></div>`,
+    iconSize:[38,42],iconAnchor:[19,40],popupAnchor:[0,-38]
+  });
+}
+function focusPoi(index){
+  const entry=poiMarkers[index];
+  if(!entry||!map)return;
+  poiMarkers.forEach((current,currentIndex)=>current.marker.setIcon(poiIcon(current.item,currentIndex,currentIndex===index)));
+  const latlng=entry.marker.getLatLng();
+  map.flyTo(latlng,Math.max(12,map.getZoom()),{duration:.45});
+  entry.marker.openPopup();
+  const row=document.querySelector(`[data-map-poi-index="${index}"]`);
+  document.querySelectorAll('.map-poi-row.is-active').forEach(el=>el.classList.remove('is-active'));
+  row?.classList.add('is-active');
+  row?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function installLegendInteraction(host){
+  if(host.dataset.poiInteraction==='1')return;
+  host.dataset.poiInteraction='1';
+  host.addEventListener('click',event=>{
+    const row=event.target.closest('[data-map-poi-index]');
+    if(!row)return;
+    if(event.target.closest('a'))return;
+    focusPoi(Number(row.dataset.mapPoiIndex));
+  });
+}
 
 function renderLegend(plan,segments,proposals){
   const host=document.getElementById('mapLegendPoi');
   if(!host)return;
   const days=[...new Set(segments.map(segment=>Number(segment.day)).filter(Number.isFinite))].sort((a,b)=>a-b);
   const types=[...new Set(proposals.map(item=>item.type).filter(Boolean))];
-  const dayLegend=days.length?days.map(day=>`<span class="map-legend-item"><i style="--legend-color:${dayColor(day)}"></i>Dag ${day}</span>`).join(''):'<span class="muted">Nog geen dagroutes.</span>';
-  const poiLegend=types.length?types.map(type=>`<span class="map-legend-item"><i class="poi-dot" style="--legend-color:${poiColors[type]||'#697d78'}"></i>${escapeHtml(poiLabels[type]||type)}</span>`).join(''):'<span class="muted">Nog geen specifieke POI’s.</span>';
+  const dayLegend=days.length?days.map(day=>`<span class="map-legend-item"><i style="--legend-color:${dayColor(day)}"></i>Dag ${day}</span>`).join(''):'';
+  const poiLegend=types.length?types.map(type=>`<span class="map-legend-item"><i class="poi-dot" style="--legend-color:${poiColors[type]||'#697d78'}"></i>${poiIcons[type]||'•'} ${escapeHtml(poiLabels[type]||type)}</span>`).join(''):'';
 
   const list=proposals.length
-    ? [...proposals].sort((a,b)=>(a.day||0)-(b.day||0)||(a.type||'').localeCompare(b.type||'')).map(item=>{
+    ? proposals.map((item,index)=>{
         const link=safeUrl(item.mapUrl||item.url||item.websiteUrl);
-        return `<article class="map-poi-row"><span class="map-poi-day" style="--day-color:${dayColor(item.day)}">D${item.day||'–'}</span><i class="map-poi-type" style="--poi-color:${poiColors[item.type]||'#697d78'}"></i><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(poiLabels[item.type]||item.type||'POI')}${item.reason?` · ${escapeHtml(item.reason)}`:''}</small></div>${link?`<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(item.name)}">↗</a>`:''}</article>`;
+        return `<article class="map-poi-row" data-map-poi-index="${index}" tabindex="0" role="button" aria-label="Toon ${escapeHtml(item.name)} op kaart"><span class="map-poi-number" style="--poi-color:${poiColors[item.type]||'#697d78'}">${index+1}</span><span class="map-poi-day" style="--day-color:${dayColor(item.day)}">D${item.day||'–'}</span><div><strong>${escapeHtml(item.name)}</strong><small>${poiIcons[item.type]||'•'} ${escapeHtml(poiLabels[item.type]||item.type||'POI')}</small></div>${link?`<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" aria-label="Open externe kaart">↗</a>`:'<span></span>'}</article>`;
       }).join('')
-    : '<div class="map-poi-empty">Nog geen specifieke POI’s geladen. Live gevonden stops verschijnen hier automatisch.</div>';
+    : '<div class="map-poi-empty">Nog geen specifieke POI’s geladen.</div>';
 
-  host.innerHTML=`<section class="map-legend-card"><div class="map-legend-title"><div><span>ROUTELEGENDA</span><strong>Elke reisdag heeft een eigen kleur</strong></div></div><div class="map-legend-block"><small>DAGR ROUTES</small><div class="map-legend-items">${dayLegend}</div></div><div class="map-legend-block"><small>POI TYPES</small><div class="map-legend-items">${poiLegend}</div></div></section><section class="map-poi-card"><div class="map-poi-title"><div><span>GPX WAYPOINTS</span><strong>Specifieke plaatsen in deze reis</strong></div><b>${proposals.length}</b></div><div class="map-poi-list">${list}</div></section>`;
+  host.innerHTML=`<section class="map-legend-card"><div class="map-legend-title"><div><span>KAARTLEGENDA</span><strong>Dagroutes & POI’s</strong></div></div><div class="map-legend-items">${dayLegend}${poiLegend}</div></section><section class="map-poi-card"><div class="map-poi-title"><div><span>GPX WAYPOINTS</span><strong>Tik een POI om hem op de kaart te markeren</strong></div><b>${proposals.length}</b></div><div class="map-poi-list">${list}</div></section>`;
+  installLegendInteraction(host);
 }
 
 export function renderMap(plan,elementId='map'){
@@ -45,39 +79,36 @@ export function renderMap(plan,elementId='map'){
   clearLayers();
   const overlays={};
   const[routeName,routeLayer]=addOverlay('Dagroutes');overlays[routeName]=routeLayer;
-  const[overnightName,overnightLayer]=addOverlay('Dagpunten & overnachtingen');overlays[overnightName]=overnightLayer;
-  const[breakName,breakLayer]=addOverlay('Pauzes & brandstof');overlays[breakName]=breakLayer;
-  const[stayName,stayLayer]=addOverlay('Accommodatie');overlays[stayName]=stayLayer;
-  const[foodName,foodLayer]=addOverlay('Restaurants');overlays[foodName]=foodLayer;
-  const[activityName,activityLayer]=addOverlay('Activiteiten & service');overlays[activityName]=activityLayer;
+  const[overnightName,overnightLayer]=addOverlay('Dagpunten');overlays[overnightName]=overnightLayer;
+  const[poiName,poiLayer]=addOverlay('POI’s');overlays[poiName]=poiLayer;
   const bounds=[];
 
   segments.forEach(segment=>{
     const coordinates=segment.points.map(point=>[point.lat,point.lon]);
-    const liveRoute=['tomtom','openrouteservice','osrm'].includes(segment.source);
     bounds.push(...coordinates);
+    const liveRoute=['tomtom','openrouteservice','osrm'].includes(segment.source);
     const multimodal=segment.mode&&segment.mode!=='road';
     const color=dayColor(segment.day);
     L.polyline(coordinates,{weight:liveRoute?6:5,dashArray:liveRoute?null:multimodal?'3 9':'8 6',opacity:.92,color})
       .addTo(routeLayer)
-      .bindPopup(`<strong>Dag ${segment.day}</strong><br><span style="color:${color}">●</span> ${liveRoute?'Live wegroute':multimodal?`Indicatief ${escapeHtml(segment.mode)}-segment`:'Indicatieve corridor'}`)
+      .bindPopup(`<strong>Dag ${segment.day}</strong><br><span style="color:${color}">●</span> ${liveRoute?'Live wegroute':'Route'}`)
   });
 
   routePoints.forEach((point,index)=>{
     bounds.push([point.lat,point.lon]);
     const color=index===0?'#123f3a':dayColor(point.day||1);
-    L.circleMarker([point.lat,point.lon],{radius:index===0?8:7,color,fillColor:'#ffffff',fillOpacity:1,weight:4})
+    L.circleMarker([point.lat,point.lon],{radius:index===0?8:6,color,fillColor:'#ffffff',fillOpacity:1,weight:4})
       .addTo(overnightLayer)
       .bindPopup(`<strong>${index===0?'Vertrek':point.role==='return'?'Terugkomst':`Dag ${point.day||''}`}</strong><br>${escapeHtml(point.name)}`)
   });
 
-  proposals.forEach(item=>{
-    const group=['fuel','rest'].includes(item.type)?breakLayer:item.type==='accommodation'?stayLayer:item.type==='restaurant'?foodLayer:activityLayer;
+  proposals.forEach((item,index)=>{
     bounds.push([item.lat,item.lon]);
-    const color=poiColors[item.type]||'#697d78';
-    L.circleMarker([item.lat,item.lon],{radius:7,color:'#ffffff',fillColor:color,fillOpacity:.95,weight:3})
-      .addTo(group)
-      .bindPopup(`<strong>Dag ${item.day}: ${escapeHtml(item.name)}</strong><br><span style="color:${color}">●</span> ${escapeHtml(poiLabels[item.type]||item.type)}<br>${escapeHtml(item.reason||'')}${proposalLinks(item)}`)
+    const marker=L.marker([item.lat,item.lon],{icon:poiIcon(item,index,false),riseOnHover:true,riseOffset:900})
+      .addTo(poiLayer)
+      .bindPopup(`<strong>${index+1}. ${escapeHtml(item.name)}</strong><br><span style="color:${poiColors[item.type]||'#697d78'}">●</span> ${escapeHtml(poiLabels[item.type]||item.type)} · Dag ${item.day}<br>${escapeHtml(item.reason||'')}${proposalLinks(item)}`);
+    marker.on('click',()=>focusPoi(index));
+    poiMarkers.push({marker,item});
   });
 
   layerControl=L.control.layers(null,overlays,{collapsed:true,position:'topright'}).addTo(map);

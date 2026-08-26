@@ -84,7 +84,7 @@
   .priority-item select{height:36px!important;width:104px!important;min-width:104px!important;max-width:104px!important;font-size:.82rem!important}
 }
 
-/* v1.6.9 spacing repairs */
+/* v1.7.0 spacing repairs */
 .current-trip-details{display:grid;gap:6px}
 .current-trip-details div{display:grid!important;grid-template-columns:minmax(92px,auto) 1fr;column-gap:10px;align-items:baseline}
 .current-trip-details span{display:block;color:var(--muted);line-height:1.25}
@@ -97,7 +97,7 @@
 }
 
 
-/* v1.6.9 premium visual system */
+/* v1.7.0 premium visual system */
 :root{
   --premium-ink:#173833;
   --premium-muted:#60746f;
@@ -171,4 +171,64 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .criterion-row span{font-size:.7rem}
   .destination-card.premium-proposal .card-body{padding:14px!important}
   .map-legend-card,.map-poi-card{padding:10px}
+}
+
+
+/* v1.7.0 visual-first cleanup */
+.live-discovery-progress{padding:12px!important}
+.live-progress-head.compact{margin-bottom:8px}
+.live-progress-steps{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;margin:0!important;padding:0!important}
+.live-progress-steps li{display:grid!important;grid-template-columns:24px minmax(0,1fr);gap:7px;align-items:center;padding:8px!important;border-radius:11px;background:rgba(255,255,255,.7);list-style:none!important}
+.live-progress-steps li>span{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;font-weight:900;background:#dff2eb;color:#176b5c}
+.live-progress-steps li.active>span{background:#edf3f1}
+.live-progress-steps li.failed>span{background:#fff1ea;color:#b4573d}
+.live-progress-steps li div{display:grid;gap:1px}
+.live-progress-steps li strong{font-size:.78rem}
+.live-progress-steps li small{font-size:.69rem;line-height:1.2;color:var(--premium-muted)}
+.progress-detail{grid-column:1/-1}
+
+.proposal-summary-compact{display:-webkit-box!important;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35!important;margin:7px 0 10px!important}
+.proposal-pictogram-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:7px 0 11px}
+.proposal-pictogram-strip span{display:grid;place-items:center;gap:2px;min-height:60px;padding:7px 4px;border-radius:13px;background:linear-gradient(145deg,#f2f8f6,#fff);border:1px solid var(--premium-line)}
+.proposal-pictogram-strip b{font-size:1.25rem;line-height:1}
+.proposal-pictogram-strip small{font-size:.61rem;font-weight:760;color:#526d67;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.proposal-visual-highlights{margin:9px 0;padding:10px 11px;border-radius:15px;background:linear-gradient(135deg,#ecf7f3,#f9fcfb);border:1px solid var(--premium-line)}
+.visual-highlight-title{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.visual-highlight-title strong{font-size:.85rem}
+.proposal-visual-highlights ul{margin:0;padding-left:17px;display:grid;gap:3px}
+.proposal-visual-highlights li{font-size:.76rem;line-height:1.28;color:#425e58}
+.destination-card .proposal-shape{font-size:.78rem!important;line-height:1.3!important;margin:7px 0!important}
+.destination-card .constraint-summary{font-size:.76rem!important;padding:8px 10px!important}
+.destination-card .tradeoff p{font-size:.76rem!important;margin:3px 0 0!important}
+.destination-card .proposal-evidence summary{font-size:.76rem}
+.destination-card .destination-image{min-height:170px;object-fit:cover}
+
+.reisslim-poi-icon-wrap{background:transparent!important;border:0!important}
+.reisslim-poi-pin{position:relative;display:grid;place-items:center;width:34px;height:34px;border-radius:50% 50% 50% 8px;transform:rotate(-45deg);background:var(--poi);border:3px solid white;box-shadow:0 5px 14px rgba(18,54,49,.3),0 0 0 3px color-mix(in srgb,var(--day) 45%,transparent)}
+.reisslim-poi-pin span{transform:rotate(45deg);font-size:14px}
+.reisslim-poi-pin b{position:absolute;right:-8px;top:-8px;transform:rotate(45deg);display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#153f39;color:#fff;font-size:.63rem;border:2px solid #fff}
+.reisslim-poi-pin.focused{width:42px;height:42px;filter:drop-shadow(0 0 8px rgba(255,193,64,.7));box-shadow:0 7px 20px rgba(18,54,49,.36),0 0 0 5px #ffd566}
+.map-poi-row{cursor:pointer!important;transition:transform .15s ease,background .15s ease,border-color .15s ease}
+.map-poi-row:active{transform:scale(.99)}
+.map-poi-row.is-active{background:#edf8f4!important;border-color:#68ac9d!important;box-shadow:0 5px 14px rgba(23,107,92,.12)}
+.map-poi-number{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--poi-color);color:#fff;font-weight:900;font-size:.74rem}
+.map-poi-row{grid-template-columns:32px 34px minmax(0,1fr) 30px!important}
+
+.compare-dock{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:1500;width:min(440px,calc(100% - 28px));display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-radius:18px;background:rgba(17,70,61,.96);color:#fff;box-shadow:0 16px 36px rgba(10,52,45,.3);backdrop-filter:blur(14px)}
+.compare-dock.hidden{display:none!important}
+.compare-dock>div{display:grid;grid-template-columns:28px auto;column-gap:7px;align-items:center}
+.compare-dock>div>span{grid-row:1/3;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.12)}
+.compare-dock strong{font-size:.8rem}
+.compare-dock small{font-size:.68rem;color:#cde2dc}
+.compare-dock button{padding:8px 13px!important;background:#fff!important;color:#174a41!important;border:0!important;border-radius:11px!important;font-size:.76rem!important;font-weight:850}
+.premium-comparison{scroll-margin-top:90px}
+.premium-comparison .comparison-wrap{border-radius:16px;overflow:auto;border:1px solid var(--premium-line);box-shadow:var(--premium-soft)}
+.premium-comparison table{background:#fff}
+.premium-comparison th{background:#f0f7f4}
+
+@media(max-width:800px){
+  .live-progress-steps{grid-template-columns:1fr 1fr!important}
+  .proposal-pictogram-strip{gap:5px}
+  .proposal-pictogram-strip span{min-height:54px}
+  .compare-dock{bottom:78px}
 }

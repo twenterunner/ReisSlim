@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.6.9',build:'1609'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.0',build:'1700'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -90,5 +90,75 @@ function polishProposalCards(){
   });
 }
 
-function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
+
+const visualCriterionIcons={budget:'€',driving:'🛣️',season:'☀️',transport:'🏍️',scenery:'🏔️',walking:'🥾',swimming:'🏊',food:'🍽️',culture:'🏛️',crowds:'🌿'};
+
+function visualiseProposalCards(){
+  const registry=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
+  document.querySelectorAll('.destination-card').forEach(card=>{
+    if(card.dataset.visualised==='1')return;
+    card.dataset.visualised='1';
+    const id=card.querySelector('[data-select]')?.dataset.select;
+    const scores=id&&registry[id];
+    const body=card.querySelector('.card-body');
+    if(!body)return;
+
+    const summary=card.querySelector('.card-body>.muted');
+    if(summary)summary.classList.add('proposal-summary-compact');
+
+    const explanation=card.querySelector('.ai-explanation');
+    if(explanation){
+      const raw=(explanation.textContent||'').replace(/^Waarom deze\?\s*/i,'').trim();
+      const bullets=raw.split(/(?:;\s+|\.\s+)/).map(v=>v.trim()).filter(v=>v.length>12).slice(0,3);
+      const visual=document.createElement('div');
+      visual.className='proposal-visual-highlights';
+      visual.innerHTML=`<div class="visual-highlight-title"><span>✨</span><strong>Waarom deze reis</strong></div><ul>${bullets.map(item=>`<li>${item}</li>`).join('')}</ul>`;
+      explanation.replaceWith(visual);
+    }
+
+    if(scores){
+      const best=Object.entries(scores).filter(([,v])=>Number.isFinite(Number(v))).sort((a,b)=>b[1]-a[1]).slice(0,4);
+      const strip=document.createElement('div');
+      strip.className='proposal-pictogram-strip';
+      strip.innerHTML=best.map(([key,value])=>`<span title="${criteriaLabels[key]||key} ${Math.round(value)}/100"><b>${visualCriterionIcons[key]||'★'}</b><small>${criteriaLabels[key]||key}</small></span>`).join('');
+      const title=card.querySelector('h3');
+      title?.insertAdjacentElement('afterend',strip);
+    }
+  });
+}
+
+function ensureCompareDock(){
+  let dock=document.getElementById('compareDock');
+  if(!dock){
+    dock=document.createElement('div');
+    dock.id='compareDock';
+    dock.className='compare-dock hidden';
+    dock.innerHTML='<div><span>⇄</span><strong>Vergelijk reizen</strong><small id="compareDockCount">0 geselecteerd</small></div><button type="button" id="openCompareDock">Vergelijk</button>';
+    document.body.appendChild(dock);
+    dock.querySelector('#openCompareDock')?.addEventListener('click',()=>{
+      const section=document.getElementById('compareSection');
+      if(section){
+        section.classList.remove('hidden');
+        section.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+    });
+  }
+  const count=document.querySelectorAll('[data-compare]:checked').length;
+  dock.classList.toggle('hidden',count<2);
+  const countEl=dock.querySelector('#compareDockCount');
+  if(countEl)countEl.textContent=`${count} geselecteerd`;
+}
+
+function enhanceComparisonUi(){
+  ensureCompareDock();
+  const section=document.getElementById('compareSection');
+  if(!section)return;
+  const checked=document.querySelectorAll('[data-compare]:checked').length;
+  if(checked>=2)section.classList.remove('hidden');
+  section.classList.add('premium-comparison');
+}
+
+function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceComparisonUi();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceComparisonUi();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();
+
+window.addEventListener('reisslim:compare-updated',()=>setTimeout(enhanceComparisonUi,0));
