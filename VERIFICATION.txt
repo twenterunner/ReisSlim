@@ -1,10 +1,14 @@
 syntax config.js: PASS
-syntax destination-provider.js: PASS
-syntax proposal-engine.js: PASS
 syntax ui-feature-flags.js: PASS
+syntax place-provider.js: PASS
+syntax map-view.js: PASS
+syntax gpx-generator.js: PASS
 syntax service-worker.js: PASS
-revision config: PASS
-revision service worker: PASS
-network-first code: PASS
-expanded discovery retained: PASS
-header revision retained: PASS
+revision: PASS
+compact ui: PASS
+named live places: PASS
+review links: PASS
+no fabricated ratings: PASS
+GPX web link: PASS
+map links: PASS
+cache rev: PASS
