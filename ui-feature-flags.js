@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.6.8',build:'1608'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.6.9',build:'1609'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -41,5 +41,54 @@ function normalizeLegacyStatusText(){
   });
 }
 
-function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
+
+const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuigmatch',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
+
+function removeDeprecatedSections(){
+  document.querySelectorAll('.inspiration-grid').forEach(grid=>grid.closest('section.panel')?.remove());
+  document.getElementById('allowStretch')?.closest('label')?.remove();
+  const notice=document.getElementById('portfolioNotice');
+  if(notice&&/^Waarom deze mix\?/i.test((notice.textContent||'').trim()))notice.innerHTML='';
+}
+
+function criterionRow(key,value,tone){
+  const label=criteriaLabels[key]||key;
+  return `<div class="criterion-row ${tone}"><span>${label}</span><strong>${Math.round(value)}</strong><i style="--criterion:${Math.max(0,Math.min(100,value))}%"></i></div>`;
+}
+
+function enhanceProposalScores(){
+  const registry=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
+  document.querySelectorAll('.destination-card').forEach(card=>{
+    const id=card.querySelector('[data-select]')?.dataset.select;
+    const scores=id&&registry[id];
+    if(!scores)return;
+    card.querySelector('.dimension-grid')?.classList.add('legacy-dimensions-hidden');
+    let panel=card.querySelector('.score-extremes');
+    const entries=Object.entries(scores).filter(([,value])=>Number.isFinite(Number(value))).map(([key,value])=>[key,Number(value)]);
+    if(entries.length<6)return;
+    const top=[...entries].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,3);
+    const bottom=[...entries].sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,3);
+    const content=`<div class="score-extremes-head"><div><span>STERKSTE MATCH</span><strong>Top 3</strong></div><div><span>ZWAKSTE MATCH</span><strong>Bottom 3</strong></div></div><div class="score-extremes-grid"><div>${top.map(([key,value])=>criterionRow(key,value,'positive')).join('')}</div><div>${bottom.map(([key,value])=>criterionRow(key,value,'negative')).join('')}</div></div>`;
+    if(!panel){
+      panel=document.createElement('section');
+      panel.className='score-extremes';
+      const anchor=card.querySelector('.constraint-summary')||card.querySelector('.chips');
+      anchor?.insertAdjacentElement('afterend',panel);
+    }
+    panel.innerHTML=content;
+  });
+}
+
+function polishProposalCards(){
+  document.querySelectorAll('.destination-card').forEach(card=>{
+    card.classList.add('premium-proposal');
+    const explanation=card.querySelector('.ai-explanation');
+    if(explanation&&!explanation.dataset.polished){
+      explanation.dataset.polished='1';
+      explanation.classList.add('proposal-insight');
+    }
+  });
+}
+
+function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();

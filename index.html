@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.6.8-1608-nominatim-discovery">
+  <meta name="reisslim-build" content="1.6.9-1609-premium-map-scores">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1608">
+  <link rel="manifest" href="manifest.webmanifest?v=1609">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1608">
-  <link rel="stylesheet" href="compact-ui.css?v=1608">
+  <link rel="stylesheet" href="styles.css?v=1609">
+  <link rel="stylesheet" href="compact-ui.css?v=1609">
 </head>
 <body>
   <header class="topbar">
@@ -44,14 +44,6 @@
         </article>
       </section>
       <section class="panel"><div class="section-heading"><div><p class="eyebrow">Bibliotheek</p><h2>Opgeslagen reizen</h2></div></div><div id="savedTripsList" class="saved-trips-grid"></div></section>
-      <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">Inspiratie</p><h2>Populaire richtingen</h2></div></div>
-        <div class="inspiration-grid">
-          <button class="inspiration-card" data-inspire="Slovenië" type="button"><span>🏔️</span><strong>Slovenië</strong><small>Meren, bergen en mooie wegen</small></button>
-          <button class="inspiration-card" data-inspire="Dolomieten" type="button"><span>🏍️</span><strong>Dolomieten</strong><small>Passen, natuur en eten</small></button>
-          <button class="inspiration-card" data-inspire="Harz" type="button"><span>🌲</span><strong>Harz</strong><small>Dichtbij en geschikt voor een korte roadtrip</small></button>
-        </div>
-      </section>
     </section>
 
     <section id="plannerView" class="app-view">
@@ -91,7 +83,6 @@
               <label class="check-option"><input id="strictBudget" type="checkbox" checked><span><strong>Budget is een harde grens</strong></span></label>
               <label class="check-option"><input id="strictDrive" type="checkbox" checked><span><strong>Dagelijkse reistijd is een harde grens</strong></span></label>
               <label class="check-option"><input id="strictChanges" type="checkbox" checked><span><strong>Accommodatiewissels zijn een harde grens</strong></span></label>
-              <label class="check-option"><input id="allowStretch" type="checkbox" checked><span><strong>Beperkte stretch-ideeën toestaan</strong></span></label>
               <label class="check-option"><input id="liveData" type="checkbox" checked><span><strong>Live route, plaatsen en weer gebruiken</strong><small>ReisSlim mag langer zoeken om live resultaten te krijgen.</small></span></label>
               <label class="check-option"><input id="remoteTravel" type="checkbox"><span><strong>Afgelegen / expeditieroute</strong></span></label>
               <label class="check-option"><input id="privateMode" type="checkbox"><span><strong>Privémodus</strong></span></label>
@@ -136,7 +127,7 @@
       <section id="noPlanItinerary" class="panel empty-view"><h2>Nog geen reis gekozen</h2><p>Maak eerst reisvoorstellen en kies daarna een bestemming.</p><button data-go-planner type="button">Naar planner</button></section>
     </section>
 
-    <section id="mapView" class="app-view"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart & waypoints</h1></div><span id="mapDataStatus" class="badge">Live data laden</span></div><div id="map"></div><p id="mapHint" class="muted">Kies eerst een bestemming.</p><p class="trust-notice">ReisSlim probeert de echte wegroute en specifieke plaatsen live op te halen.</p></section></section>
+    <section id="mapView" class="app-view"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Route</p><h1>Kaart & waypoints</h1></div><span id="mapDataStatus" class="badge">Live data laden</span></div><div id="map"></div><div id="mapLegendPoi" class="map-legend-poi" aria-live="polite"></div><p id="mapHint" class="muted">Kies eerst een bestemming.</p><p class="trust-notice">ReisSlim probeert de echte wegroute en specifieke plaatsen live op te halen.</p></section></section>
     <section id="budgetView" class="app-view"><section class="panel"><div class="section-heading"><div><p class="eyebrow">Kosten</p><h1>Budget</h1></div></div><div id="budgetSummary" class="summary-grid"></div><div id="budgetBreakdown"></div><details id="budgetAssumptions"></details><h2>Controlepunten</h2><div id="validationList"></div></section></section>
   </main>
 
@@ -148,9 +139,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.6.8 · Build 1608</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.6.9 · Build 1609</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1608"></script>
-  <script type="module" src="app.js?v=1608"></script>
+  <script src="ui-feature-flags.js?v=1609"></script>
+  <script type="module" src="app.js?v=1609"></script>
 </body>
 </html>
