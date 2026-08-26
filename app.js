@@ -27,8 +27,9 @@ const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
 
 function endpointLabel(endpoint){
-  if(String(endpoint||'').includes('kumi.systems'))return 'OpenStreetMap-server 2';
-  if(String(endpoint||'').includes('overpass-api.de'))return 'OpenStreetMap-server 1';
+  if(String(endpoint||'').includes('Nominatim'))return 'OpenStreetMap plaatsendienst';
+  if(String(endpoint||'').includes('kumi.systems'))return 'OpenStreetMap detailserver 2';
+  if(String(endpoint||'').includes('overpass-api.de'))return 'OpenStreetMap detailserver 1';
   if(endpoint==='cache')return 'lokale cache';
   return 'OpenStreetMap-server';
 }
@@ -72,11 +73,11 @@ function finishLiveDiscoveryProgress(){
 function handleDiscoveryProgress(event){
   const p=state.liveDiscoveryProgress||(state.liveDiscoveryProgress={});
   if(event.type==='discovery-start'){
-    p.origin=event.origin;p.reachKm=event.reachKm;p.totalPasses=event.totalPasses;p.lastMessage='OpenStreetMap-servers worden benaderd…';
+    p.origin=event.origin;p.reachKm=event.reachKm;p.totalPasses=event.totalPasses;p.lastMessage='OpenStreetMap-plaatsendienst wordt benaderd…';
   }else if(event.type==='pass-start'){
     p.pass=event.pass;p.totalPasses=event.totalPasses;p.endpointLabel='';p.lastMessage=`Zoekgebied ${event.pass} voorbereiden…`;
   }else if(event.type==='endpoint-start'){
-    p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} doorzoekt steden, natuurgebieden en interessante regio’s…`;
+    p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} bepaalt een bereikbare plaats rond route-seed ${event.seedIndex||''}${event.totalSeeds?`/${event.totalSeeds}`:''}…`;
   }else if(event.type==='endpoint-failure'){
     p.lastMessage=event.timeout?`${endpointLabel(event.endpoint)} reageerde niet binnen de tijdslimiet.`:`${endpointLabel(event.endpoint)} gaf een fout; volgende bron proberen.`;
   }else if(event.type==='endpoint-switch'){
@@ -122,7 +123,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
     const result=await discoverDestinationBatch(state.trip,{
       cursor:state.discoveryCursor,
       excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
-      timeoutMs:15000,
+      timeoutMs:7000,
       onProgress:handleDiscoveryProgress,
       onBatch:async batch=>{
         const known=new Set(state.catalog.map(i=>i.id));

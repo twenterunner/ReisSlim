@@ -1,20 +1,13 @@
-ReisSlim v1.5.5 / Build 1505 verification
-
 syntax destination-provider.js: PASS
-syntax service-worker.js: PASS
-syntax config.js: PASS
-syntax ui-feature-flags.js: PASS
 syntax app.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+syntax ui-feature-flags.js: PASS
 revision: PASS
-progress panel exists: PASS
-progress events: PASS
-independent endpoint controller per OpenStreetMap server: PASS
-progressive batch callback: PASS
-browser yield between discovery passes: PASS
-app merges successful live batches immediately: PASS
-retry live action present: PASS
-fallback visibility tied to active live-discovery state: PASS
-service-worker cache 1505: PASS
-
-Browser live-provider acceptance: NOT RUN in packaging runtime.
-Reason: external OpenStreetMap provider behavior/CORS/mobile-network timing must be verified in the deployed browser.
+Nominatim-first discovery: PASS
+old broad discovery fetch removed: PASS
+paced requests: PASS
+progressive batches: PASS
+early useful portfolio: PASS
+new cache: PASS
+Browser live-network acceptance must be confirmed after GitHub Pages deployment.

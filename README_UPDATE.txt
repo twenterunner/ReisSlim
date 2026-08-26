@@ -1,15 +1,7 @@
-ReisSlim v1.5.5 / Build 1505
+ReisSlim v1.5.6 / Build 1506
+LIVE DISCOVERY ROOT-CAUSE FIX
 
-Requested live-search UX update:
-- dynamic progress panel with elapsed seconds
-- origin + search radius shown
-- search round 1/4 ... 4/4 shown
-- shows active OSM server
-- shows failover when server 1 fails
-- raw location count + usable live region count
-- first successful live batch appears immediately
-- endpoint-specific timeout controllers
-- retry-live button after genuine failure
-- fallback hidden only while live search is actually running
+Changed destination discovery from broad multi-clause Overpass searches to
+lightweight OpenStreetMap Nominatim reverse lookups at roadtrip-reach seeds.
 
-Upload ALL extracted files to the repository root.
+Upload all files in this ZIP to repository root.
