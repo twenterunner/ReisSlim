@@ -1,16 +1,20 @@
 syntax config.js: PASS
 syntax trip-model.js: PASS
-syntax destination-provider.js: PASS
+syntax route-topology.js: PASS
+syntax itinerary-engine.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
 syntax destination-engine.js: PASS
 syntax proposal-engine.js: PASS
 syntax ui-feature-flags.js: PASS
 syntax service-worker.js: PASS
-revision: PASS
-road-only normalize: PASS
-road reach hard rejection: PASS
-blanket tags removed: PASS
-evidence-based tags: PASS
-preference dominance: PASS
-essential preference penalty: PASS
-flight UI hidden: PASS
+revision 1404: PASS
+3 topologies: PASS
+loop alternate corridor: PASS
+open-ended no return: PASS
+specific lunch midpoint: PASS
+specific named place only: PASS
+generic recommendations filtered: PASS
+preference reasons: PASS
+value-add UI metrics: PASS
 cache bump: PASS

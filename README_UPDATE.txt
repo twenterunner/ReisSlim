@@ -1,34 +1,34 @@
-ReisSlim v1.4.3 / Build 1403
+ReisSlim v1.4.4 / Build 1404
 
-Fixes requested:
-1. Preferences now materially change proposals.
-   Root cause: live-discovered destinations were given generic tags
-   ['natuur','cultuur','eten'] and every motorcycle destination was given 'motor'.
-   That made many checkbox combinations score almost identically.
-   v1.4.3 only assigns tags supported by the discovered OSM feature type.
+Main fixes
+1. "Waarom deze?" now explicitly explains the preferences that matched:
+   e.g. culture -> cities/heritage/cultural sights; mountains -> mountainous terrain;
+   nice roads -> scenic/curvy-road potential; food -> horeca/local food options.
+   The weighted preference match is still shown, but now with actual reasons.
 
-2. Preference scoring is now dominant enough to reorder results.
-   Weighted preference coverage contributes 56% of the destination score.
-   'Essentieel' misses are explicitly penalized.
-   Portfolio diversity can no longer overpower preference fit.
+2. The four proposal metrics are made more decision-useful in the UI:
+   Voorkeursmatch, Roadtripfit, Seizoenfit and Voertuig/routefit, each with a
+   qualitative interpretation such as "zeer sterk" / "sterk" / "redelijk".
 
-3. Roadtrip-only mode.
-   - travelMode is forced to 'direct'
-   - flight/fly-drive/fly-ride/fly-camper is ignored even in saved drafts
-   - travel-mode field is hidden from the planner
-   - open-jaw multimodal option is removed
-   - destinations beyond realistic out-and-back road reach are HARD rejected
-   - targeted searches outside road reach do not trigger remote discovery
+3. Route topology now has exactly three roadtrip choices:
+   - Lus — andere route terug
+   - Heen & terug — dezelfde route
+   - Open einde — eindig op bestemming
+   Flight/multimodal modes remain disabled.
 
-4. Example fixed:
-   A normal motorcycle trip from Saasveld can no longer surface Namibia as
-   a selectable proposal because it exceeds the roadtrip reach calculation.
+4. Loop duplication reduced:
+   - return corridor offset is dynamic (75–190 km depending on trip scale)
+   - loop overlap uses a tighter 15 km overlap threshold
+   - out-and-back deliberately reuses the same corridor
+   - open-ended does not return to the start
 
-5. Revision is v1.4.3 / Build 1403 and is visible in the header.
+5. Specific stops/accommodation:
+   - generic placeholders are no longer shown as recommendations
+   - travel days include a lunch recommendation around the mid-route point
+   - accommodation is searched at the overnight point
+   - live place search uses named OSM results only
+   - search radius increased and queries are chunked across route anchors
+   - two Overpass endpoints are tried for resilience
+   - only live named places are exported as recommendation points
 
 Upload all files in this ZIP to the deployed repository root.
-
-Verification:
-- all changed JS files pass node --check
-- static tests verify direct-only normalization, road-reach rejection,
-  removal of blanket live tags, preference-dominant score, and revision/cache.
