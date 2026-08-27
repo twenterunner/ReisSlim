@@ -1,0 +1,13 @@
+ReisSlim v1.7.25 · Build 1725 verification
+
+PASS - ui-hotfix-1725.js syntax validation
+PASS - service-worker.js syntax validation
+PASS - destination pictogram strip is removed
+PASS - destination photos are requested through image-provider.js
+PASS - normal table rows receive a choose-trip action
+PASS - comparison table columns receive a choose-trip action
+PASS - map popups receive a choose-trip action when absent
+PASS - all choose actions delegate to the original proposal [data-select] button
+PASS - header/footer revision is forced to 1.7.25 / 1725
+PASS - README is updated to 1.7.25 / 1725
+PASS - service worker uses a new 1.7.25 / 1725 cache and injects ui-hotfix-1725.js

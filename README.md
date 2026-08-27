@@ -1,28 +1,18 @@
-# ReisSlim v1.5.5 · Build 1505
+# ReisSlim v1.7.25 · Build 1725
 
-## Progressive live discovery
+## Proposal photos and selection from every view
 
-The live-search panel now reports progress instead of showing one static message.
+This release improves proposal review and comparison.
 
-It shows:
-- origin and calculated roadtrip reach;
-- current search round (1–4);
-- which OpenStreetMap Overpass server is being queried;
-- provider timeout/failover to the second server;
-- number of raw locations received;
-- number of usable live roadtrip regions already found;
-- elapsed time;
-- final success or failure.
+- Every trip/destination is presented with a destination photo where a live image is available.
+- The old proposal pictogram strip is removed in favour of destination photography.
+- Table view now allows the user to choose the preferred trip directly with **Kies deze reis**.
+- The complete table row is also selectable, except when tapping another interactive control.
+- Comparison table headers now show the destination photo and a **Kies deze reis** button.
+- Map popups expose a working **Kies deze reis** action.
+- Selection from table, comparison table, map popup and normal proposal card all use the same underlying proposal-selection action.
+- The legacy floating comparison bar is suppressed; comparison remains available in the normal comparison section.
+- Runtime header and footer revision labels are synchronized to **v1.7.25 · Build 1725**.
+- Service-worker cache is bumped so the new UI hotfix is loaded instead of a stale cached release.
 
-Crucially, live destination results are added to the proposal portfolio after
-each successful search round. ReisSlim no longer waits for all four rounds before
-showing useful live results.
-
-Each Overpass endpoint has its own 15-second timeout controller, so a timeout on
-server 1 no longer prevents server 2 from actually being tried.
-
-If all four rounds fail, the progress panel states that explicitly and exposes a
-"Probeer live opnieuw" button. Only then are fallback cards allowed to become
-visible again.
-
-**Release: ReisSlim v1.5.5 · Build 1505**
+**Release: ReisSlim v1.7.25 · Build 1725**
