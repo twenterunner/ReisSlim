@@ -18,6 +18,22 @@ function safeUrl(value){try{const url=new URL(String(value||''));return['http:',
 function clearLayers(){activeLayers.forEach(item=>item.remove());activeLayers=[];poiMarkers=[];poiCategoryLayers=new Map();activePoiTypes=new Set();if(layerControl){layerControl.remove();layerControl=null}}
 function addOverlay(name){const group=L.layerGroup().addTo(map);activeLayers.push(group);return[name,group]}
 function dayColor(day){return dayColors[(Math.max(1,Number(day)||1)-1)%dayColors.length]}
+
+function displayPointFor(item,index,proposals){
+  const base={lat:Number(item.lat),lon:Number(item.lon)};
+  if(!Number.isFinite(base.lat)||!Number.isFinite(base.lon))return base;
+  const closeBefore=proposals.slice(0,index).filter(other=>{
+    const dLat=(Number(other.lat)-base.lat)*111;
+    const dLon=(Number(other.lon)-base.lon)*111*Math.cos(base.lat*Math.PI/180);
+    return Math.hypot(dLat,dLon)<1.2;
+  }).length;
+  if(!closeBefore)return base;
+  // Marker-only radial displacement of ~180-420 m. Stored POI/GPX coordinate remains unchanged.
+  const ring=1+Math.floor((closeBefore-1)/6),slot=(closeBefore-1)%6,angle=slot*Math.PI/3;
+  const km=.18*ring,latOffset=(km/111)*Math.sin(angle),lonOffset=(km/(111*Math.max(.2,Math.cos(base.lat*Math.PI/180))))*Math.cos(angle);
+  return{lat:base.lat+latOffset,lon:base.lon+lonOffset};
+}
+
 function proposalLinks(item){const links=[];const mapUrl=safeUrl(item.mapUrl||item.url),website=safeUrl(item.websiteUrl),source=safeUrl(item.sourceUrl);if(mapUrl)links.push(`<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Kaart & reviews</a>`);if(website&&website!==mapUrl)links.push(`<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer">Website</a>`);if(source&&source!==mapUrl&&source!==website)links.push(`<a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">OSM-bron</a>`);return links.length?`<br>${links.join(' · ')}`:''}
 
 function poiIcon(item,index,focused=false){
@@ -134,7 +150,8 @@ export function renderMap(plan,elementId='map'){
       activeLayers.push(group);
       overlays[`${poiIcons[item.type]||'•'} ${poiLabels[item.type]||item.type}`]=group;
     }
-    const marker=L.marker([item.lat,item.lon],{icon:poiIcon(item,index,false),riseOnHover:true,riseOffset:900})
+    const displayPoint=displayPointFor(item,index,proposals);
+    const marker=L.marker([displayPoint.lat,displayPoint.lon],{icon:poiIcon(item,index,false),riseOnHover:true,riseOffset:900})
       .addTo(group)
       .bindPopup(`<strong>${index+1}. ${escapeHtml(item.name)}</strong><br><span style="color:${poiColors[item.type]||'#697d78'}">●</span> ${escapeHtml(poiLabels[item.type]||item.type)} · Dag ${item.day}<br>${escapeHtml(item.reason||'')}${proposalLinks(item)}`);
     marker.on('click',()=>focusPoi(index));

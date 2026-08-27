@@ -178,28 +178,76 @@ function applyLivePlace(item,place,distanceKm,day){
 }
 
 
+
 async function reverseGeocodePoint(point,fetchImpl,timeoutMs=3200){
   if(!validCoordinate(point))return null;
   const url=new URL('https://nominatim.openstreetmap.org/reverse');
   url.search=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),format:'jsonv2',zoom:'10',addressdetails:'1'});
   try{
     const row=await fetchJson(url,{headers:{accept:'application/json'}},timeoutMs,fetchImpl),address=row?.address||{};
-    const name=address.city||address.town||address.village||address.municipality||address.county||String(row?.display_name||'').split(',')[0];
-    return name?{lat:Number(row.lat)||point.lat,lon:Number(row.lon)||point.lon,name,country:String(address.country||''),countryCode:String(address.country_code||'').toUpperCase()}:null;
+    const name=address.city||address.town||address.village||address.municipality||address.county||address.state_district;
+    const country=String(address.country||'').trim(),countryCode=String(address.country_code||'').toUpperCase();
+    // Require an actual land address. Ocean/reverse results without a country/locality are rejected.
+    if(!name||!country||!countryCode)return null;
+    return{lat:Number(row.lat)||point.lat,lon:Number(row.lon)||point.lon,name,country,countryCode,landValidated:true};
   }catch{return null}
 }
-async function resolveGeneratedExplorationStops(plan,fetchImpl,options={}){
-  for(const day of plan.days||[]){
-    if(!day.toPoint?.generatedExploration)continue;
-    const resolved=await reverseGeocodePoint(day.toPoint,fetchImpl,options.nominatimTimeoutMs||3200);
-    if(!resolved)continue;
-    const oldName=day.to;
-    day.to=resolved.name;day.location=resolved.name;day.overnight=resolved.name;day.toPoint={...day.toPoint,...resolved,name:resolved.name};
-    if(day.primaryPlan)day.primaryPlan=day.primaryPlan.replace(oldName,resolved.name);
-    const next=(plan.days||[]).find(candidate=>candidate.day===day.day+1);
-    if(next&&next.from===oldName){next.from=resolved.name;next.fromPoint={...next.fromPoint,...resolved,name:resolved.name}}
+function searchPointAround(point,bearingDeg,distanceKm){
+  const R=6371,a=distanceKm/R,b=bearingDeg*Math.PI/180,lat1=point.lat*Math.PI/180,lon1=point.lon*Math.PI/180;
+  const lat2=Math.asin(Math.sin(lat1)*Math.cos(a)+Math.cos(lat1)*Math.sin(a)*Math.cos(b));
+  const lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(a)*Math.cos(lat1),Math.cos(a)-Math.sin(lat1)*Math.sin(lat2));
+  return{lat:Number((lat2*180/Math.PI).toFixed(6)),lon:Number((((lon2*180/Math.PI+540)%360)-180).toFixed(6))};
+}
+async function findNearestLandLocality(point,fetchImpl,timeoutMs=3200){
+  const direct=await reverseGeocodePoint(point,fetchImpl,timeoutMs);
+  if(direct)return direct;
+  // Ocean guard: search a compact ring around the synthetic point. The first real locality
+  // is preferred over retaining a coordinate that cannot be identified as land.
+  const radii=[35,70,120,180];
+  const bearings=[0,45,90,135,180,225,270,315];
+  for(const radius of radii){
+    for(const bearing of bearings){
+      const candidate=searchPointAround(point,bearing,radius);
+      const resolved=await reverseGeocodePoint(candidate,fetchImpl,Math.min(timeoutMs,2400));
+      if(resolved)return resolved;
+    }
+  }
+  return null;
+}
+export async function prepareGeneratedRouteStops(plan,{fetchImpl=fetch,timeoutMs=3200,onProgress}={}){
+  const generated=(plan?.days||[]).filter(day=>day.toPoint?.generatedExploration);
+  if(!generated.length)return plan;
+  for(let index=0;index<generated.length;index++){
+    const day=generated[index],oldName=day.to;
+    onProgress?.({index,total:generated.length,day:day.day,message:`Controleer overnachtingsregio voor dag ${day.day}`});
+    const resolved=await findNearestLandLocality(day.toPoint,fetchImpl,timeoutMs);
+    if(resolved){
+      day.to=resolved.name;day.location=resolved.name;day.overnight=resolved.name;
+      day.toPoint={...day.toPoint,...resolved,name:resolved.name,generatedExploration:true,landValidated:true};
+      if(day.primaryPlan)day.primaryPlan=day.primaryPlan.replace(oldName,resolved.name);
+      const next=(plan.days||[]).find(candidate=>candidate.day===day.day+1);
+      if(next&&next.from===oldName){
+        next.from=resolved.name;
+        next.fromPoint={...next.fromPoint,...resolved,name:resolved.name,landValidated:true};
+      }
+    }else{
+      // Never keep an unverified synthetic point in the sea. If live validation fails,
+      // collapse this leg onto the previous known land point. It can still be regenerated
+      // on the next live run, but the map/route remains geographically safe.
+      const previous=(plan.days||[]).find(candidate=>candidate.day===day.day-1)?.toPoint;
+      if(validCoordinate(previous)){
+        const fallbackName=(plan.days||[]).find(candidate=>candidate.day===day.day-1)?.to||'Vorige regio';
+        day.to=fallbackName;day.location=fallbackName;day.overnight=fallbackName;
+        day.toPoint={...previous,name:fallbackName,generatedExploration:true,landValidated:false,landFallback:true};
+        const next=(plan.days||[]).find(candidate=>candidate.day===day.day+1);
+        if(next&&next.from===oldName){next.from=fallbackName;next.fromPoint={...day.toPoint}}
+      }
+    }
   }
   return plan;
+}
+async function resolveGeneratedExplorationStops(plan,fetchImpl,options={}){
+  return prepareGeneratedRouteStops(plan,{fetchImpl,timeoutMs:options.nominatimTimeoutMs||3200});
 }
 
 async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storage){

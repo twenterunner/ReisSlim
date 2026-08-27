@@ -1,0 +1,29 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax map-view.js: PASS
+horizontal day carousel: PASS
+day counter: PASS
+loading overlay: PASS
+loading progress stages: PASS
+rotating images: PASS
+planner hot tiles removed: PASS
+pre-routing land guard: PASS
+ocean fallback: PASS
+POI declutter: PASS
+five nav columns: PASS
+revision config: PASS
+revision header: PASS
+revision footer: PASS
+revision cache: PASS
+Live OSM land validation and routing still require deployed network access.

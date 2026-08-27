@@ -1,10 +1,12 @@
-ReisSlim v1.7.8 · Build 1708
+ReisSlim v1.7.9 · Build 1709
 
-Open-ended route fix:
-- A 10-day open-ended roadtrip now keeps moving through multiple overnight regions.
-- It respects max accommodation changes.
-- It alternates onward travel with local exploration/rest instead of staying at one destination.
-- Generated onward regions are reverse-geocoded to real locality names when live OSM data is available.
-- Loop and out-and-back behavior are unchanged.
-
-Package is completely flat: no folders. Images are in the ZIP root and all references have been rewritten accordingly.
+THIS UPDATE
+- Reisplan daily cards now swipe horizontally left-to-right with scroll snap and a visible day counter.
+- Added a full Reisplan live-loading overlay with progress bar, current task text and rotating local travel images.
+- Loading stages: geographic land check -> road routing -> specific POIs/accommodation/weather -> final assembly.
+- Removed Planner hero subtitle, feature/hot tiles and hero summary card; only the visual hero + title remain.
+- Open-ended synthetic route stops are land-validated BEFORE road routing.
+- Ocean points are rejected; the app searches nearby for a real land locality. If live land validation fails, it falls back to the previous known land point rather than routing into the sea.
+- POI markers that would overlap are visually decluttered on the map without changing the stored GPX coordinates.
+- Bottom navigation is forced to five equal mobile columns so Dashboard, Planner, Reisplan, Kaart and Budget are always visible.
+- Flat ZIP: all files remain at ZIP root, no folders.

@@ -84,7 +84,7 @@
   .priority-item select{height:36px!important;width:104px!important;min-width:104px!important;max-width:104px!important;font-size:.82rem!important}
 }
 
-/* v1.7.8 spacing repairs */
+/* v1.7.9 spacing repairs */
 .current-trip-details{display:grid;gap:6px}
 .current-trip-details div{display:grid!important;grid-template-columns:minmax(92px,auto) 1fr;column-gap:10px;align-items:baseline}
 .current-trip-details span{display:block;color:var(--muted);line-height:1.25}
@@ -97,7 +97,7 @@
 }
 
 
-/* v1.7.8 premium visual system */
+/* v1.7.9 premium visual system */
 :root{
   --premium-ink:#173833;
   --premium-muted:#60746f;
@@ -174,7 +174,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 }
 
 
-/* v1.7.8 visual-first cleanup */
+/* v1.7.9 visual-first cleanup */
 .live-discovery-progress{padding:12px!important}
 .live-progress-head.compact{margin-bottom:8px}
 .live-progress-steps{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;margin:0!important;padding:0!important}
@@ -232,7 +232,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .proposal-pictogram-strip span{min-height:54px}
   .compare-dock{bottom:78px}
 }
-/* v1.7.8 premium visual redesign */
+/* v1.7.9 premium visual redesign */
 :root{--premium:#07584f;--premium2:#0b7567;--mint:#d9f8e9;--ink:#173b38}
 .premium-hero{position:relative;overflow:hidden;border-radius:30px;min-height:390px;padding:34px;color:white;background-size:cover;background-position:center;box-shadow:0 18px 44px rgba(12,66,59,.18)}
 .home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('home-hero.webp')}
@@ -245,7 +245,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 #plannerView #intakeSection{border:0;box-shadow:0 14px 36px rgba(20,60,55,.1)}#plannerView .form-grid>label,#plannerView .vehicle-profile-panel,#plannerView fieldset{border-radius:18px}#plannerView input,#plannerView select,#plannerView textarea{border-radius:14px}#plannerView .check-option{min-height:58px;border-radius:16px}#plannerView button[type=submit]{min-height:58px;font-size:1.08rem;background:linear-gradient(90deg,var(--premium),var(--premium2))}
 @media(max-width:720px){.premium-hero{min-height:430px;padding:24px 20px;border-radius:24px}.premium-hero h1{font-size:2.6rem}.planner-hero{display:block}.hero-glass{display:none}.hero-save{margin-top:22px;min-width:0}.premium-grid{grid-template-columns:1fr}.inspiration-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.inspire-card{min-width:78vw;scroll-snap-align:start}.planner-steps{margin:-12px 8px 12px;padding:10px 8px}.planner-steps span{font-size:.72rem;display:block;text-align:center}.planner-steps b{margin:0 auto 4px}.feature-row{gap:6px}.feature-row span{font-size:.78rem;padding:7px 9px}}
 
-/* v1.7.8 faithful premium planner layout */
+/* v1.7.9 faithful premium planner layout */
 .home-hero{
   background-image:
     linear-gradient(90deg,rgba(4,42,38,.80) 0%,rgba(4,42,38,.48) 46%,rgba(4,42,38,.18) 100%),
@@ -309,14 +309,14 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .vehicle-profile-panel{grid-template-columns:1fr!important}.more-options-grid{grid-template-columns:1fr}
 }
 
-/* v1.7.8 header cleanup */
+/* v1.7.9 header cleanup */
 .topbar{grid-template-columns:minmax(0,1fr) auto!important}
 .topbar .brand-static{cursor:default!important;pointer-events:none!important;background:transparent!important;border:0!important;padding:0!important}
 .topbar>button:not(#newTripBtn){display:none!important}
 #newTripBtn{display:inline-flex!important;align-items:center!important;justify-content:center!important}
 
 
-/* v1.7.8 mobile containment + interaction-safe layout */
+/* v1.7.9 mobile containment + interaction-safe layout */
 html,body{width:100%;max-width:100%;overflow-x:hidden}
 .app-shell,.app-view,.premium-hero,.panel,#tripForm,.planner-primary-grid,.planner-subsection{width:100%;max-width:100%;min-width:0}
 .app-shell{overflow-x:clip}
@@ -346,7 +346,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .planner-search-bar button[type="submit"]{white-space:normal!important;max-width:100%!important}
 }
 
-/* v1.7.8 reliability + clean photography + interactive POI filters */
+/* v1.7.9 reliability + clean photography + interactive POI filters */
 .home-hero{
   background-image:linear-gradient(90deg,rgba(3,42,37,.88) 0%,rgba(3,42,37,.50) 52%,rgba(3,42,37,.12) 100%),url('home-hero-photo.webp')!important;
   background-position:center!important;background-size:cover!important;
@@ -372,7 +372,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .planner-hero.clean-photo-hero{background-position:54% center!important}
 }
 
-/* v1.7.8 hero image visibility acceptance fix */
+/* v1.7.9 hero image visibility acceptance fix */
 .home-hero{
   background-image:
     linear-gradient(90deg,rgba(3,42,37,.62) 0%,rgba(3,42,37,.28) 44%,rgba(3,42,37,.04) 78%),
@@ -403,9 +403,71 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   }
 }
 
-/* v1.7.8 route-wide operational POIs */
+/* v1.7.9 route-wide operational POIs */
 .reisslim-poi-pin.planned-poi{opacity:.78;filter:saturate(.82)}
 .reisslim-poi-pin.planned-poi:after{content:"";position:absolute;inset:-5px;border:2px dashed rgba(255,255,255,.92);border-radius:50% 50% 50% 8px}
 .planned-poi-row{background:linear-gradient(145deg,#fbfcfc,#f2f6f4)!important}
 .planned-poi-row .map-poi-number{opacity:.78}
 .map-legend-card:after{content:"Gestreepte POI = gepland routepunt; gevuld = specifieke live plaats";display:block;margin-top:8px;font-size:.66rem;color:#6b7d78}
+
+/* v1.7.9 Reisplan carousel / live loading / mobile nav / planner hero cleanup */
+html,body{max-width:100%;overflow-x:hidden}
+main,.app-view,.panel{max-width:100%;box-sizing:border-box}
+.planner-hero .hero-sub,.planner-hero .feature-row,.planner-hero .hero-trip-card{display:none!important}
+.planner-hero.clean-photo-hero{min-height:310px!important}
+.planner-hero.clean-photo-hero .hero-copy{max-width:72%!important}
+.planner-hero.clean-photo-hero h1{margin-bottom:0!important}
+
+/* Daily cards swipe horizontally */
+.itinerary-days-column{min-width:0}
+.itinerary-carousel-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:8px}
+.itinerary-carousel-heading h2{margin:0}
+.itinerary-carousel-heading small{color:var(--muted);font-size:.72rem}
+.itinerary-carousel-heading>strong{white-space:nowrap;padding:6px 9px;border-radius:999px;background:#eaf5f2;color:#176b5c;font-size:.72rem}
+#itinerary.itinerary-carousel{
+  display:flex!important;gap:12px;overflow-x:auto!important;overflow-y:hidden;padding:3px 8px 12px 2px;
+  scroll-snap-type:x mandatory;scroll-padding-inline:2px;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain
+}
+#itinerary.itinerary-carousel .day-card{
+  flex:0 0 min(88vw,520px);width:min(88vw,520px);min-width:0;margin:0!important;padding:0!important;
+  border-left:0!important;scroll-snap-align:start;scroll-snap-stop:always
+}
+#itinerary.itinerary-carousel .day-card:before{display:none!important}
+#itinerary.itinerary-carousel .day-card-inner{height:100%;box-sizing:border-box;border:1px solid rgba(20,74,66,.10);box-shadow:0 8px 22px rgba(18,66,58,.07)}
+#itinerary.itinerary-carousel .day-card.is-current .day-card-inner{border-color:rgba(23,107,92,.30);box-shadow:0 10px 26px rgba(18,88,75,.12)}
+#itinerary.itinerary-carousel::-webkit-scrollbar{height:5px}
+#itinerary.itinerary-carousel::-webkit-scrollbar-thumb{background:#abcac2;border-radius:999px}
+
+/* Loading overlay */
+.plan-loading-overlay{
+  position:fixed;z-index:1800;inset:var(--topbar-height,0) 0 70px 0;display:grid;place-items:center;
+  padding:18px;background:rgba(237,246,243,.88);backdrop-filter:blur(14px)
+}
+.plan-loading-overlay.hidden{display:none!important}
+.plan-loading-card{width:min(620px,100%);overflow:hidden;border-radius:24px;background:#fff;border:1px solid rgba(20,74,66,.12);box-shadow:0 24px 70px rgba(13,61,53,.22)}
+.plan-loading-gallery{position:relative;height:190px;overflow:hidden;background:#dbe9e5}
+.plan-loading-gallery img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .22s ease,transform .7s ease}
+.plan-loading-gallery img.is-switching{opacity:.25;transform:scale(1.025)}
+.plan-loading-gallery:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,42,37,.06),rgba(4,42,37,.62))}
+.plan-loading-gallery-caption{position:absolute;z-index:2;left:16px;right:16px;bottom:14px;color:#fff;display:grid;gap:2px}
+.plan-loading-gallery-caption span{font-size:.66rem;letter-spacing:.14em;font-weight:850;text-transform:uppercase;color:#6ef0c8}
+.plan-loading-gallery-caption strong{font-size:1.02rem}
+.plan-loading-copy{padding:17px}
+.plan-loading-copy h2{margin:3px 0 7px;font-size:1.35rem}
+.plan-loading-copy>p:not(.eyebrow){margin:0 0 14px;color:#5c716b;line-height:1.4;font-size:.86rem}
+.plan-loading-progress{height:9px;border-radius:999px;background:#e4eeeb;overflow:hidden}
+.plan-loading-progress i{display:block;width:0;height:100%;border-radius:999px;background:linear-gradient(90deg,#16715f,#28aa8f);transition:width .3s ease}
+.plan-loading-meta{display:flex;justify-content:space-between;gap:8px;margin-top:7px}
+.plan-loading-meta span{font-weight:900;color:#176b5c}.plan-loading-meta small{color:#6e817c}
+
+/* Always keep all five bottom menu items visible, even if planner content is wider */
+.bottom-nav{
+  left:0!important;right:0!important;width:100vw!important;max-width:100vw!important;box-sizing:border-box!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;overflow:hidden!important;padding-left:6px!important;padding-right:6px!important
+}
+.bottom-nav .nav-item{min-width:0!important;width:auto!important;padding:6px 2px!important}
+.bottom-nav .nav-item span{font-size:1rem}
+.bottom-nav .nav-item small{font-size:.64rem!important;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+/* POI marker declutter support */
+.reisslim-poi-pin{will-change:transform}

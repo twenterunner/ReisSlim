@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.7.8-1708-open-ended-expedition">
+  <meta name="reisslim-build" content="1.7.9-1709-reisplan-carousel-loader-landguard">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1708">
+  <link rel="manifest" href="manifest.webmanifest?v=1709">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1708">
-  <link rel="stylesheet" href="compact-ui.css?v=1708">
+  <link rel="stylesheet" href="styles.css?v=1709">
+  <link rel="stylesheet" href="compact-ui.css?v=1709">
 </head>
 <body>
   <header class="topbar">
@@ -57,19 +57,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Vertel ons jouw reiswensen</p>
           <h1>Plan jouw perfecte <em>roadtrip</em></h1>
-          <p class="hero-sub">Van vertrekpunt tot droomreis. ReisSlim bouwt route, stops, verblijf en budget rond jouw voorkeuren.</p>
-          <div class="feature-row">
-            <span><b>➤</b> Live route</span><span><b>★</b> Bijzondere stops</span><span><b>▣</b> Slimme planning</span><span><b>€</b> Realistisch budget</span>
-          </div>
         </div>
-        <aside class="hero-trip-card">
-          <small>Jouw concept</small>
-          <strong id="plannerHeroTripName">Nieuwe roadtrip</strong>
-          <div><span>🏍</span><b id="plannerHeroTransport">Motor</b></div>
-          <div><span>📅</span><b id="plannerHeroDays">10 dagen</b></div>
-          <div><span>📍</span><b id="plannerHeroOrigin">Saasveld</b></div>
-          <div><span>💶</span><b id="plannerHeroBudget">€3.500</b></div>
-        </aside>
       </section>
 
       <div class="planner-steps">
@@ -204,6 +192,21 @@
     </section>
 
     <section id="itineraryView" class="app-view">
+      <div id="planLoadingOverlay" class="plan-loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
+        <div class="plan-loading-card">
+          <div class="plan-loading-gallery">
+            <img id="planLoadingImage" src="planner-hero-photo-v2.webp" alt="">
+            <div class="plan-loading-gallery-caption"><span>ReisSlim</span><strong>Jouw reis wordt opgebouwd</strong></div>
+          </div>
+          <div class="plan-loading-copy">
+            <p class="eyebrow">LIVE REISPLAN</p>
+            <h2 id="planLoadingTitle">Route voorbereiden…</h2>
+            <p id="planLoadingText">We controleren de route en zoeken bruikbare plaatsen langs je reis.</p>
+            <div class="plan-loading-progress"><i id="planLoadingProgressBar"></i></div>
+            <div class="plan-loading-meta"><span id="planLoadingPercent">0%</span><small id="planLoadingStage">Starten</small></div>
+          </div>
+        </div>
+      </div>
       <section id="variantSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Stap 2</p><h1>Kies de opbouw van je reis</h1></div></div><div id="variantCards" class="variant-grid"></div></section>
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
@@ -214,7 +217,13 @@
         <section class="assistant-card assistant-premium"><p class="eyebrow">ReisSlim Assistant</p><h2>Vertel wat je anders wilt</h2><div class="assistant-examples"><button type="button" data-assistant-example="Maak de reis rustiger en beperk rijden tot 4 uur per dag">Meer rust</button><button type="button" data-assistant-example="Maak de route mooier en geef natuur en bergen meer gewicht">Mooier rijden</button><button type="button" data-assistant-example="Maak de reis goedkoper en verminder hotelwissels">Lagere kosten</button></div><div class="assistant-input"><input id="assistantMessage" placeholder="Bijv. minder rijden, meer cultuur, max 4 uur per dag..."><button id="assistantPreviewBtn" type="button">Bekijk wijziging</button></div><div id="assistantPreview"></div><div class="actions compact"><button id="assistantApplyBtn" class="hidden" type="button">Bevestig wijziging</button><button id="assistantCancelBtn" class="secondary hidden" type="button">Annuleer</button></div></section>
         <p id="gpxNotice" class="trust-notice"></p>
         <div class="itinerary-optimizer-grid">
-          <div><h2>Dagplanning</h2><div id="itinerary" class="timeline"></div></div>
+          <div class="itinerary-days-column">
+            <div class="itinerary-carousel-heading">
+              <div><h2>Dagplanning</h2><small>Swipe zijwaarts door de dagen</small></div>
+              <strong id="itineraryCarouselCounter">Dag 1</strong>
+            </div>
+            <div id="itinerary" class="timeline itinerary-carousel"></div>
+          </div>
           <aside id="optimizerSection" class="optimizer-card hidden">
             <div class="section-heading"><div><p class="eyebrow">Trip Optimizer</p><h2>Reiskwaliteit</h2></div><span class="beta-badge">BETA</span></div>
             <div class="quality-hero"><div class="quality-ring"><strong id="qualityScore">—</strong><span>/100</span></div><div><strong id="qualityVerdict">Nog niet berekend</strong></div></div>
@@ -241,9 +250,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.7.8 · Build 1708</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.7.9 · Build 1709</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1708"></script>
-  <script type="module" src="app.js?v=1708"></script>
+  <script src="ui-feature-flags.js?v=1709"></script>
+  <script type="module" src="app.js?v=1709"></script>
 </body>
 </html>

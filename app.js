@@ -14,7 +14,7 @@ import { downloadGpx, downloadJson } from './gpx-generator.js';
 import { invalidateMap, renderMap } from './map-view.js';
 import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js';
 import { evaluatePlanConstraints } from './constraint-engine.js';
-import { enrichPlanWithPlaces, geocodeOrigin } from './place-provider.js';
+import { enrichPlanWithPlaces, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js';
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
@@ -149,25 +149,91 @@ function placeProgressText(event){
 
 function calculatePlan(destination,optimize=false){let plan=buildItinerary(state.trip,destination),changes=[];if(optimize)({plan,changes}=optimisePlan(state.trip,destination,plan));const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus,changes}}
 function derivePlanState(destination,plan){const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus}}
+
+const PLAN_LOADING_IMAGES=['planner-hero-photo-v2.webp','home-hero-photo-v2.webp','slovenie.webp','dolomieten.webp','harz.webp','planner-hero-photo.webp'];
+let planLoadingImageTimer=null,planLoadingImageIndex=0,planLoadingProgress=0;
+function showPlanLoading(title='Reisplan voorbereiden…',text='We bouwen je route stap voor stap op.'){
+  const overlay=$('planLoadingOverlay');if(!overlay)return;
+  planLoadingProgress=0;overlay.classList.remove('hidden');
+  updatePlanLoading(4,title,text,'Starten');
+  const image=$('planLoadingImage');
+  clearInterval(planLoadingImageTimer);
+  planLoadingImageTimer=setInterval(()=>{
+    planLoadingImageIndex=(planLoadingImageIndex+1)%PLAN_LOADING_IMAGES.length;
+    if(image){image.classList.add('is-switching');setTimeout(()=>{image.src=PLAN_LOADING_IMAGES[planLoadingImageIndex];image.classList.remove('is-switching')},180)}
+  },1800);
+}
+function updatePlanLoading(percent,title,text,stage=''){
+  const overlay=$('planLoadingOverlay');if(!overlay)return;
+  planLoadingProgress=Math.max(planLoadingProgress,Math.min(100,Math.round(Number(percent)||0)));
+  if(title)$('planLoadingTitle').textContent=title;
+  if(text)$('planLoadingText').textContent=text;
+  $('planLoadingProgressBar').style.width=`${planLoadingProgress}%`;
+  $('planLoadingPercent').textContent=`${planLoadingProgress}%`;
+  $('planLoadingStage').textContent=stage||'Bezig';
+}
+function hidePlanLoading(success=true){
+  const overlay=$('planLoadingOverlay');if(!overlay)return;
+  updatePlanLoading(100,success?'Reisplan klaar':'Live data deels geladen',success?'Route, plaatsen en kaart zijn bijgewerkt.':'Het basisplan blijft beschikbaar.','Klaar');
+  clearInterval(planLoadingImageTimer);planLoadingImageTimer=null;
+  setTimeout(()=>overlay.classList.add('hidden'),success?550:900);
+}
+function prepareItineraryCarousel(){
+  const track=$('itinerary'),counter=$('itineraryCarouselCounter');
+  if(!track||!counter)return;
+  const cards=[...track.querySelectorAll('.day-card')];
+  if(!cards.length){counter.textContent='';return}
+  const update=()=>{
+    const center=track.scrollLeft+track.clientWidth/2;
+    let best=0,bestDistance=Infinity;
+    cards.forEach((card,index)=>{
+      const cardCenter=card.offsetLeft+card.offsetWidth/2,d=Math.abs(cardCenter-center);
+      if(d<bestDistance){bestDistance=d;best=index}
+    });
+    counter.textContent=`Dag ${best+1} van ${cards.length}`;
+    cards.forEach((card,index)=>card.classList.toggle('is-current',index===best));
+  };
+  track.onscroll=()=>requestAnimationFrame(update);
+  requestAnimationFrame(update);
+}
+
 async function enhanceLiveData(destinationId,originalPlan){
   const run=++state.routingRun;
-  $('mapDataStatus').textContent='Live wegroute berekenen…';
-  planLiveBanner('Stap 1/3 · echte wegroute berekenen…');
-  updateVisiblePendingPlaceText('Live wegroute wordt berekend…');
+  showPlanLoading('Routepunten controleren…','We controleren eerst of alle open-einde routepunten op land en bij echte plaatsen liggen.');
+  $('mapDataStatus').textContent='Routepunten controleren…';
+  planLiveBanner('Stap 1/4 · routepunten geografisch controleren…');
   try{
     let plan=originalPlan;
+    updatePlanLoading(8,'Routepunten controleren…','Open-einde overnachtingszones worden gekoppeld aan echte plaatsen op land.','Geografie');
+    plan=await prepareGeneratedRouteStops(plan,{
+      timeoutMs:3000,
+      onProgress:event=>{
+        if(run!==state.routingRun)return;
+        const ratio=event.total?event.index/event.total:0;
+        updatePlanLoading(8+Math.round(ratio*14),'Routepunten controleren…',event.message||'Zoeken naar een echte plaats op land.','Geografie');
+      }
+    });
+    if(run!==state.routingRun||state.destination?.id!==destinationId)return;
+
+    updatePlanLoading(24,'Wegroute berekenen…','We verbinden alle reisdagen over echte wegen en controleren de etappes.','Route');
+    $('mapDataStatus').textContent='Live wegroute berekenen…';
+    planLiveBanner('Stap 2/4 · echte wegroute berekenen…');
+    updateVisiblePendingPlaceText('Live wegroute wordt berekend…');
+
     if(routingConfigured(state.trip)){
       plan=await enrichPlanWithLiveRouting(state.trip,state.destination,plan,{timeoutMs:25000});
       if(run!==state.routingRun||state.destination?.id!==destinationId)return;
       Object.assign(state,derivePlanState(state.destination,plan));
-      renderPlan(state);renderMap(state.plan);
+      renderPlan(state);prepareItineraryCarousel();renderMap(state.plan);
       const routed=Boolean(plan.routing?.live);
       const loopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
-      planLiveBanner(routed?'Stap 1/3 klaar · wegroute gevonden. Stap 2/3 · specifieke stops, eten en verblijf zoeken…':'Wegroute deels/temporair niet live. Stap 2/3 · specifieke plaatsen zoeken…',routed?'working':'error');
-      $('mapDataStatus').textContent=routed
-        ? (loopOverlap!==null?`Live lusroute · ${loopOverlap}% overlap · plaatsen zoeken…`:'Live wegroute gevonden · plaatsen zoeken…')
-        :'Wegroute nog niet volledig live · plaatsen zoeken…';
+      updatePlanLoading(48,routed?'Wegroute gevonden':'Routebasis gereed',routed?'De echte wegroute staat. Nu zoeken we specifieke stops, eten, brandstof en verblijf.':'We gaan verder met specifieke plaatsen langs de route.','Route');
+      planLiveBanner(routed?'Stap 2/4 klaar · wegroute gevonden. Stap 3/4 · specifieke plaatsen zoeken…':'Wegroute deels live. Stap 3/4 · specifieke plaatsen zoeken…',routed?'working':'error');
+      $('mapDataStatus').textContent=routed?(loopOverlap!==null?`Live lusroute · ${loopOverlap}% overlap · plaatsen zoeken…`:'Live wegroute gevonden · plaatsen zoeken…'):'Wegroute deels live · plaatsen zoeken…';
+    }else{
+      updatePlanLoading(42,'Routebasis gereed','Live routering is niet geconfigureerd; we gebruiken de routebasis en zoeken nu plaatsen langs de etappes.','Route');
     }
+
     plan=await enrichPlanWithPlaces(state.trip,state.destination,plan,{
       placeTimeoutMs:6500,
       nominatimTimeoutMs:4500,
@@ -175,29 +241,37 @@ async function enhanceLiveData(destinationId,originalPlan){
       onProgress:event=>{
         if(run!==state.routingRun)return;
         const text=placeProgressText(event);
-        planLiveBanner(`Stap 2/3 · ${text}`);
+        const completed=Number(event?.completed||event?.index||0),total=Number(event?.total||0);
+        const fraction=total?Math.min(1,completed/total):.45;
+        updatePlanLoading(50+Math.round(fraction*38),'Specifieke plaatsen zoeken…',text,'POI, verblijf & weer');
+        planLiveBanner(`Stap 3/4 · ${text}`);
         updateVisiblePendingPlaceText(text);
         $('mapDataStatus').textContent=text;
       }
     });
     if(run!==state.routingRun||state.destination?.id!==destinationId)return;
+
+    updatePlanLoading(92,'Reisplan samenstellen…','We verwerken route, POI’s, weer, budget en dagplanning in één reisplan.','Samenstellen');
     Object.assign(state,derivePlanState(state.destination,plan));
-    renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);
+    renderPlan(state);prepareItineraryCarousel();renderOptimizationPreview(state);renderMap(state.plan);
     const routed=Boolean(plan.routing?.live),places=plan.recommendations?.length||0,weather=Boolean(plan.weather?.live);
     const finalLoopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
-    const parts=[routed?(finalLoopOverlap!==null?`lusroute ${finalLoopOverlap}% overlap`:'wegroute'):null,places?`${places} specifieke plaatsen`:null,weather?'weer':null].filter(Boolean);
+    const parts=[routed?(finalLoopOverlap!==null?`lusroute ${finalLoopOverlap}% overlap`:'wegroute'):null,places?`${places} plaatsen`:null,weather?'weer':null].filter(Boolean);
     $('mapDataStatus').textContent=parts.length?`Live: ${parts.join(', ')}`:'Live bronnen leverden geen bruikbaar resultaat';
     planLiveBanner(parts.length?`Klaar · ${parts.join(' · ')}`:'Live verrijking afgerond zonder bruikbare resultaten',parts.length?'done':'error');
     persistDraft(parts.length?`Live ${parts.join(', ')} opgeslagen`:'Live verrijking afgerond');
+    updatePlanLoading(100,'Reisplan klaar',parts.length?`${parts.join(' · ')} verwerkt.`:'Basisreisplan gereed.','Klaar');
+    hidePlanLoading(true);
   }catch(error){
     console.warn(error);
     if(run===state.routingRun){
       $('mapDataStatus').textContent='Live verrijking kon niet volledig worden afgerond';
       planLiveBanner(`Live verrijking onderbroken: ${error?.message||'onbekende fout'}`,'error');
+      hidePlanLoading(false);
     }
   }
 }
-function applyDestination(destination,optimize=false){Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
+function applyDestination(destination,optimize=false){if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);prepareItineraryCarousel();renderOptimizationPreview(state);renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function chooseProposal(destination){learn('select',destination);state.destination=destination;state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId=null;state.plan=null;renderItineraryVariants(state);$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen');showView('itineraryView')}
 function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:8,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state)}
 async function discoverLiveOptions({append=false,retry=false}={}){
@@ -284,7 +358,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
     finishLiveDiscoveryProgress();
   }
 }
-function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
+function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);prepareItineraryCarousel();renderOptimizationPreview(state);renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
 
@@ -401,7 +475,7 @@ function initialize(){
     setStatus(state.optimizationProposal.meaningful?'Sterkste haalbare verbetercombinatie gevonden':'Geen betekenisvolle verbetering zonder compromissen');
     $('optimizationPreview')?.scrollIntoView({behavior:'smooth',block:'nearest'});
   });
-  $('applyOptimizationBtn').addEventListener('click',()=>{if(!state.plan||!state.optimizationProposal)return;const ids=[...document.querySelectorAll('[data-optimization-action]:checked')].map(box=>box.dataset.optimizationAction);if(!ids.length)return;state.undoSnapshot=clone({plan:state.plan,budget:state.budget,quality:state.quality,validation:state.validation,constraintStatus:state.constraintStatus});Object.assign(state,applyOptimizationProposal(state.trip,state.destination,state.plan,ids));renderPlan(state);renderOptimizationPreview(state);renderMap(state.plan);persistDraft()});
+  $('applyOptimizationBtn').addEventListener('click',()=>{if(!state.plan||!state.optimizationProposal)return;const ids=[...document.querySelectorAll('[data-optimization-action]:checked')].map(box=>box.dataset.optimizationAction);if(!ids.length)return;state.undoSnapshot=clone({plan:state.plan,budget:state.budget,quality:state.quality,validation:state.validation,constraintStatus:state.constraintStatus});Object.assign(state,applyOptimizationProposal(state.trip,state.destination,state.plan,ids));renderPlan(state);prepareItineraryCarousel();renderOptimizationPreview(state);renderMap(state.plan);persistDraft()});
   $('rejectOptimizationBtn').addEventListener('click',()=>{state.optimizationProposal=null;renderOptimizationPreview(state)});
   $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderMap(state.plan)});
   document.querySelectorAll('[data-inspire]').forEach(button=>button.addEventListener('click',()=>{$('destinationQuery').value=button.dataset.inspire;showView('plannerView')}));

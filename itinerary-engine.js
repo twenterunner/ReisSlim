@@ -27,7 +27,7 @@ function destinationPoint(from,bearingDeg,distanceKm){
 }
 function makeExplorationNode(base,index,bearing,distanceKm,destination){
   const point=destinationPoint(base,bearing,distanceKm);
-  return{...point,name:`Roadtripstop ${index+1}`,role:'destination',generatedExploration:true,explorationIndex:index,explorationAnchor:destination.name||base.name||'bestemming'};
+  return{...point,name:`Roadtripstop ${index+1}`,role:'destination',generatedExploration:true,landValidated:false,explorationIndex:index,explorationAnchor:destination.name||base.name||'bestemming'};
 }
 function makeLocalStay(base,index,count,activities){
   const flexible=count>=4&&index===Math.floor(count/2);
