@@ -1,12 +1,10 @@
-ReisSlim v1.7.9 · Build 1709
+ReisSlim v1.7.10 · Build 1710
 
-THIS UPDATE
-- Reisplan daily cards now swipe horizontally left-to-right with scroll snap and a visible day counter.
-- Added a full Reisplan live-loading overlay with progress bar, current task text and rotating local travel images.
-- Loading stages: geographic land check -> road routing -> specific POIs/accommodation/weather -> final assembly.
-- Removed Planner hero subtitle, feature/hot tiles and hero summary card; only the visual hero + title remain.
-- Open-ended synthetic route stops are land-validated BEFORE road routing.
-- Ocean points are rejected; the app searches nearby for a real land locality. If live land validation fails, it falls back to the previous known land point rather than routing into the sea.
-- POI markers that would overlap are visually decluttered on the map without changing the stored GPX coordinates.
-- Bottom navigation is forced to five equal mobile columns so Dashboard, Planner, Reisplan, Kaart and Budget are always visible.
-- Flat ZIP: all files remain at ZIP root, no folders.
+- Replaced Planner hero with a clean text-free photographic asset.
+- Added 24 text-free progress/loading images covering European scenery plus Namibia/South Africa region highlights; mix includes scenery, motorcycle/camper/car imagery without making every image vehicle-focused.
+- Progress gallery cycles through the expanded image set.
+- Fixed POIs remaining indefinitely as “wordt live gezocht”: every lookup now terminates as either a resolved named live POI or a completed miss.
+- Completed misses are removed from map/GPX rather than being displayed as fake/pending waypoints.
+- Broadened sparse-region POI lookup and added a reverse-geocode fallback.
+- Revision locked to 1.7.10 / 1710 across config, header, footer, manifest and service-worker cache.
+- Flat ZIP, no folders.

@@ -122,7 +122,7 @@ async function queryEndpoint(query,endpoint,fetchImpl,timeoutMs){
 
 async function fetchNominatimCategory(item,fetchImpl,timeoutMs=3500){
   const qMap={accommodation:['hotel','guest house','camping'],restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area','service area','cafe'],service:['fuel'],activity:['museum','attraction','viewpoint']};
-  const queries=qMap[item.type]||qMap.activity,delta=.22,viewbox=[item.point.lon-delta,item.point.lat+delta,item.point.lon+delta,item.point.lat-delta].join(',');
+  const queries=qMap[item.type]||qMap.activity,delta=.55,viewbox=[item.point.lon-delta,item.point.lat+delta,item.point.lon+delta,item.point.lat-delta].join(',');
   for(const q of queries){
     try{
       const url=new URL(NOMINATIM_URL);url.search=new URLSearchParams({q,format:'jsonv2',limit:'8',bounded:'1',viewbox,addressdetails:'1',extratags:'1'});
@@ -131,6 +131,18 @@ async function fetchNominatimCategory(item,fetchImpl,timeoutMs=3500){
       if(places.length)return places;
     }catch{}
   }
+  // Last-resort named-place lookup: in sparse regions (Namibia/SA in particular)
+  // category search can return nothing although a usable named POI exists nearby.
+  try{
+    const reverse=new URL('https://nominatim.openstreetmap.org/reverse');
+    reverse.search=new URLSearchParams({lat:String(item.point.lat),lon:String(item.point.lon),format:'jsonv2',zoom:'18',addressdetails:'1',extratags:'1'});
+    const row=await fetchJson(reverse,{headers:{accept:'application/json'}},timeoutMs,fetchImpl);
+    const name=String(row?.name||row?.display_name||'').split(',')[0].trim();
+    const point={lat:Number(row?.lat),lon:Number(row?.lon)};
+    if(name&&validCoordinate(point)){
+      return[{id:`nominatim-reverse-${row.place_id||`${point.lat}-${point.lon}`}`,type:item.type==='service'?'fuel':item.type,name,point,tags:row.extratags||{},openingHours:row.extratags?.opening_hours||null,website:row.extratags?.website||null,osmUrl:row.osm_id?`https://www.openstreetmap.org/${row.osm_type==='node'?'node':row.osm_type==='way'?'way':'relation'}/${row.osm_id}`:null,mapUrl:mapsSearchUrl(name,point),evidenceScore:0}];
+    }
+  }catch{}
   return[];
 }
 
@@ -286,7 +298,15 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
       .map(place=>({place,distanceKm:haversineKm(item.point,place.point)}))
       .filter(x=>Number.isFinite(x.distanceKm))
       .sort((a,b)=>suitability(b.place,item,trip,b.distanceKm)-suitability(a.place,item,trip,a.distanceKm)||a.distanceKm-b.distanceKm);
-    if(ranked[0]){applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);foundCount++;}
+    if(ranked[0]){
+      applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);foundCount++;
+    }else{
+      // A finished lookup must never remain visually stuck in a pending state.
+      Object.assign(item,{live:false,genericFallback:false,lookupComplete:true,lookupMissing:true,
+        confidence:'live-place-not-found',source:'OpenStreetMap zoekactie afgerond',
+        name:`Geen specifieke ${item.type==='fuel'?'brandstofstop':item.type==='rest'?'ruststop':item.type==='restaurant'?'eetstop':item.type==='accommodation'?'overnachting':'POI'} gevonden`,
+        lastChecked:new Date().toISOString()});
+    }
     completed++;
     options.onProgress?.({type:ranked[0]?'place-found':'place-missing',day:day.day,itemType:item.type,name:ranked[0]?.place?.name||null,completed,total,found:foundCount});
   });
@@ -294,9 +314,9 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
     day.recommendations=(day.recommendations||[]).filter(item=>{
       if(!item.name||!validCoordinate(item.point))return false;
       if(item.live)return true;
-      // Operational route targets remain visible if the external live lookup misses;
-      // the UI clearly shows them as planned route targets until a named place is found.
-      return ['rest','fuel','restaurant'].includes(item.type);
+      // Completed misses are not map/GPX waypoints. Their search is complete and the
+      // progress UI reports the miss; no fake pending POI remains on screen.
+      return false;
     });
     day.sleepProposal=day.recommendations.find(item=>item.type==='accommodation')||null;
   }

@@ -1,0 +1,28 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax map-view.js: PASS
+24 progress images exist: PASS
+progress image list has 24: PASS
+planner hero clean asset: PASS
+pending POIs excluded from map: PASS
+completed misses removed: PASS
+fallback reverse lookup: PASS
+broader sparse-region search: PASS
+service worker caches progress images: PASS
+config revision: PASS
+header revision: PASS
+footer revision: PASS
+cache revision: PASS
+
+Network-dependent POI naming cannot be fully exercised offline; code paths, terminal states, fallback lookup and removal of unresolved pseudo-POIs were verified statically.

@@ -12,10 +12,10 @@ Nominatim primary: PASS
 Overpass emergency only: PASS
 single discovery pass: PASS
 cache v11: PASS
-header version 1709: PASS
-footer/index version 1709: PASS
+header version 1710: PASS
+footer/index version 1710: PASS
 single service worker activate: PASS
-service worker cache 1709: PASS
+service worker cache 1710: PASS
 spacing rules present: PASS
 Nominatim normalization acceptance: PASS sample reverse result -> Teststad / DE
 External live Nominatim response requires deployed-network acceptance.

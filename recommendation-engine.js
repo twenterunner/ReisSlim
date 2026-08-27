@@ -130,10 +130,9 @@ export function buildRecommendations(trip,destination,days){
 }
 
 export function collectRecommendationPoints(plan){
-  // Keep unresolved operational route targets visible as planned POIs. Live lookups replace
-  // their names/coordinates when available; this prevents route coverage from disappearing
-  // merely because one external place lookup timed out.
+  // Map/GPX POIs must be resolved, named places. Never expose a pending
+  // "wordt live gezocht" placeholder as though it were a real waypoint.
   return(plan?.recommendations||[])
-    .filter(item=>validCoordinate(item.point)&&(item.live||['fuel','rest','restaurant'].includes(item.type)))
+    .filter(item=>validCoordinate(item.point)&&item.live&&item.genericFallback!==true)
     .map(item=>({...item.point,...item,role:item.type}));
 }

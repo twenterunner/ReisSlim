@@ -150,7 +150,7 @@ function placeProgressText(event){
 function calculatePlan(destination,optimize=false){let plan=buildItinerary(state.trip,destination),changes=[];if(optimize)({plan,changes}=optimisePlan(state.trip,destination,plan));const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus,changes}}
 function derivePlanState(destination,plan){const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus}}
 
-const PLAN_LOADING_IMAGES=['planner-hero-photo-v2.webp','home-hero-photo-v2.webp','slovenie.webp','dolomieten.webp','harz.webp','planner-hero-photo.webp'];
+const PLAN_LOADING_IMAGES=['progress-01.webp','progress-02.webp','progress-03.webp','progress-04.webp','progress-05.webp','progress-06.webp','progress-07.webp','progress-08.webp','progress-09.webp','progress-10.webp','progress-11.webp','progress-12.webp','progress-13.webp','progress-14.webp','progress-15.webp','progress-16.webp','progress-17.webp','progress-18.webp','progress-19.webp','progress-20.webp','progress-21.webp','progress-22.webp','progress-23.webp','progress-24.webp'];
 let planLoadingImageTimer=null,planLoadingImageIndex=0,planLoadingProgress=0;
 function showPlanLoading(title='Reisplan voorbereiden…',text='We bouwen je route stap voor stap op.'){
   const overlay=$('planLoadingOverlay');if(!overlay)return;
@@ -161,7 +161,7 @@ function showPlanLoading(title='Reisplan voorbereiden…',text='We bouwen je rou
   planLoadingImageTimer=setInterval(()=>{
     planLoadingImageIndex=(planLoadingImageIndex+1)%PLAN_LOADING_IMAGES.length;
     if(image){image.classList.add('is-switching');setTimeout(()=>{image.src=PLAN_LOADING_IMAGES[planLoadingImageIndex];image.classList.remove('is-switching')},180)}
-  },1800);
+  },1100);
 }
 function updatePlanLoading(percent,title,text,stage=''){
   const overlay=$('planLoadingOverlay');if(!overlay)return;
