@@ -22,7 +22,7 @@ import { enrichDestinationImages } from './image-provider.js';
 import { weatherWindowScore } from './weather-engine.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
-const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false};
+const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
@@ -68,7 +68,13 @@ function renderLiveDiscoveryProgress(){
 
   box.innerHTML=`<div class="live-progress-head compact"><div><strong>${searchDone?'Live opties klaar':searchFailed?'Portfolio klaar · live uitbreiding niet nodig':'Live opties zoeken'}</strong><small>${searchDone?`${resultCount} nieuwe regio${resultCount===1?'':'’s'} toegevoegd`:searchFailed?'Je reisvoorstellen zijn volledig bruikbaar; alleen extra live regio’s konden deze ronde niet worden toegevoegd.':'Nieuwe resultaten verschijnen direct.'}</small></div><span>${elapsedSeconds()}s</span></div><ul class="live-progress-steps">${lines.join('')}</ul>${searchFailed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Opnieuw proberen</button>':''}`;
   const retry=$('retryLiveDiscoveryBtn');
-  if(retry)retry.onclick=()=>discoverLiveOptions({retry:true});
+  if(retry)retry.onclick=async()=>{
+    if(retry.disabled)return;
+    retry.disabled=true;
+    retry.textContent=state.discoveryBusy?'Wachten op lopende zoekactie…':'Opnieuw zoeken…';
+    setStatus(state.discoveryBusy?'Lopende live zoekactie afronden; nieuwe poging staat klaar…':'Nieuwe live zoekpoging starten…');
+    await discoverLiveOptions({retry:true});
+  };
 }
 function startLiveDiscoveryProgress(){
   state.liveDiscoveryStartedAt=Date.now();
@@ -353,7 +359,32 @@ function refreshPortfolio(){
   renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();
 }
 async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
-  if(!state.trip.liveData||state.discoveryBusy)return 0;
+  if(!state.trip?.liveData)return 0;
+  if(state.discoveryBusy){
+    if(!retry)return 0;
+    // Manual retry must never be swallowed by a background/prefetch discovery.
+    // Queue exactly one retry and run it as soon as the active discovery releases the lock.
+    if(state.retryDiscoveryQueued)return 0;
+    state.retryDiscoveryQueued=true;
+    if(!quiet){
+      const p=state.liveDiscoveryProgress||(state.liveDiscoveryProgress={});
+      p.failed=false;p.complete=false;p.lastMessage='Lopende zoekactie afronden; jouw nieuwe poging start automatisch…';
+      renderLiveDiscoveryProgress();
+    }
+    try{
+      const deadline=Date.now()+20000;
+      while(state.discoveryBusy&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,120));
+      if(state.discoveryBusy){
+        if(!quiet){
+          const p=state.liveDiscoveryProgress||(state.liveDiscoveryProgress={});
+          p.failed=true;p.complete=false;p.failureReason='De vorige live zoekactie reageert niet. Probeer opnieuw.';
+          renderLiveDiscoveryProgress();
+        }
+        return 0;
+      }
+      return await discoverLiveOptions({append,retry:true,quiet});
+    }finally{state.retryDiscoveryQueued=false}
+  }
   state.discoveryBusy=true;
   if(retry){
     state.discoveryCursor=Math.max(1,state.discoveryCursor+1);
