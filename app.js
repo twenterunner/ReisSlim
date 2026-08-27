@@ -18,7 +18,37 @@ import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepar
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
-import { enrichDestinationImages } from './image-provider.js';
+const IMAGE_CACHE_KEY='reisslim-destination-images-v2';
+const imageCache=(()=>{try{return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY)||'{}')}catch{return {}}})();
+const saveImageCache=()=>{try{localStorage.setItem(IMAGE_CACHE_KEY,JSON.stringify(imageCache))}catch{}};
+const cleanImageTerm=value=>String(value||'').replace(/\([^)]*\)/g,' ').replace(/[^\p{L}\p{N} .,'’&-]+/gu,' ').replace(/\s+/g,' ').trim();
+async function fetchWikimediaDestinationImage(destination){
+  const name=cleanImageTerm(destination?.name),country=cleanImageTerm(destination?.country);
+  if(!name)return null;
+  const cacheKey=`${name}|${country}`.toLowerCase();
+  if(imageCache[cacheKey])return imageCache[cacheKey];
+  const terms=[`${name} ${country} landscape`,`${name} ${country} tourism`,`${name} landscape`,name];
+  for(const term of terms){
+    try{
+      const params=new URLSearchParams({action:'query',generator:'search',gsrsearch:`${term} filetype:bitmap`,gsrnamespace:'6',gsrlimit:'8',prop:'imageinfo',iiprop:'url|mime',iiurlwidth:'1200',format:'json',origin:'*'});
+      const response=await fetch(`https://commons.wikimedia.org/w/api.php?${params}`,{mode:'cors',cache:'force-cache'});
+      if(!response.ok)continue;
+      const data=await response.json();
+      const pages=Object.values(data?.query?.pages||{});
+      const hit=pages.find(page=>{const info=page.imageinfo?.[0];return info&&/^image\/(?:jpeg|png|webp)$/i.test(info.mime||'')&&(info.thumburl||info.url)});
+      const info=hit?.imageinfo?.[0],url=info?.thumburl||info?.url;
+      if(url){const image={url,source:'Wikimedia Commons',query:term};imageCache[cacheKey]=image;saveImageCache();return image}
+    }catch(error){console.warn('Destination image lookup failed',term,error)}
+  }
+  return null;
+}
+async function enrichDestinationImages(destinations,{maximum=12}={}){
+  const targets=(destinations||[]).filter(item=>item&&!item.image?.url).slice(0,Math.max(1,maximum));
+  let cursor=0;
+  async function worker(){while(cursor<targets.length){const item=targets[cursor++];const image=await fetchWikimediaDestinationImage(item);if(image)item.image=image}}
+  await Promise.all(Array.from({length:Math.min(3,targets.length)},worker));
+  return destinations;
+}
 import { weatherWindowScore } from './weather-engine.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
