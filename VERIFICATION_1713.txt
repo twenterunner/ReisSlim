@@ -1,0 +1,29 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax trip-model.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax constraint-engine.js: PASS
+syntax map-view.js: PASS
+culture neutral when unselected: PASS
+unselected criteria excluded: PASS
+preference weighting increased: PASS
+one day form: PASS
+one day validation: PASS
+single-day roundtrip plan: PASS
+single-day live via routing: PASS
+daytrip no hotel: PASS
+12 initial options: PASS
+8 more options: PASS
+40 candidate preselect: PASS
+10 live seeds: PASS
+revision: PASS

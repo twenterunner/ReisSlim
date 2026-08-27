@@ -282,7 +282,7 @@ async function enhanceLiveData(destinationId,originalPlan){
 }
 function applyDestination(destination,optimize=false){if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function chooseProposal(destination){learn('select',destination);state.destination=destination;state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId=null;state.plan=null;renderItineraryVariants(state);$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen');showView('itineraryView')}
-function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:8,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state)}
+function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state)}
 async function discoverLiveOptions({append=false,retry=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
   state.discoveryBusy=true;
@@ -454,7 +454,7 @@ function initialize(){
     window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:state.compareIds.length}}));
   });
   $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state);persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
-  $('moreProposalsBtn').addEventListener('click',async()=>{const more=getMoreProposals(state.trip,state.catalog,state.ranked.map(i=>i.id),portfolioOptions({limit:4,focus:$('proposalFocus').value}));state.ranked.push(...more);renderDestinations(state);if(state.trip.liveData)await discoverLiveOptions({append:true})});
+  $('moreProposalsBtn').addEventListener('click',async()=>{const more=getMoreProposals(state.trip,state.catalog,state.ranked.map(i=>i.id),portfolioOptions({limit:8,focus:$('proposalFocus').value}));state.ranked.push(...more);renderDestinations(state);if(state.trip.liveData)await discoverLiveOptions({append:true})});
   $('proposalFocus').addEventListener('change',refreshPortfolio);
   $('variantCards').addEventListener('click',event=>{const b=event.target.closest('[data-select-variant]');if(b)applyVariant(b.dataset.selectVariant)});
   $('orsApiKey').addEventListener('change',()=>saveRoutingSettings({orsApiKey:$('orsApiKey').value}));

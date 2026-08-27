@@ -76,7 +76,8 @@ export function routingEndpoint(){return String(globalThis.REISSLIM_ROUTING_API_
 export function routingConfigured(trip=null,settings=readRoutingSettings()){if(trip?.liveData===false)return false;if(trip?.travelMode&&trip.travelMode!=='direct')return false;if(/^https:\/\//.test(routingEndpoint())||settings.orsApiKey)return true;return trip?['car','motorcycle'].includes(transportId(trip.transport)):false}
 export function buildRoutingRequest(trip,day){
   const origin={lat:day.fromPoint.lat,lon:day.fromPoint.lon},destination={lat:day.toPoint.lat,lon:day.toPoint.lon};
-  return{day:day.day,origin,destination,waypoints:[],vehicle:vehicleSpec(trip)}
+  const daytripVia=day.kind==='daytrip'&&validCoordinate(day.destinationPoint)?[{lat:day.destinationPoint.lat,lon:day.destinationPoint.lon}]:[];
+  return{day:day.day,origin,destination,waypoints:daytripVia,vehicle:vehicleSpec(trip)}
 }
 function waypointsOnGeometry(geometry,timing,transport){const count=Math.max(0,timing.stopCount||0);if(geometry.length<2||!count)return[];return Array.from({length:count},(_,index)=>{const position=Math.min(geometry.length-1,Math.max(1,Math.round((index+1)*(geometry.length-1)/(count+1))));return{...geometry[position],name:timing.fuelStops>index?`Brandstof- en ruststop ${index+1}`:`Ruststop ${index+1}`,role:timing.fuelStops>index?'fuel':'rest',transport,approximate:false}})}
 function applyResult(trip,day,result){const geometry=Array.isArray(result.geometry)?result.geometry.filter(validCoordinate):[];if(geometry.length<10||!Number.isFinite(result.distanceKm)||!Number.isFinite(result.roadHours))return false;const timing=estimateLegTiming(trip,{distanceKm:result.distanceKm,roadHours:result.roadHours,arrival:day.kind!=='return'||day.to!==trip.origin});Object.assign(day,{distanceKm:Math.round(result.distanceKm),roadHours:timing.roadHours,driveHours:timing.elapsedHours,elapsedHours:timing.elapsedHours,breakHours:timing.breakHours,restStops:timing.restStops,fuelStops:timing.fuelStops,stopCount:timing.stopCount,waypoints:waypointsOnGeometry(geometry,timing,trip.transport),geometry,routeSource:result.provider||'live-provider',routeOverlap:Number.isFinite(result.loopOverlap)?result.loopOverlap:null,exceedsDailyLimit:timing.elapsedHours>trip.maxDrive+.05});return true}
@@ -149,7 +150,7 @@ export async function enrichPlanWithLiveRouting(trip,destination,plan,options={}
   const fetchImpl=options.fetchImpl||globalThis.fetch;
   if(!routingConfigured(trip,options.settings||readRoutingSettings(options.storage))||typeof fetchImpl!=='function')return plan;
   const next=typeof globalThis.structuredClone==='function'?globalThis.structuredClone(plan):JSON.parse(JSON.stringify(plan));
-  const routeDays=next.days.filter(day=>['outward','return','transfer'].includes(day.kind)&&validCoordinate(day.fromPoint)&&validCoordinate(day.toPoint));
+  const routeDays=next.days.filter(day=>['outward','return','transfer','daytrip'].includes(day.kind)&&validCoordinate(day.fromPoint)&&validCoordinate(day.toPoint));
   let applied=0;
   const providers=[];
 

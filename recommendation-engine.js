@@ -60,7 +60,7 @@ function spread(count,min=.18,max=.82,shift=0){
   return Array.from({length:count},(_,i)=>Math.max(min,Math.min(max,min+(max-min)*(i/(count-1))+shift)));
 }
 function operationalTargets(day,trip,transport,rule){
-  const isTravel=['outward','return','transfer'].includes(day.kind);
+  const isTravel=['outward','return','transfer','daytrip'].includes(day.kind);
   if(!isTravel)return[];
   const roadHours=Number(day.roadHours||day.driveHours||0);
   const distance=Number(day.distanceKm||0);
@@ -95,7 +95,7 @@ function operationalTargets(day,trip,transport,rule){
 export function buildRecommendations(trip,destination,days){
   const transport=transportId(trip.transport),rule=rules[transport]||rules.car,all=[];
   for(const day of days){
-    const recommendations=[],isTravel=['outward','return','transfer'].includes(day.kind),isHomecoming=day.kind==='return'&&day.to===trip.origin;
+    const recommendations=[],isTravel=['outward','return','transfer','daytrip'].includes(day.kind),isHomecoming=(day.kind==='return'||day.kind==='daytrip')&&day.to===trip.origin;
     const anchor=day.toPoint||day.fromPoint||destination.bases?.[0];
 
     // Operational route coverage always spans every travel leg.

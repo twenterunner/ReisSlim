@@ -6,7 +6,7 @@ const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const DEFAULT_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const GOLDEN_ANGLE=137.507764;
-const DEFAULT_BATCH_SEEDS=6;
+const DEFAULT_BATCH_SEEDS=10;
 const DEFAULT_RESULT_LIMIT=72;
 const DISCOVERY_PASSES=1;
 const countryNames={
@@ -21,7 +21,7 @@ ZA:'Zuid-Afrika',NA:'Namibië'
 const countryCosts={CH:185,DK:155,NO:165,SE:145,AT:150,IT:150,FR:140,DE:125,BE:125,CZ:105,PL:100,SI:125,HR:120,ES:125,PT:115};
 
 function destinationPoint(origin,distanceKm,bearingDegrees){const radius=6371,bearing=bearingDegrees*Math.PI/180,lat1=origin.lat*Math.PI/180,lon1=origin.lon*Math.PI/180;const lat2=Math.asin(Math.sin(lat1)*Math.cos(distanceKm/radius)+Math.cos(lat1)*Math.sin(distanceKm/radius)*Math.cos(bearing));const lon2=lon1+Math.atan2(Math.sin(bearing)*Math.sin(distanceKm/radius)*Math.cos(lat1),Math.cos(distanceKm/radius)-Math.sin(lat1)*Math.sin(lat2));return{lat:lat2*180/Math.PI,lon:lon2*180/Math.PI}}
-export function roadtripReachKm(trip){const outboundDays=Math.max(1,Math.floor((Number(trip.days||3)-1)/2));const productiveRoadSpeed=trip.transport==='motorcycle'?72:trip.transport==='caravan'?62:trip.transport==='motorhome'?66:78;return Math.max(250,Math.min(3600,Number(trip.maxDrive||5)*productiveRoadSpeed*outboundDays))}
+export function roadtripReachKm(trip){const days=Number(trip.days||1),productiveRoadSpeed=trip.transport==='motorcycle'?72:trip.transport==='caravan'?62:trip.transport==='motorhome'?66:78;if(days===1)return Math.max(35,Math.min(420,Number(trip.maxDrive||5)*productiveRoadSpeed*.48));const outboundDays=Math.max(1,Math.floor((days-1)/2));return Math.max(250,Math.min(3600,Number(trip.maxDrive||5)*productiveRoadSpeed*outboundDays))}
 function reachFor(trip){return roadtripReachKm(trip)}
 
 export function discoverySeeds(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){
@@ -77,7 +77,7 @@ function dynamicProfile(trip,element){
 function spatialKey(item){const base=item.bases?.[0];return base?`${Math.round(base.lat*8)/8}:${Math.round(base.lon*8)/8}`:item.id}
 export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],limit=DEFAULT_RESULT_LIMIT}={}){
   const excluded=new Set(excludedIds),seenNames=new Set(),seenSpatial=new Map(),maximumDistance=roadtripReachKm(trip)*1.08;
-  const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=70&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
+  const candidates=(payload?.elements||[]).map(element=>dynamicProfile(trip,element)).filter(Boolean).filter(item=>item.distanceKm>=(Number(trip.days)===1?20:70)&&item.distanceKm<=maximumDistance&&!excluded.has(item.id)).sort((a,b)=>a.distanceKm-b.distanceKm||a.id.localeCompare(b.id));
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
 
@@ -307,7 +307,7 @@ export async function discoverDestinationBatch(
         if(!result.cached&&result.cacheKey){try{storage?.setItem(result.cacheKey,JSON.stringify(result.payload))}catch{}}
         onProgress?.({type:'pass-success',pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,candidateElements:result.payload.elements.length,totalCandidateElements:combined.length,newDestinations:fresh.length,totalDestinations:emitted.length});
         await onBatch?.({destinations:fresh,pass,totalPasses:DISCOVERY_PASSES,endpoint:result.endpoint,totalDestinations:emitted.length,totalCandidateElements:combined.length});
-        if(emitted.length>=6){
+        if(emitted.length>=10){
           onProgress?.({type:'discovery-complete',totalPasses:DISCOVERY_PASSES,successfulPasses,totalDestinations:emitted.length,candidateElements:combined.length,early:true});
           return{destinations:emitted,live:true,cached:usedCache,source:'OpenStreetMap Overpass',passes:pass,successfulPasses,candidateElements:combined.length};
         }

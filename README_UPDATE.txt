@@ -1,15 +1,23 @@
-ReisSlim v1.7.12 · Build 1712
+ReisSlim v1.7.13 · Build 1713
 
-VERBETER REIS
-- Maximum improvement is the default.
-- Old/restored lock states are cleared at startup.
-- Checked locks now clearly mean “ReisSlim mag dit niet veranderen”.
-- Maximum mode refuses weak proposals below +6 total unless >= +10 on a key dimension or >= 2 defects are solved.
-- Preview shows exact score before/after, total gain, dimension deltas, trade-offs and concrete changes.
-- Applying a proposal keeps a permanent before/after summary.
-- Route compression, cost optimisation and recovery buffers are stronger.
+PREFERENCE-LED SCORING
+- Selected preferences are now the basis for positive destination-property scoring.
+- An unselected property is neutral (50/100) at best and is excluded from Top/Bottom match lists.
+- Culture can therefore no longer appear as a strong match unless Culture was selected.
+- Preference contribution to the total proposal score increased from 56% to 62%.
 
-GUI
-- Reisplan now has a photographic hero with destination, days, route type and budget.
-- Optimizer rebuilt as a visual score-change experience rather than a long settings form.
-- Flat ZIP, no folders.
+SINGLE-DAY TRIPS
+- Reisduur now accepts 1–60 days.
+- A 1-day trip is planned as an actual daytrip: origin -> destination -> origin on the same day.
+- Reach is calculated against total round-trip driving time, not a multi-day rule.
+- Live routing sends the destination as a via point and returns to the origin.
+- No overnight accommodation is proposed for a daytrip.
+- Minimum budget validation reduced to €100 so short daytrips are practical.
+
+MORE OPTIONS
+- Initial portfolio increased from 8 to 12.
+- 'Show more' adds 8 instead of 4.
+- Candidate preselection increased from 24 to 40.
+- Live discovery seed coverage increased from 6 to 10.
+
+Flat ZIP, no folders.

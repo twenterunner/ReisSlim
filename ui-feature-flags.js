@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.12',build:'1712'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.13',build:'1713'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -68,7 +68,7 @@ function enhanceProposalScores(){
     if(entries.length<6)return;
     const top=[...entries].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,3);
     const bottom=[...entries].sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,3);
-    const content=`<div class="score-extremes-head"><div><span>STERKSTE MATCH</span><strong>Top 3</strong></div><div><span>ZWAKSTE MATCH</span><strong>Bottom 3</strong></div></div><div class="score-extremes-grid"><div>${top.map(([key,value])=>criterionRow(key,value,'positive')).join('')}</div><div>${bottom.map(([key,value])=>criterionRow(key,value,'negative')).join('')}</div></div>`;
+    const content=`<div class="score-extremes-head"><div><span>STERKSTE MATCH</span><strong>Top 3 relevant</strong></div><div><span>ZWAKSTE MATCH</span><strong>Bottom 3 relevant</strong></div></div><div class="score-extremes-grid"><div>${top.map(([key,value])=>criterionRow(key,value,'positive')).join('')}</div><div>${bottom.map(([key,value])=>criterionRow(key,value,'negative')).join('')}</div></div>`;
     if(!panel){
       panel=document.createElement('section');
       panel.className='score-extremes';

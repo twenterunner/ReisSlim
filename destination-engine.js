@@ -78,13 +78,23 @@ function preferenceScore(trip,destination){
 }
 function budgetScore(total,budget){const ratio=total/Math.max(1,budget);if(ratio<=.9)return 100;return roundScore(100-(ratio-.9)*150)}
 function destinationIntentScore(trip,destination){const query=String(trip.destinationQuery||'').trim().toLocaleLowerCase('nl-NL');if(!query)return 0;const words=query.split(/\s+/).filter(word=>word.length>2),haystack=[destination.name,destination.country,destination.summary,...(destination.tags||[])].join(' ').toLocaleLowerCase('nl-NL'),matches=words.filter(word=>haystack.includes(word)).length;return matches?Math.min(30,18+matches*6):-12}
-function roadReachStatus(trip,destination){const origin=resolveOrigin(trip),point=destination.bases?.[0];if(!origin||!point)return{ok:true};const straight=haversineKm(origin,point);if(!Number.isFinite(straight))return{ok:true};const outboundDays=trip.routeTopology==='open-ended'?Math.max(1,trip.days-1):Math.max(1,Math.floor((trip.days-1)/2)),speed=trip.transport==='motorcycle'?72:trip.transport==='caravan'?62:trip.transport==='motorhome'?66:78,roadReach=trip.maxDrive*speed*outboundDays,estimatedRoad=straight*1.18;return{ok:estimatedRoad<=roadReach*1.12,estimatedRoad,roadReach}}
+function roadReachStatus(trip,destination){const origin=resolveOrigin(trip),point=destination.bases?.[0];if(!origin||!point)return{ok:true};const straight=haversineKm(origin,point);if(!Number.isFinite(straight))return{ok:true};const speed=trip.transport==='motorcycle'?72:trip.transport==='caravan'?62:trip.transport==='motorhome'?66:78,singleDay=Number(trip.days)===1,outboundDays=trip.routeTopology==='open-ended'?Math.max(1,trip.days-1):Math.max(1,Math.floor((trip.days-1)/2)),roadReach=singleDay?trip.maxDrive*speed*.48:trip.maxDrive*speed*outboundDays,estimatedRoad=straight*1.18;return{ok:estimatedRoad<=roadReach*1.08,estimatedRoad,roadReach,singleDay}}
 export function scoreDestination(trip,destination){const month=new Date(`${trip.startDate}T12:00:00`).getMonth()+1,route=calculateRouteMetrics(trip,destination),relaxedRoute=route.requiredLegs*2+1>trip.days?calculateRouteMetrics({...trip,maxDrive:trip.maxDrive+STRETCH_LIMITS.maxDriveHours},destination):route,budget=buildBudget(trip,destination),preference=preferenceScore(trip,destination),season=destination.season?.includes(month)?90:40,vehicle=transportId(trip.transport),transport=vehicle==='motorcycle'?destination.motorcycle*10:['motorhome','caravan'].includes(vehicle)?destination.camper*10:destination.family*10,constraintStatus=evaluateDestinationConstraints(trip,{route,relaxedRoute,budget}),road=roadReachStatus(trip,destination);if(!road.ok){constraintStatus.violations.push({key:'road-reach',label:'Roadtripbereik',detail:`${destination.name} ligt buiten het realistische roadtripbereik.`,adjustment:'Kies dichterbij, meer reisdagen of een hogere daglimiet.',stretchable:false});Object.assign(constraintStatus,{category:'rejected',exact:false,stretch:false,selectable:false,summary:constraintStatus.violations.map(item=>item.detail).join(' ')})}
- const minimumDays=trip.routeTopology==='open-ended'?Math.max(2,route.requiredLegs+1):constraintStatus.minimumDays,driving=roundScore(100-Math.max(0,route.requiredLegs-1)*15-Math.max(0,minimumDays-trip.days)*15),budgetFit=budgetScore(budget.total,trip.budget),routePotential=roundScore(((tagScore(destination,'natuur')+tagScore(destination,'bergen')+tagScore(destination,'motor'))/3+transport)/2);
- const dimensions={budget:budgetFit,driving,season,transport,family:destination.family*10,motorcycle:destination.motorcycle*10,camper:destination.camper*10,scenery:roundScore((tagScore(destination,'natuur')+tagScore(destination,'bergen')+tagScore(destination,'kust'))/3),walking:tagScore(destination,'wandelen'),swimming:tagScore(destination,'zwemmen'),food:tagScore(destination,'eten',90,55),culture:tagScore(destination,'cultuur',90,50),crowds:destination.crowds*10};
- const intentScore=destinationIntentScore(trip,destination),score=roundScore(preference.score*.56+budgetFit*.12+season*.09+transport*.11+driving*.12+intentScore-(constraintStatus.category==='stretch'?12:0)),matchSentence=preference.reasons.length?preference.reasons.join('; '):'geen specifieke inhoudelijke voorkeur geselecteerd',budgetMargin=Math.max(0,trip.budget-budget.total);
+ const minimumDays=Number(trip.days)===1?1:trip.routeTopology==='open-ended'?Math.max(2,route.requiredLegs+1):constraintStatus.minimumDays,driving=roundScore(100-Math.max(0,route.requiredLegs-1)*15-Math.max(0,minimumDays-trip.days)*15),budgetFit=budgetScore(budget.total,trip.budget);
+ const selected=new Set(trip.preferences||[]),neutral=50,selectedTag=(id,matched=90,unmatched=45)=>selected.has(id)?tagScore(destination,id,matched,unmatched):neutral;
+ const scenicSelected=['natuur','bergen','kust'].filter(id=>selected.has(id));
+ const scenery=scenicSelected.length?roundScore(scenicSelected.reduce((sum,id)=>sum+tagScore(destination,id),0)/scenicSelected.length):neutral;
+ const dimensions={budget:budgetFit,driving,season,transport,family:selected.has('kinderen')?destination.family*10:neutral,motorcycle:selected.has('motor')?destination.motorcycle*10:neutral,camper:destination.camper*10,scenery,walking:selectedTag('wandelen'),swimming:selectedTag('zwemmen'),food:selectedTag('eten',90,55),culture:selectedTag('cultuur',90,50),crowds:destination.crowds*10};
+ const routePreferenceValues=[selected.has('natuur')?tagScore(destination,'natuur'):null,selected.has('bergen')?tagScore(destination,'bergen'):null,selected.has('motor')?destination.motorcycle*10:null].filter(Number.isFinite);
+ const routePotential=roundScore(((routePreferenceValues.length?routePreferenceValues.reduce((a,b)=>a+b,0)/routePreferenceValues.length:neutral)+transport)/2);
+ const intentScore=destinationIntentScore(trip,destination),score=roundScore(preference.score*.62+budgetFit*.10+season*.07+transport*.09+driving*.12+intentScore-(constraintStatus.category==='stretch'?12:0)),matchSentence=preference.reasons.length?preference.reasons.join('; '):'geen specifieke inhoudelijke voorkeur geselecteerd',budgetMargin=Math.max(0,trip.budget-budget.total);
  const story=proposalStory(trip,destination,preference,route,budgetMargin,constraintStatus);
- const criteria={budget:dimensions.budget,driving:dimensions.driving,season:dimensions.season,transport:dimensions.transport,scenery:dimensions.scenery,walking:dimensions.walking,swimming:dimensions.swimming,food:dimensions.food,culture:dimensions.culture,crowds:dimensions.crowds};
+ const criteria={budget:dimensions.budget,driving:dimensions.driving,season:dimensions.season,transport:dimensions.transport};
+ if(selected.has('natuur')||selected.has('bergen')||selected.has('kust'))criteria.scenery=dimensions.scenery;
+ if(selected.has('wandelen'))criteria.walking=dimensions.walking;
+ if(selected.has('zwemmen'))criteria.swimming=dimensions.swimming;
+ if(selected.has('eten'))criteria.food=dimensions.food;
+ if(selected.has('cultuur'))criteria.culture=dimensions.culture;
  globalThis.__REISSLIM_PROPOSAL_SCORES=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
  globalThis.__REISSLIM_PROPOSAL_SCORES[destination.id]=criteria;
  return{...destination,summary:story,score,dimensions,estimate:budget.total,budget,route,matches:preference.matches,preferenceCoverage:preference.coverage,preferencePurity:preference.purity,preferenceReasons:preference.reasons,essentialMisses:preference.essentialMisses,intentMatch:intentScore>0,minimumDays,feasible:constraintStatus.exact,category:constraintStatus.category,constraintStatus,confidence:route.originKnown?'redelijk':'beperkt',compromises:constraintStatus.violations.map(item=>item.detail),
@@ -93,15 +103,18 @@ export function scoreDestination(trip,destination){const month=new Date(`${trip.
 }
 const byMatch=(a,b)=>Number(b.intentMatch)-Number(a.intentMatch)||b.preferenceCoverage-a.preferenceCoverage||b.score-a.score||a.estimate-b.estimate||a.name.localeCompare(b.name,'nl');
 
-function cheapCatalogPreselect(trip, destinationList, maximum = 24) {
+function cheapCatalogPreselect(trip, destinationList, maximum = 40) {
   const origin = resolveOrigin(trip);
   const selectedPrefs = new Set(trip.preferences || []);
   const weightFor = id => Number(trip.preferenceWeights?.[id] || 2);
   const productiveSpeed = trip.transport === 'motorcycle' ? 72 : trip.transport === 'caravan' ? 62 : trip.transport === 'motorhome' ? 66 : 78;
+  const singleDay=Number(trip.days)===1;
   const outboundDays = trip.routeTopology === 'open-ended'
-    ? Math.max(1, Number(trip.days || 3) - 1)
-    : Math.max(1, Math.floor((Number(trip.days || 3) - 1) / 2));
-  const reachKm = Math.max(250, Number(trip.maxDrive || 5) * productiveSpeed * outboundDays * 1.12);
+    ? Math.max(1, Number(trip.days || 1) - 1)
+    : Math.max(1, Math.floor((Number(trip.days || 1) - 1) / 2));
+  const reachKm = singleDay
+    ? Math.max(35, Number(trip.maxDrive || 5) * productiveSpeed * .48)
+    : Math.max(250, Number(trip.maxDrive || 5) * productiveSpeed * outboundDays * 1.12);
 
   const scored = (destinationList || []).map((destination, index) => {
     const point = destination.bases?.[0];
@@ -128,6 +141,6 @@ function cheapCatalogPreselect(trip, destinationList, maximum = 24) {
   return pool.sort((a,b)=>b.merit-a.merit||a.index-b.index).slice(0,maximum).map(item=>item.destination);
 }
 
-export function rankDestinationGroups(trip,destinationList){const preselected=cheapCatalogPreselect(trip,destinationList,24),scored=preselected.map(destination=>scoreDestination(trip,destination)),exact=scored.filter(item=>item.category==='exact').sort(byMatch),stretched=scored.filter(item=>item.category==='stretch').sort((a,b)=>a.constraintStatus.stretchPenalty-b.constraintStatus.stretchPenalty||byMatch(a,b)).slice(0,STRETCH_LIMITS.visibleProposals),rejected=scored.filter(item=>item.category==='rejected').sort((a,b)=>a.constraintStatus.violations.length-b.constraintStatus.violations.length||byMatch(a,b));return{exact,stretched,rejected,visible:[...exact,...stretched],closestAdjustments:closestAdjustments(rejected)}}
+export function rankDestinationGroups(trip,destinationList){const preselected=cheapCatalogPreselect(trip,destinationList,40),scored=preselected.map(destination=>scoreDestination(trip,destination)),exact=scored.filter(item=>item.category==='exact').sort(byMatch),stretched=scored.filter(item=>item.category==='stretch').sort((a,b)=>a.constraintStatus.stretchPenalty-b.constraintStatus.stretchPenalty||byMatch(a,b)).slice(0,STRETCH_LIMITS.visibleProposals),rejected=scored.filter(item=>item.category==='rejected').sort((a,b)=>a.constraintStatus.violations.length-b.constraintStatus.violations.length||byMatch(a,b));return{exact,stretched,rejected,visible:[...exact,...stretched],closestAdjustments:closestAdjustments(rejected)}}
 export function rankDestinations(trip,destinationList){return rankDestinationGroups(trip,destinationList).visible}
 export const scoreInRange=score=>clamp(score)===score;

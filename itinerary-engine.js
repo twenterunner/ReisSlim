@@ -75,8 +75,29 @@ function buildOpenEndedExplorationDays(trip,destination,outbound,metrics,totalDa
   return days.slice(0,totalDays);
 }
 
+
+function buildSingleDayTrip(trip,destination,first){
+  const origin=first.outbound?.[0]||first.metrics?.origin,target=first.outbound?.at(-1)||destination.bases?.[0];
+  if(!validCoordinate(origin)||!validCoordinate(target))return null;
+  const one=segmentMetrics(origin,target,first.metrics.oneWayDistanceKm,first.metrics.oneWayRoadHours);
+  const combined={distanceKm:Math.round(Number(one.distanceKm||0)*2),roadHours:Number((Number(one.roadHours||0)*2).toFixed(2))};
+  const timing=estimateLegTiming(trip,{...combined,arrival:false});
+  const activity=chooseActivities(trip,destination)[0];
+  const day={kind:'daytrip',typeLabel:'Dagtrip',from:origin.name||trip.origin,to:trip.origin,location:target.name||destination.name,fromPoint:{...origin},toPoint:{...origin},destinationPoint:{...target},overnight:trip.origin,distanceKm:combined.distanceKm,roadHours:timing.roadHours,driveHours:timing.elapsedHours,elapsedHours:timing.elapsedHours,breakHours:timing.breakHours,restStops:timing.restStops,fuelStops:timing.fuelStops,stopCount:timing.stopCount,waypoints:[{...target,name:target.name||destination.name,role:'destination'}],geometry:[{...origin},{...target},{...origin}],routeSource:'estimated-daytrip',activityType:activity?.type||'dagtrip',primaryPlan:`Dagtrip vanuit ${trip.origin} naar ${target.name||destination.name} en dezelfde dag terug. ${activity?.title?`Hoogtepunt: ${activity.title}.`:''}`,rainAlternative:activity?.rainAlternative||'Kies een korter programma en keer eerder terug bij slecht weer.',exceedsDailyLimit:timing.elapsedHours>trip.maxDrive+.05,day:1,date:trip.startDate};
+  return day;
+}
+
 export function buildItinerary(trip,destination){
  const first=buildTravelNodes(trip,destination,1),requiredLegs=first.metrics.requiredLegs,openEnded=trip.routeTopology==='open-ended';
+ if(Number(trip.days)===1){
+   const day=buildSingleDayTrip(trip,destination,first);
+   if(day){
+     const days=[day];applyDaySchedules(trip,days);const recommendations=buildRecommendations(trip,destination,days);
+     const metrics={...first.metrics,exploration:{overlap:0,explorationScore:100,method:'single-day-roundtrip'}};
+     const warnings=day.exceedsDailyLimit?[`Deze dagtrip duurt circa ${day.elapsedHours.toFixed(1)} uur inclusief geplande pauzes en overschrijdt je daglimiet.`]:[];
+     return{days,routeMetrics:metrics,requiredLegs:1,usedLegs:1,minimumDays:1,feasible:!day.exceedsDailyLimit,proposalCategory:destination.category||'exact',warnings,accommodationChanges:0,recommendations,routing:{source:'estimated-daytrip',label:'Dagtrip · heen en terug op dezelfde dag',live:false},origin:{name:trip.origin,...(first.metrics.origin||{})},topology:'daytrip'};
+   }
+ }
  const preferred=destination.constraintStatus?.travelLegs||requiredLegs;
  const allocation=openEnded?{usedLegs:Math.min(requiredLegs,Math.max(1,trip.days-1)),stayDays:Math.max(0,trip.days-Math.min(requiredLegs,Math.max(1,trip.days-1)))}:solveDayAllocation(trip,requiredLegs,preferred);
  const usedLegs=allocation.usedLegs,{metrics,outbound}=buildTravelNodes(trip,destination,usedLegs);let inbound=[];
