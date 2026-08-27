@@ -1,0 +1,34 @@
+ReisSlim v1.7.29 · Build 1729
+
+ROOT CAUSE OF 'STUCK AT 1.7.27'
+The v1.7.28 compact package updated config.js/index.html but did NOT update
+ui-feature-flags.js. That file still contained:
+  version:'1.7.27', build:'1727'
+and it is the code that injects the revision badge into the header.
+Therefore the header correctly kept displaying 1.7.27 even after the other
+files were at 1.7.28.
+
+FIX
+- ui-feature-flags.js is explicitly updated and included.
+- config, index, manifest and service-worker identifiers are all 1.7.29 / 1729.
+- service-worker cache name changed, forcing stale cached branding/revision files out.
+- accepted realistic ReisSlim icon is now used in:
+  * application header
+  * browser/favicon reference
+  * Apple touch icon
+  * PWA manifest 192x192 icon
+  * PWA maskable 512x512 icon
+- old generic R mark is removed from the header.
+
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+header uses accepted icon: PASS
+browser icon reference: PASS
+apple touch icon reference: PASS
+manifest uses PNG icons: PASS
+stale 1.7.27 header constant removed: PASS
+header revision is 1.7.29: PASS
+config revision is 1.7.29: PASS
+new service-worker cache: PASS
+accepted icon files exist: PASS
