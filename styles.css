@@ -525,7 +525,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 /* v1.7.19 optimizer score reconciliation */
 .optimizer-net-row{margin-top:.35rem;padding-top:.65rem;border-top:1px solid rgba(20,80,72,.15);font-weight:900}.optimizer-math-note{display:block;margin-top:.55rem;line-height:1.35;color:#667773}.optimizer-delta-row em{min-width:3.7rem;text-align:center}
 
-/* v1.7.22 compact UI cleanup, comparison and weather */
+/* v1.7.23 compact UI cleanup, comparison and weather */
 .stats-card[hidden],.tradeoff[hidden],#variantSection.hidden{display:none!important}
 .proposal-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;align-items:stretch}
 .proposal-actions>button[data-select]{grid-column:1/-1;width:100%!important}
@@ -549,7 +549,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 @media(max-width:430px){.proposal-actions{grid-template-columns:1fr 1fr!important}.premium-comparison .comparison-table th,.premium-comparison .comparison-table td{min-width:105px}.proposal-weather-badge small{display:none}.weather-days{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 
 
-/* v1.7.22 compare viewport lock + proposal review flow */
+/* v1.7.23 compare viewport lock + proposal review flow */
 html,body{max-width:100%;overflow-x:hidden}
 #resultsSection,.card-grid,.destination-card,.proposal-actions,#compareSection,.premium-comparison{min-width:0!important;max-width:100%!important;box-sizing:border-box}
 .compare-dock{
@@ -571,7 +571,51 @@ html,body{max-width:100%;overflow-x:hidden}
   .compare-dock button{padding:8px 11px!important}
 }
 
-/* v1.7.22 preference + proposal cleanup */
+/* v1.7.23 preference + proposal cleanup */
 .proposal-evidence{display:none!important}
 .premium-preferences select[data-priority]{pointer-events:auto!important;opacity:1!important;cursor:pointer}
 .premium-preferences select[data-priority]:disabled{opacity:1!important;color:inherit!important}
+
+/* v1.7.23 continuous review + comparison experience */
+.destination-card .card-body>p.muted{display:none!important}
+.review-queue-status,.review-exhausted{
+  margin:10px 0 16px;padding:14px 16px;border-radius:16px;background:#edf8f4;
+  color:#155e52;font-weight:800;border:1px solid rgba(20,120,100,.16)
+}
+.review-exhausted p{margin:5px 0 0;font-weight:500;color:#58706a}
+.comparison-experience{min-width:0}
+.compare-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.compare-tabs button{padding:11px 8px;border-radius:14px;background:#eff5f3;color:#36564f;font-weight:850;border:1px solid rgba(26,82,72,.1)}
+.compare-tabs button.active{background:#167965;color:white;box-shadow:0 6px 16px rgba(14,111,91,.18)}
+.compare-overview-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;-webkit-overflow-scrolling:touch}
+.compare-overview-card{flex:0 0 min(82vw,320px);scroll-snap-align:start;border:1px solid rgba(18,74,64,.13);border-radius:20px;background:white;overflow:hidden;box-shadow:0 8px 22px rgba(15,66,58,.08)}
+.compare-overview-card>img{width:100%;height:120px;object-fit:cover;display:block}
+.compare-overview-card>div{padding:15px}
+.compare-overview-card span{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#3e7b70}
+.compare-overview-card h3{margin:3px 0 5px;font-size:1.25rem}
+.compare-big-score{font-size:1.75rem;color:#0d5f50}
+.compare-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}
+.compare-kpis b{font-size:.72rem;padding:8px 5px;border-radius:10px;background:#f1f7f5;text-align:center;overflow-wrap:anywhere}
+.compare-overview-card ul{margin:8px 0;padding-left:18px;color:#365b53}
+.compare-overview-card li{margin:3px 0}
+.compare-weak{padding:8px 10px;border-radius:10px;background:#fff7e8;color:#745b2b;font-size:.82rem}
+.compare-overview-card button{width:100%;margin-top:9px}
+.compare-why{margin:8px 0 4px;padding:13px 15px;border-radius:15px;background:linear-gradient(135deg,#e7f6f1,#f5fbf9)}
+.compare-why p{margin:4px 0 0;color:#53716a}
+.comparison-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.visual-scorecard{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
+.visual-scorecard th,.visual-scorecard td{min-width:112px;padding:10px;vertical-align:middle}
+.visual-scorecard td{position:relative}
+.visual-scorecard td i{display:block;height:4px;border-radius:4px;background:linear-gradient(90deg,#16816c var(--compare-score),#e4ece9 var(--compare-score));margin-top:6px}
+.visual-scorecard td.comparison-winner{background:#e4f6ef!important;box-shadow:inset 0 0 0 2px rgba(17,135,108,.22)}
+.visual-scorecard td.comparison-winner::after{content:'✓ Beste';display:block;font-size:.62rem;font-weight:900;color:#08705d;margin-top:4px}
+.compare-map-wrap{min-width:0}
+.proposal-compare-map{height:390px;width:100%;border-radius:18px;overflow:hidden;background:#e9f1ee}
+.compare-map-wrap p{font-size:.8rem;color:#667973;margin:8px 2px}
+.compare-map-empty{display:grid;place-items:center;height:100%;padding:30px;text-align:center;color:#627871}
+@media(max-width:430px){
+ .compare-overview-card{flex-basis:86vw}
+ .compare-kpis{grid-template-columns:1fr 1fr}
+ .proposal-compare-map{height:340px}
+ .compare-tabs button{font-size:.82rem}
+}

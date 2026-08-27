@@ -313,10 +313,21 @@ async function enrichPortfolioWeather(){
   if(run!==state.weatherPortfolioRun)return;
   const sort=(a,b)=>Number(b.portfolioScore||b.score)-Number(a.portfolioScore||a.score);
   state.ranking.exact.sort(sort);state.ranking.stretched.sort(sort);state.ranking.visible=[...state.ranking.exact,...state.ranking.stretched].slice(0,12);state.ranked=state.ranking.visible;
-  renderDestinations(state);renderComparison(state);window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
+  renderDestinations(state);updateReviewProgress();renderComparison(state);renderEnhancedComparison();window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
 }
-function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state);schedulePortfolioWeather()}
-async function discoverLiveOptions({append=false,retry=false}={}){
+function updateReviewProgress(){
+  const badge=$('resultCount');
+  if(!badge)return;
+  const visible=state.ranked.length,reviewed=state.dismissedIds.length;
+  badge.textContent=`${visible} nu · ${reviewed}/100 beoordeeld`;
+}
+function refreshPortfolio(){
+  if(state.trip)state.trip.allowStretch=true;
+  state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));
+  state.ranked=state.ranking.visible;
+  renderDestinations(state);updateReviewProgress();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();
+}
+async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
   state.discoveryBusy=true;
   if(retry){
@@ -324,8 +335,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
     state.catalog=[...destinations];
     refreshPortfolio();
   }
-  startLiveDiscoveryProgress();
-  setStatus('Live reisopties zoeken via OpenStreetMap…');
+  if(!quiet){startLiveDiscoveryProgress();setStatus('Live reisopties zoeken via OpenStreetMap…')}
   try{
     let addedTotal=0;
     const batchHandler=async batch=>{
@@ -334,16 +344,14 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       if(!fresh.length)return;
       state.catalog.push(...fresh);
       addedTotal+=fresh.length;
-      refreshPortfolio();
-      await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
-      persistDraft(`${addedTotal} live regio’s gevonden — zoeken gaat verder`);
+      if(!quiet){refreshPortfolio();await new Promise(resolve=>requestAnimationFrame(()=>resolve()));persistDraft(`${addedTotal} live regio’s gevonden — zoeken gaat verder`)}
     };
     let result=await discoverDestinationBatch(state.trip,{
       cursor:state.discoveryCursor,
       excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
       timeoutMs:7000,
       bypassCache:retry,
-      onProgress:handleDiscoveryProgress,
+      onProgress:quiet?undefined:handleDiscoveryProgress,
       onBatch:batchHandler
     });
     state.discoveryCursor++;
@@ -355,13 +363,13 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       const p=state.liveDiscoveryProgress;
       p.failed=false;p.complete=false;p.endpointLabel='live bron';
       p.lastMessage='Cache leverde geen bruikbare regio’s op — automatisch een verse OpenStreetMap-zoekronde starten…';
-      renderLiveDiscoveryProgress();
+      if(!quiet)renderLiveDiscoveryProgress();
       result=await discoverDestinationBatch(state.trip,{
         cursor:state.discoveryCursor,
         excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
         timeoutMs:7000,
         bypassCache:true,
-        onProgress:handleDiscoveryProgress,
+        onProgress:quiet?undefined:handleDiscoveryProgress,
         onBatch:batchHandler
       });
       state.discoveryCursor++;
@@ -378,7 +386,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
         excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
         timeoutMs:5200,
         bypassCache:true,
-        onProgress:handleDiscoveryProgress,
+        onProgress:quiet?undefined:handleDiscoveryProgress,
         onBatch:batchHandler
       });
       state.discoveryCursor++;
@@ -389,7 +397,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       void hydrateProposalImages();
       persistDraft(`${result.destinations.length} live regio’s gevonden`);
     }else{
-      setStatus('Reisportfolio gereed · live uitbreiding kon deze ronde niet worden toegevoegd');
+      if(!quiet)setStatus('Reisportfolio gereed · live uitbreiding kon deze ronde niet worden toegevoegd');
     }
 
     if(state.liveDiscoveryProgress){
@@ -402,7 +410,7 @@ async function discoverLiveOptions({append=false,retry=false}={}){
         state.liveDiscoveryProgress.failureReason=result.reason||'Geen live regio’s gevonden.';
       }
     }
-    renderLiveDiscoveryProgress();
+    if(!quiet)renderLiveDiscoveryProgress();
     return result.destinations?.length||0;
   }catch(error){
     console.error(error);
@@ -411,13 +419,173 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       state.liveDiscoveryProgress.failureReason=String(error?.message||error);
       state.liveDiscoveryProgress.lastMessage='Onverwachte fout tijdens live zoeken.';
     }
-    renderLiveDiscoveryProgress();
+    if(!quiet)renderLiveDiscoveryProgress();
     return 0;
   }finally{
     state.discoveryBusy=false;
-    finishLiveDiscoveryProgress();
+    if(!quiet)finishLiveDiscoveryProgress();
   }
 }
+
+const REVIEW_VISIBLE_TARGET=8;
+const REVIEW_RESERVE_TARGET=24;
+const REVIEW_SEARCH_ROUNDS=12;
+let reviewPrefetchBusy=false;
+let reviewSearchEmptyRounds=0;
+
+function showReviewQueueStatus(message){
+  let box=document.getElementById('reviewQueueStatus');
+  if(!box){
+    box=document.createElement('div');
+    box.id='reviewQueueStatus';
+    box.className='review-queue-status';
+    $('destinationCards')?.prepend(box);
+  }
+  box.textContent=message;
+}
+
+function hideReviewQueueStatus(){document.getElementById('reviewQueueStatus')?.remove()}
+
+async function ensureReviewQueue({target=REVIEW_VISIBLE_TARGET,maxRounds=REVIEW_SEARCH_ROUNDS}={}){
+  refreshPortfolio();
+  if(!state.trip?.liveData||state.ranked.length>=target)return state.ranked.length;
+  showReviewQueueStatus(`Nieuwe reisopties zoeken… ${state.dismissedIds.length}/100 beoordeeld`);
+  let rounds=0,empty=0;
+  while(state.ranked.length<target&&rounds<maxRounds&&empty<4){
+    rounds++;
+    const before=state.catalog.length;
+    const added=await discoverLiveOptions({append:true,quiet:true});
+    const gained=Math.max(Number(added||0),state.catalog.length-before);
+    if(gained>0){empty=0;reviewSearchEmptyRounds=0}else{empty++;reviewSearchEmptyRounds++}
+    refreshPortfolio();
+    showReviewQueueStatus(`Nieuwe reisopties zoeken… ${state.ranked.length} klaar · ${state.dismissedIds.length}/100 beoordeeld`);
+  }
+  hideReviewQueueStatus();
+  if(!state.ranked.length){
+    const totalReviewed=state.dismissedIds.length;
+    const message=document.createElement('div');
+    message.className='review-exhausted';
+    message.innerHTML=`<strong>${totalReviewed} unieke opties beoordeeld</strong><p>ReisSlim heeft in deze zoekrondes geen nieuwe unieke reis gevonden. We zoeken opnieuw zodra je voorwaarden of focus wijzigen.</p>`;
+    $('destinationCards').prepend(message);
+  }
+  scheduleReviewPrefetch();
+  return state.ranked.length;
+}
+
+function scheduleReviewPrefetch(){
+  if(reviewPrefetchBusy||!state.trip?.liveData)return;
+  const run=()=>void prefetchReviewReserve();
+  if('requestIdleCallback'in window)requestIdleCallback(run,{timeout:1800});else setTimeout(run,700);
+}
+
+async function prefetchReviewReserve(){
+  if(reviewPrefetchBusy||state.discoveryBusy||!state.trip?.liveData)return;
+  reviewPrefetchBusy=true;
+  try{
+    let rounds=0,empty=0;
+    const unseenCount=()=>Math.max(0,(state.ranking?.candidates||[]).filter(item=>!state.dismissedIds.includes(item.id)).length);
+    while(unseenCount()<REVIEW_RESERVE_TARGET&&rounds<6&&empty<3){
+      rounds++;
+      const before=state.catalog.length;
+      const added=await discoverLiveOptions({append:true,quiet:true});
+      const gained=Math.max(Number(added||0),state.catalog.length-before);
+      if(gained>0){empty=0;reviewSearchEmptyRounds=0}else{empty++;reviewSearchEmptyRounds++}
+      // Rebuild only in memory/DOM after each useful batch so newly found regions
+      // become immediately available as replacements when a card is dismissed.
+      if(gained>0)refreshPortfolio();
+    }
+  }finally{reviewPrefetchBusy=false}
+}
+
+const comparisonPreferenceMap={
+  natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',
+  kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'
+};
+const comparisonLabels={
+  score:'Totale match',budget:'Budgetmatch',driving:'Reisbelasting',season:'Seizoen / weer',
+  transport:'Voertuigmatch',family:'Kindvriendelijk',scenery:'Landschap',walking:'Wandelen',
+  swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'
+};
+let proposalCompareMap=null;
+let comparisonView='overview';
+
+function comparisonSelected(){
+  const all=[...(state.ranking?.candidates||[]),...state.ranked,...state.catalog];
+  return state.compareIds.map(id=>all.find(item=>item.id===id)).filter(Boolean).filter((item,index,array)=>array.findIndex(x=>x.id===item.id)===index);
+}
+function metricValue(item,key){return key==='score'?Number(item.score):Number(item.dimensions?.[key])}
+function selectedComparisonRows(){
+  const preferred=[...new Set((state.trip?.preferences||[]).map(id=>comparisonPreferenceMap[id]).filter(Boolean))];
+  return ['score','budget','driving','season','transport',...preferred].filter((key,index,array)=>array.indexOf(key)===index);
+}
+function comparisonWinnerIndexes(selected,key,{lower=false}={}){
+  const values=selected.map(item=>key==='estimate'?Number(item.estimate):key==='distance'?Number(item.distanceKm):metricValue(item,key));
+  const finite=values.filter(Number.isFinite);if(!finite.length)return new Set();
+  const best=(lower?Math.min:Math.max)(...finite);
+  return new Set(values.map((value,index)=>Number.isFinite(value)&&Math.abs(value-best)<.001?index:-1).filter(index=>index>=0));
+}
+function comparisonDeltaSummary(selected){
+  if(selected.length<2)return'';
+  const ordered=[...selected].sort((x,y)=>Number(y.score)-Number(x.score));
+  const a=ordered[0],b=ordered[1],diff=Math.round(Number(a.score)-Number(b.score));
+  const rows=selectedComparisonRows().filter(key=>key!=='score').map(key=>({key,delta:metricValue(a,key)-metricValue(b,key)})).filter(x=>Number.isFinite(x.delta)).sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta)).slice(0,3);
+  const parts=rows.map(x=>`${x.delta>=0?'+':''}${Math.round(x.delta)} ${comparisonLabels[x.key]||x.key}`);
+  return `<div class="compare-why"><strong>Waarom ${a.name} boven ${b.name}?</strong><p>${diff>=0?'+':''}${diff} totaal${parts.length?` · ${parts.join(' · ')}`:''}</p></div>`;
+}
+function renderComparisonMap(selected){
+  const node=document.getElementById('proposalCompareMap');if(!node||comparisonView!=='map')return;
+  if(proposalCompareMap){proposalCompareMap.remove();proposalCompareMap=null}
+  const L=globalThis.L,origin=state.trip?.originPoint;
+  const points=selected.map(item=>({item,point:item.bases?.[0]})).filter(x=>Number.isFinite(x.point?.lat)&&Number.isFinite(x.point?.lon));
+  if(!L||!points.length){node.innerHTML='<div class="compare-map-empty">Geen kaartcoördinaten beschikbaar voor deze selectie.</div>';return}
+  proposalCompareMap=L.map(node,{zoomControl:true,scrollWheelZoom:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap-bijdragers'}).addTo(proposalCompareMap);
+  const colors=['#0f766e','#4f7db2','#7d5bc6','#cf6848'];
+  const bounds=[];
+  if(Number.isFinite(origin?.lat)&&Number.isFinite(origin?.lon)){
+    L.circleMarker([origin.lat,origin.lon],{radius:8,weight:3,fillOpacity:1}).addTo(proposalCompareMap).bindTooltip(state.trip.origin||'Vertrek');
+    bounds.push([origin.lat,origin.lon]);
+  }
+  points.forEach(({item,point},index)=>{
+    const color=colors[index%colors.length];
+    L.circleMarker([point.lat,point.lon],{radius:9,weight:3,fillOpacity:.95,color,fillColor:color}).addTo(proposalCompareMap).bindTooltip(`${item.name} · ${item.score}/100`);
+    bounds.push([point.lat,point.lon]);
+    if(Number.isFinite(origin?.lat)&&Number.isFinite(origin?.lon))L.polyline([[origin.lat,origin.lon],[point.lat,point.lon]],{color,weight:4,opacity:.8,dashArray:'8 8'}).addTo(proposalCompareMap);
+  });
+  if(bounds.length)proposalCompareMap.fitBounds(bounds,{padding:[28,28],maxZoom:8});
+  setTimeout(()=>proposalCompareMap?.invalidateSize(),80);
+}
+function renderEnhancedComparison(){
+  const selected=comparisonSelected(),host=$('comparisonTable');
+  if(!host||selected.length<2)return;
+  const rows=selectedComparisonRows();
+  const overview=`<div class="compare-overview-strip">${selected.map((item,index)=>{
+    const top=rows.filter(k=>k!=='score').map(key=>[key,metricValue(item,key)]).filter(([,v])=>Number.isFinite(v)).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const weak=rows.filter(k=>k!=='score').map(key=>[key,metricValue(item,key)]).filter(([,v])=>Number.isFinite(v)).sort((a,b)=>a[1]-b[1])[0];
+    const image=item.image?.url?`<img src="${item.image.url}" alt="">`:'';
+    return `<article class="compare-overview-card" style="--compare-index:${index}">${image}<div><span>${item.country||''}</span><h3>${item.name}</h3><strong class="compare-big-score">${item.score}/100</strong><div class="compare-kpis"><b>± €${Number(item.estimate||0).toLocaleString('nl-NL')}</b><b>± ${Math.round(Number(item.distanceKm||0))} km</b><b>${item.liveWeatherScore?`Weer ${Math.round(item.liveWeatherScore)}/100`:'Weer —'}</b></div><ul>${top.map(([k,v])=>`<li>✓ ${comparisonLabels[k]||k} ${Math.round(v)}</li>`).join('')}</ul>${weak?`<p class="compare-weak">Zwakste: ${comparisonLabels[weak[0]]||weak[0]} ${Math.round(weak[1])}</p>`:''}<button type="button" data-compare-choose="${item.id}">Kies deze reis</button></div></article>`;
+  }).join('')}</div>${comparisonDeltaSummary(selected)}`;
+
+  const scoreRows=[
+    ['Totale match','score',false],
+    ['Geschatte kosten','estimate',true],
+    ['Afstand enkele reis','distance',true],
+    ...rows.filter(k=>k!=='score').map(key=>[comparisonLabels[key]||key,key,false])
+  ];
+  const scorecard=`<div class="comparison-scroll"><table class="comparison-table visual-scorecard"><thead><tr><th>Factor</th>${selected.map(item=>`<th>${item.name}</th>`).join('')}</tr></thead><tbody>${scoreRows.map(([label,key,lower])=>{
+    const winners=comparisonWinnerIndexes(selected,key,{lower});
+    return `<tr><th>${label}</th>${selected.map((item,index)=>{
+      const raw=key==='estimate'?Number(item.estimate):key==='distance'?Number(item.distanceKm):metricValue(item,key);
+      const display=key==='estimate'?`€${Math.round(raw).toLocaleString('nl-NL')}`:key==='distance'?`${Math.round(raw)} km`:`${Math.round(raw)}/100`;
+      return `<td class="${winners.has(index)?'comparison-winner':''}"><strong>${display}</strong>${!['estimate','distance'].includes(key)?`<i style="--compare-score:${Math.max(0,Math.min(100,raw))}%"></i>`:''}</td>`;
+    }).join('')}</tr>`;
+  }).join('')}</tbody></table></div>`;
+
+  const map=`<div class="compare-map-wrap"><div id="proposalCompareMap" class="proposal-compare-map"></div><p>Geografische vergelijking vanaf ${state.trip?.origin||'je vertrekpunt'}. Gestreepte lijnen tonen richting en afstand; de echte wegroute wordt berekend wanneer je een reis kiest.</p></div>`;
+  host.innerHTML=`<div class="comparison-experience"><div class="compare-tabs" role="tablist"><button type="button" data-compare-view="overview" class="${comparisonView==='overview'?'active':''}">Overzicht</button><button type="button" data-compare-view="scorecard" class="${comparisonView==='scorecard'?'active':''}">Scorekaart</button><button type="button" data-compare-view="map" class="${comparisonView==='map'?'active':''}">Kaart</button></div><section data-compare-panel="overview" class="${comparisonView==='overview'?'':'hidden'}">${overview}</section><section data-compare-panel="scorecard" class="${comparisonView==='scorecard'?'':'hidden'}">${scorecard}</section><section data-compare-panel="map" class="${comparisonView==='map'?'':'hidden'}">${map}</section></div>`;
+  if(comparisonView==='map')requestAnimationFrame(()=>renderComparisonMap(selected));
+}
+
 function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
@@ -458,7 +626,7 @@ function initialize(){
   $('startPlanningBtn').addEventListener('click',()=>showView('plannerView'));$('continueTripBtn').addEventListener('click',()=>showView('plannerView'));
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
-  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData)await discoverLiveOptions()});
+  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData){await discoverLiveOptions();refreshPortfolio();scheduleReviewPrefetch()}});
   let saveTimer;const autosave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{state.trip=readTripForm(state.trip);persistDraft()},300)};$('tripForm').addEventListener('input',autosave);$('tripForm').addEventListener('change',autosave);
   $('tripForm').addEventListener('reisslim:preferences-changed',()=>{
     const scrollY=window.scrollY;
@@ -470,12 +638,8 @@ function initialize(){
   });
   async function refillAfterDismiss(){
     refreshPortfolio();
-    persistDraft(`${state.dismissedIds.length} reisopties beoordeeld`);
-    if(state.dismissedIds.length>=100||!state.trip?.liveData)return;
-    if(state.ranked.length<8){
-      await discoverLiveOptions({append:true});
-      refreshPortfolio();
-    }
+    persistDraft(`${state.dismissedIds.length}/100 reisopties beoordeeld`);
+    await ensureReviewQueue({target:REVIEW_VISIBLE_TARGET,maxRounds:REVIEW_SEARCH_ROUNDS});
   }
   $('destinationCards').addEventListener('click',event=>{const select=event.target.closest('[data-select]');if(select){const d=state.ranked.find(i=>i.id===select.dataset.select);if(d)chooseProposal(d)}const dismiss=event.target.closest('[data-dismiss-proposal]');if(dismiss){state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.dismissProposal])];void refillAfterDismiss()}const save=event.target.closest('[data-save-proposal]');if(save){const id=save.dataset.saveProposal;state.savedProposalIds=state.savedProposalIds.includes(id)?state.savedProposalIds.filter(i=>i!==id):[...state.savedProposalIds,id];renderDestinations(state)}});
   $('destinationCards').addEventListener('change',event=>{
@@ -489,13 +653,26 @@ function initialize(){
       }
     }else state.compareIds=state.compareIds.filter(i=>i!==id);
     renderDestinations(state);
-    renderComparison(state);
+    renderComparison(state);renderEnhancedComparison();
     persistDraft(state.compareIds.length>=2?`${state.compareIds.length} reizen geselecteerd voor vergelijking`:'Vergelijking bijgewerkt');
     const section=$('compareSection');
     if(state.compareIds.length>=2)section?.classList.remove('hidden');
     window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:state.compareIds.length}}));
   });
-  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state);persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
+  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state);renderEnhancedComparison();persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
+  $('compareSection').addEventListener('click',event=>{
+    const tab=event.target.closest('[data-compare-view]');
+    if(tab){
+      comparisonView=tab.dataset.compareView;
+      renderEnhancedComparison();
+      return;
+    }
+    const choose=event.target.closest('[data-compare-choose]');
+    if(choose){
+      const d=comparisonSelected().find(item=>item.id===choose.dataset.compareChoose);
+      if(d)chooseProposal(d);
+    }
+  });
   $('proposalFocus').addEventListener('change',refreshPortfolio);
   $('variantCards').addEventListener('click',event=>{const b=event.target.closest('[data-select-variant]');if(b)applyVariant(b.dataset.selectVariant)});
   $('orsApiKey').addEventListener('change',()=>saveRoutingSettings({orsApiKey:$('orsApiKey').value}));

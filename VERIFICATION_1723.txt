@@ -1,0 +1,30 @@
+ReisSlim v1.7.23 · Build 1723
+
+Implemented:
+- Continuous proposal review queue. Dismissing a proposal triggers repeated new live search rounds until the visible queue is refilled or multiple genuinely empty source rounds occur.
+- No automatic stop at 6 or at 100 dismissals; 100 is a progress target, not a hard ceiling.
+- Background prefetch keeps a reserve of unseen candidates.
+- Review badge shows current cards and progress toward 100 reviewed options.
+- Redundant summary paragraph below proposal pictograms is hidden.
+- Comparison redesigned into three views:
+  1. Overzicht: swipeable visual cards with score, cost, distance, weather, strengths and weakness.
+  2. Scorekaart: selected criteria + core constraints, with winner highlighted on every row.
+  3. Kaart: selected destinations plotted together from the departure point on an OpenStreetMap basemap.
+- Added "Waarom A boven B?" delta summary.
+
+syntax app.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+continuous queue: PASS
+no hard stop at 100: PASS
+background reserve: PASS
+quiet discovery: PASS
+redundant summary hidden: PASS
+overview comparison: PASS
+scorecard comparison: PASS
+map comparison: PASS
+winner highlighting: PASS
+why A above B: PASS
+review progress: PASS
+revision: PASS
