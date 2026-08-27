@@ -1,15 +1,25 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.21',build:'1721'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.22',build:'1722'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
 function setupTopology(){const mode=document.getElementById('travelMode');if(mode){mode.value='direct';const label=mode.closest('label');if(label)label.style.display='none'}const select=document.getElementById('routeTopology');if(select){const current=select.value;select.innerHTML='<option value="loop">Lus — andere route terug</option><option value="out-and-back">Heen & terug — dezelfde route</option><option value="open-ended">Open einde — eindig op bestemming</option>';select.value=['loop','out-and-back','open-ended'].includes(current)?current:'loop'}}
 function enablePreferenceDrivenReplanning(){
   const grid=document.getElementById('preferenceGrid'),form=document.getElementById('tripForm');
-  if(!grid||!form||grid.dataset.preferenceReplan==='1')return;
+  if(!grid||!form)return;
+  // Importance selectors must always be usable. Previously unchecked preferences
+  // had a disabled selector, which made many "Belangrijk/Essentieel" choices impossible.
+  grid.querySelectorAll('[data-priority]').forEach(select=>select.disabled=false);
+  if(grid.dataset.preferenceReplan==='1')return;
   grid.dataset.preferenceReplan='1';
   let timer;
   grid.addEventListener('change',event=>{
     if(!event.target.matches('[data-pref],[data-priority]'))return;
+    if(event.target.matches('[data-priority]')){
+      const box=grid.querySelector(`[data-pref][value="${event.target.dataset.priority}"]`);
+      if(box&&!box.checked)box.checked=true;
+      event.target.disabled=false;
+    }
+    grid.querySelectorAll('[data-priority]').forEach(select=>select.disabled=false);
     clearTimeout(timer);
     timer=setTimeout(()=>{
       const status=document.getElementById('autosaveStatus');
@@ -47,6 +57,9 @@ function applyRequestedCleanup(){
   const stats=document.querySelector('.stats-card');if(stats)stats.hidden=true;
   const variants=document.getElementById('variantSection');if(variants)variants.classList.add('hidden');
   document.querySelectorAll('.tradeoff').forEach(el=>el.hidden=true);
+  // "Onderbouwing & bron" directly above the main CTA added little value and
+  // visually separated the user from "Kies deze reis".
+  document.querySelectorAll('.proposal-evidence').forEach(el=>el.hidden=true);
 }
 function highlightComparisonWinners(){
   const table=document.querySelector('#comparisonTable .comparison-table');if(!table)return;
@@ -121,7 +134,20 @@ function polishProposalCards(){
 }
 
 
-const visualCriterionIcons={budget:'€',driving:'🛣️',season:'☀️',transport:'🏍️',scenery:'🏔️',walking:'🥾',swimming:'🏊',food:'🍽️',culture:'🏛️',crowds:'🌿'};
+const transportIcons={car:'🚗',motorcycle:'🏍️',motorhome:'🚐',caravan:'🚙'};
+function currentTransportIcon(){return transportIcons[document.getElementById('transport')?.value]||'🚗'}
+const visualCriterionIcons={budget:'€',driving:'🛣️',season:'☀️',scenery:'🏔️',walking:'🥾',swimming:'🏊',food:'🍽️',culture:'🏛️',crowds:'🌿'};
+function criterionIcon(key){return key==='transport'?currentTransportIcon():(visualCriterionIcons[key]||'★')}
+function syncTransportVisuals(){
+  const select=document.getElementById('transport');
+  if(!select)return;
+  const icon=select.closest('.premium-field')?.querySelector('.field-icon')||select.closest('label')?.querySelector('.field-icon');
+  if(icon)icon.textContent=currentTransportIcon();
+  document.querySelectorAll('.proposal-pictogram-strip span').forEach(item=>{
+    const label=item.querySelector('small')?.textContent?.trim();
+    if(label==='Voertuigmatch'){const b=item.querySelector('b');if(b)b.textContent=currentTransportIcon()}
+  });
+}
 
 function visualiseProposalCards(){
   const registry=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
@@ -150,13 +176,17 @@ function visualiseProposalCards(){
       const best=Object.entries(scores).filter(([,v])=>Number.isFinite(Number(v))).sort((a,b)=>b[1]-a[1]).slice(0,4);
       const strip=document.createElement('div');
       strip.className='proposal-pictogram-strip';
-      strip.innerHTML=best.map(([key,value])=>`<span title="${criteriaLabels[key]||key} ${Math.round(value)}/100"><b>${visualCriterionIcons[key]||'★'}</b><small>${criteriaLabels[key]||key}</small></span>`).join('');
+      strip.innerHTML=best.map(([key,value])=>`<span title="${criteriaLabels[key]||key} ${Math.round(value)}/100"><b>${criterionIcon(key)}</b><small>${criteriaLabels[key]||key}</small></span>`).join('');
       const title=card.querySelector('h3');
       title?.insertAdjacentElement('afterend',strip);
     }
   });
 }
 
+let compareDockDismissedSignature='';
+function compareSelectionSignature(){
+  return [...document.querySelectorAll('[data-compare]:checked')].map(box=>box.dataset.compare).sort().join('|');
+}
 function ensureCompareDock(){
   let dock=document.getElementById('compareDock');
   if(!dock){
@@ -167,6 +197,8 @@ function ensureCompareDock(){
     document.body.appendChild(dock);
     dock.querySelector('#openCompareDock')?.addEventListener('click',()=>{
       const section=document.getElementById('compareSection');
+      compareDockDismissedSignature=compareSelectionSignature();
+      dock.classList.add('hidden');
       if(section){
         section.classList.remove('hidden');
         section.scrollIntoView({behavior:'smooth',block:'start'});
@@ -174,7 +206,10 @@ function ensureCompareDock(){
     });
   }
   const count=document.querySelectorAll('[data-compare]:checked').length;
-  dock.classList.toggle('hidden',count<2);
+  const signature=compareSelectionSignature();
+  if(count<2)compareDockDismissedSignature='';
+  const dismissed=count>=2&&signature===compareDockDismissedSignature;
+  dock.classList.toggle('hidden',count<2||dismissed);
   const countEl=dock.querySelector('#compareDockCount');
   if(countEl)countEl.textContent=`${count} geselecteerd`;
 }
@@ -189,7 +224,7 @@ function enhanceComparisonUi(){
   highlightComparisonWinners();
 }
 
-function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceProposalWeather();enhanceComparisonUi();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceProposalWeather();enhanceComparisonUi();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
+function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();syncTransportVisuals();enhanceProposalWeather();enhanceComparisonUi();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();syncTransportVisuals();enhanceProposalWeather();enhanceComparisonUi();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();
 
 window.addEventListener('reisslim:compare-updated',()=>setTimeout(enhanceComparisonUi,0));
@@ -202,3 +237,11 @@ new MutationObserver(()=>syncPremiumRouteRadios()).observe(document.body,{subtre
 document.addEventListener('change',event=>{if(event.target?.id==='routeTopology')syncPremiumRouteRadios()});
 
 window.addEventListener('reisslim:weather-proposals-updated',()=>{enhanceProposalWeather();highlightComparisonWinners()});
+
+document.addEventListener('change',event=>{
+  if(event.target?.id==='transport'){
+    syncTransportVisuals();
+    // Existing proposal strips were built for the previous vehicle; update immediately.
+    requestAnimationFrame(syncTransportVisuals);
+  }
+});

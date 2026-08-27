@@ -525,7 +525,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 /* v1.7.19 optimizer score reconciliation */
 .optimizer-net-row{margin-top:.35rem;padding-top:.65rem;border-top:1px solid rgba(20,80,72,.15);font-weight:900}.optimizer-math-note{display:block;margin-top:.55rem;line-height:1.35;color:#667773}.optimizer-delta-row em{min-width:3.7rem;text-align:center}
 
-/* v1.7.21 compact UI cleanup, comparison and weather */
+/* v1.7.22 compact UI cleanup, comparison and weather */
 .stats-card[hidden],.tradeoff[hidden],#variantSection.hidden{display:none!important}
 .proposal-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;align-items:stretch}
 .proposal-actions>button[data-select]{grid-column:1/-1;width:100%!important}
@@ -549,7 +549,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 @media(max-width:430px){.proposal-actions{grid-template-columns:1fr 1fr!important}.premium-comparison .comparison-table th,.premium-comparison .comparison-table td{min-width:105px}.proposal-weather-badge small{display:none}.weather-days{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 
 
-/* v1.7.21 compare viewport lock + proposal review flow */
+/* v1.7.22 compare viewport lock + proposal review flow */
 html,body{max-width:100%;overflow-x:hidden}
 #resultsSection,.card-grid,.destination-card,.proposal-actions,#compareSection,.premium-comparison{min-width:0!important;max-width:100%!important;box-sizing:border-box}
 .compare-dock{
@@ -570,3 +570,8 @@ html,body{max-width:100%;overflow-x:hidden}
   .compare-dock{gap:7px;padding:9px 10px!important;border-radius:15px}
   .compare-dock button{padding:8px 11px!important}
 }
+
+/* v1.7.22 preference + proposal cleanup */
+.proposal-evidence{display:none!important}
+.premium-preferences select[data-priority]{pointer-events:auto!important;opacity:1!important;cursor:pointer}
+.premium-preferences select[data-priority]:disabled{opacity:1!important;color:inherit!important}

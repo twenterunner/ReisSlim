@@ -1,0 +1,23 @@
+ReisSlim v1.7.22 · Build 1722
+
+Fixes:
+- Compare floating bar hides after opening comparison and stays hidden for the current selection.
+- It becomes available again only if the comparison selection changes.
+- All preference importance selectors are always usable.
+- Choosing Belangrijk/Essentieel automatically selects that preference.
+- Redundant Onderbouwing & bron block above Kies deze reis is removed.
+- Planner vervoer icon follows selected transport.
+- Voertuigmatch pictogram follows selected transport instead of always showing a motorcycle.
+
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+compare hides after opening: PASS
+compare returns after changed selection: PASS
+priority selects always enabled: PASS
+priority selection auto-checks preference: PASS
+proposal evidence removed: PASS
+car icon supported: PASS
+transport score icon dynamic: PASS
+planner transport icon dynamic: PASS
+revision: PASS
