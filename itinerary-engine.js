@@ -3,6 +3,7 @@ import { buildBreakWaypoints, buildTravelNodes, haversineKm, segmentMetrics } fr
 import { buildRecommendations } from './recommendation-engine.js';
 import { estimateLegTiming, transportId, travelGuidance } from './vehicle-intelligence.js';
 import { applyDaySchedules, solveDayAllocation } from './plan-solver.js';
+import { resolveOrigin } from './trip-model.js';
 import { buildAlternativeReturnNodes, routeExplorationMetrics } from './route-topology.js';
 
 export function addDays(dateString,amount){const date=new Date(`${dateString}T12:00:00`);date.setDate(date.getDate()+amount);return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
@@ -77,7 +78,11 @@ function buildOpenEndedExplorationDays(trip,destination,outbound,metrics,totalDa
 
 
 function buildSingleDayTrip(trip,destination,first){
-  const origin=first.metrics?.origin||first.outbound?.[0],target=destination.bases?.[0]||first.outbound?.at(-1);
+  // Never derive the day-loop start from a generated route node. It must be
+  // the coordinate of the departure field selected by the user.
+  const resolved=resolveOrigin(trip);
+  const origin=validCoordinate(resolved)?{...resolved,name:trip.origin,role:'origin',progress:0}:first.metrics?.origin||first.outbound?.[0];
+  const target=destination.bases?.[0]||first.outbound?.at(-1);
   if(!validCoordinate(origin)||!validCoordinate(target))return null;
   const one=segmentMetrics(origin,target,first.metrics.oneWayDistanceKm,first.metrics.oneWayRoadHours);
   const combined={distanceKm:Math.round(Number(one.distanceKm||0)*2),roadHours:Number((Number(one.roadHours||0)*2).toFixed(2))};

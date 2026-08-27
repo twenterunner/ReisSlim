@@ -47,15 +47,19 @@ function geometryOverlap(reference=[],candidate=[],thresholdKm=10){
   const matched=pool.filter(point=>ref.some(other=>distanceKm(point,other)<=thresholdKm)).length;
   return matched/Math.max(1,pool.length);
 }
-function loopControlPoints(from,to,{side=1,offsetFactor=.30,viaCount=3}={}){
+function loopControlPoints(from,to,{side=1,offsetFactor=.30,viaCount=3,shortLoop=false}={}){
   const direct=distanceKm(from,to);
-  if(!Number.isFinite(direct)||direct<60)return[];
+  const minimumDirect=shortLoop?8:35;
+  if(!Number.isFinite(direct)||direct<minimumDirect)return[];
   const midLat=radians((from.lat+to.lat)/2);
   const dLat=to.lat-from.lat,dLon=(to.lon-from.lon)*Math.cos(midLat),len=Math.hypot(dLat,dLon)||1;
   const perpLat=-dLon/len,perpLon=dLat/len/Math.max(.25,Math.cos(midLat));
-  // The offset deliberately scales with trip length. Three control points keep
-  // the return corridor apart for most of the leg instead of only at one bend.
-  const maxOffsetKm=Math.max(55,Math.min(145,direct*offsetFactor));
+  // Short day loops need much smaller but still meaningful lateral offsets.
+  // The old hard 60 km threshold caused exactly the observed Harz failure:
+  // no controls => origin -> target -> origin => identical road back.
+  const maxOffsetKm=shortLoop
+    ?Math.max(7,Math.min(36,direct*offsetFactor))
+    :Math.max(24,Math.min(120,direct*offsetFactor));
   return Array.from({length:viaCount},(_,index)=>{
     const progress=(index+1)/(viaCount+1);
     const envelope=.72+.28*Math.sin(Math.PI*progress);
@@ -84,7 +88,7 @@ export function buildRoutingRequest(trip,day){
       // Travel outward to the selected highlight, then force the return onto
       // a separated corridor. This avoids the old local/open route around the
       // destination and avoids simply retracing the outbound road.
-      const returnControls=loopControlPoints(target,origin,{side:1,offsetFactor:.24,viaCount:2});
+      const returnControls=loopControlPoints(target,origin,{side:1,offsetFactor:.46,viaCount:3,shortLoop:true});
       daytripVia=[target,...returnControls];
     }else{
       daytripVia=[target];
@@ -97,6 +101,7 @@ function applyResult(trip,day,result){const geometry=Array.isArray(result.geomet
 if(day.kind==='daytrip'&&trip.routeTopology==='loop'){
   const start=geometry[0],end=geometry.at(-1);
   if(!validCoordinate(start)||!validCoordinate(end)||distanceKm(start,end)>.8)return false;
+  if(!Number.isFinite(result.loopOverlap)||result.loopOverlap>.58)return false;
 }const timing=estimateLegTiming(trip,{distanceKm:result.distanceKm,roadHours:result.roadHours,arrival:day.kind!=='return'||day.to!==trip.origin});Object.assign(day,{distanceKm:Math.round(result.distanceKm),roadHours:timing.roadHours,driveHours:timing.elapsedHours,elapsedHours:timing.elapsedHours,breakHours:timing.breakHours,restStops:timing.restStops,fuelStops:timing.fuelStops,stopCount:timing.stopCount,waypoints:waypointsOnGeometry(geometry,timing,trip.transport),geometry,routeSource:result.provider||'live-provider',routeOverlap:Number.isFinite(result.loopOverlap)?result.loopOverlap:null,exceedsDailyLimit:timing.elapsedHours>trip.maxDrive+.05});return true}
 async function fetchWithTimeout(url,options,fetchImpl,timeoutMs){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetchImpl(url,{...options,signal:controller.signal});if(!response.ok)throw new Error(`Routeprovider ${response.status}`);return response.json()}finally{clearTimeout(timer)}}
 function normalizeOsrmRoute(payload){const route=payload?.routes?.[0],coordinates=route?.geometry?.coordinates||[];if(!route||coordinates.length<10)throw new Error('Geen volledige OSRM route');return{provider:'osrm',distanceKm:route.distance/1000,roadHours:route.duration/3600,geometry:coordinates.map(([lon,lat])=>({lat,lon}))}}
@@ -148,6 +153,80 @@ async function fetchLoopReturnRoute(trip,day,options,fetchImpl,timeoutMs){
   delete best._loopScore;
   return best;
 }
+
+async function fetchSingleDayLoopRoute(trip,day,options,fetchImpl,timeoutMs){
+  const origin={lat:day.fromPoint.lat,lon:day.fromPoint.lon};
+  const target={lat:day.destinationPoint.lat,lon:day.destinationPoint.lon};
+
+  // First establish the true outbound road route.
+  const outward=await fetchRouteForRequest(
+    trip,
+    {day:day.day,origin,destination:target,waypoints:[],vehicle:vehicleSpec(trip)},
+    options,fetchImpl,timeoutMs
+  );
+
+  const direct=Math.max(1,distanceKm(origin,target));
+  const configs=[
+    {side:1, offsetFactor:.36, viaCount:2},
+    {side:-1,offsetFactor:.36, viaCount:2},
+    {side:1, offsetFactor:.52, viaCount:3},
+    {side:-1,offsetFactor:.52, viaCount:3},
+    {side:1, offsetFactor:.68, viaCount:3},
+    {side:-1,offsetFactor:.68, viaCount:3}
+  ];
+
+  let best=null;
+  for(let index=0;index<configs.length;index++){
+    const config=configs[index];
+    const controls=loopControlPoints(target,origin,{...config,shortLoop:true});
+    if(!controls.length)continue;
+    try{
+      const back=await fetchRouteForRequest(
+        trip,
+        {day:day.day,origin:target,destination:origin,waypoints:controls,vehicle:vehicleSpec(trip)},
+        options,fetchImpl,timeoutMs
+      );
+
+      // Compare ONLY the actual outbound road with the return road.
+      const overlap=geometryOverlap(outward.geometry,back.geometry,3.5);
+      const returnRatio=back.distanceKm/Math.max(1,outward.distanceKm);
+      const detourPenalty=Math.max(0,returnRatio-1.80)*30;
+      const score=overlap*100+detourPenalty;
+      const candidate={back,overlap,score,config};
+
+      if(!best||candidate.score<best.score)best=candidate;
+      // A proper loop should visibly use another corridor for most of the return.
+      if(overlap<=.36&&returnRatio<=1.8)break;
+    }catch(error){
+      if(index===configs.length-1&&options.debug)console.warn('Alternatieve daglus mislukt',error);
+    }
+  }
+
+  if(!best)throw new Error('Geen alternatieve terugcorridor voor daglus gevonden');
+
+  const back=best.back;
+  const geometry=[
+    ...outward.geometry,
+    ...back.geometry.slice(1)
+  ];
+
+  // Hard acceptance criteria: it must really close and it must not mostly retrace.
+  if(distanceKm(geometry[0],geometry.at(-1))>.8)throw new Error('Daglus sluit niet op vertrekpunt');
+  if(best.overlap>.58)throw new Error(`Daglus heeft te veel route-overlap (${Math.round(best.overlap*100)}%)`);
+
+  return{
+    provider:outward.provider===back.provider?outward.provider:'mixed',
+    distanceKm:outward.distanceKm+back.distanceKm,
+    roadHours:outward.roadHours+back.roadHours,
+    geometry,
+    loopOverlap:Number(best.overlap.toFixed(3)),
+    loopSide:best.config.side,
+    loopOffsetFactor:best.config.offsetFactor,
+    loopOutwardDistanceKm:outward.distanceKm,
+    loopReturnDistanceKm:back.distanceKm
+  };
+}
+
 async function fetchRouteForRequest(trip,request,options,fetchImpl,timeoutMs){
   const gateway=options.apiUrl??routingEndpoint();
   if(gateway)return fetchWithTimeout(gateway,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(request)},fetchImpl,timeoutMs);
@@ -157,6 +236,9 @@ async function fetchRouteForRequest(trip,request,options,fetchImpl,timeoutMs){
   return fetchOsrmRoute(request,fetchImpl,timeoutMs,options.osrmUrls||OSRM_URLS);
 }
 async function fetchRouteForDay(trip,day,options,fetchImpl,timeoutMs){
+  if(Number(trip.days)===1&&trip.routeTopology==='loop'&&day.kind==='daytrip'&&validCoordinate(day.destinationPoint)){
+    return fetchSingleDayLoopRoute(trip,day,options,fetchImpl,timeoutMs);
+  }
   if(trip.routeTopology==='loop'&&day.kind==='return'){
     return fetchLoopReturnRoute(trip,day,options,fetchImpl,timeoutMs);
   }
