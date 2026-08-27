@@ -54,7 +54,14 @@ export async function geocodeOrigin(origin,options={}){
 function clauseFor(item,radius){
   const lat=Number(item.point.lat).toFixed(5),lon=Number(item.point.lon).toFixed(5);
   const around=`around:${radius},${lat},${lon}`;
-  if(item.type==='accommodation')return `nwr(${around})["tourism"~"^(hotel|guest_house|hostel|motel|camp_site|caravan_site)$"]["name"];`;
+  if(item.type==='accommodation'){
+    const tourism=item.accommodationType==='camping'
+      ?'^(camp_site|caravan_site)$'
+      :item.accommodationType==='hotel-bnb'
+        ?'^(hotel|guest_house|hostel|motel)$'
+        :'^(hotel|guest_house|hostel|motel|camp_site|caravan_site)$';
+    return `nwr(${around})["tourism"~"${tourism}"]["name"];`;
+  }
   if(item.type==='restaurant')return `nwr(${around})["amenity"~"^(restaurant|cafe)$"]["name"];`;
   if(item.type==='fuel')return `nwr(${around})["amenity"~"^(fuel|charging_station)$"]["name"];`;
   if(item.type==='rest')return `nwr(${around})["highway"~"^(rest_area|services)$"]["name"];`;
@@ -96,8 +103,10 @@ function normalizePlace(element){
 }
 export function normalizeOverpassPlaces(payload){ return (payload?.elements||[]).map(normalizePlace).filter(Boolean); }
 
-function accommodationFits(place,vehicle){
+function accommodationFits(place,vehicle,requested='any'){
   const camping=['camp_site','caravan_site'].includes(place.tags?.tourism);
+  if(requested==='camping')return camping;
+  if(requested==='hotel-bnb')return !camping;
   if(['motorhome','caravan'].includes(vehicle))return camping;
   return !camping;
 }
@@ -125,7 +134,7 @@ function suitability(place,item,trip,distanceKm){
   let score=140-distanceKm*4+(place.evidenceScore||0);
   if(item.type==='service'&&['fuel','rest'].includes(place.type))score+=10;
   else if(place.type!==item.type)score-=150;
-  if(place.type==='accommodation')score+=accommodationFits(place,vehicle)?28:-55;
+  if(place.type==='accommodation')score+=accommodationFits(place,vehicle,item.accommodationType||trip.accommodationType||'any')?42:-180;
   if(place.type==='restaurant'){
     if(item.meal==='lunch')score+=place.tags?.cuisine?8:2;
     if(place.tags?.amenity==='cafe')score-=4;
@@ -140,7 +149,12 @@ async function queryEndpoint(query,endpoint,fetchImpl,timeoutMs){
 
 
 async function fetchNominatimCategory(item,fetchImpl,timeoutMs=3500){
-  const qMap={accommodation:['hotel','guest house','camping'],restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area','service area','cafe'],service:['fuel'],activity:['museum','attraction','viewpoint']};
+  const accommodationQueries=item.accommodationType==='camping'
+    ?['camping','camp site','caravan site']
+    :item.accommodationType==='hotel-bnb'
+      ?['hotel','guest house','bed and breakfast']
+      :['hotel','guest house','camping'];
+  const qMap={accommodation:accommodationQueries,restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area','service area','cafe'],service:['fuel'],activity:['museum','attraction','viewpoint']};
   const queries=qMap[item.type]||qMap.activity,delta=.55,viewbox=[item.point.lon-delta,item.point.lat+delta,item.point.lon+delta,item.point.lat-delta].join(',');
   for(const q of queries){
     try{

@@ -2,7 +2,7 @@
   "id": "./",
   "name": "ReisSlim – slimme roadtripplanner",
   "short_name": "ReisSlim",
-  "start_url": "./?build=1714",
+  "start_url": "./?build=1715",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

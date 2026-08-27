@@ -1,0 +1,25 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax image-provider.js: PASS
+syntax trip-model.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax constraint-engine.js: PASS
+syntax map-view.js: PASS
+selector present: PASS
+trip persists selector: PASS
+camping overpass filter: PASS
+hotel bnb overpass filter: PASS
+nominatim respects type: PASS
+ranking enforces type: PASS
+recommendation carries type: PASS
+revision consistent: PASS

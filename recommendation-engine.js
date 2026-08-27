@@ -101,11 +101,23 @@ export function buildRecommendations(trip,destination,days){
     // Operational route coverage always spans every travel leg.
     recommendations.push(...operationalTargets(day,trip,transport,rule));
 
-    if(!isHomecoming)recommendations.push(proposal({
-      day:day.day,type:'accommodation',name:rule.accommodation,
-      reason:'Specifiek verblijf zo dicht mogelijk bij de geplande overnachtingsbasis, met voertuiggeschikte toegang.',
-      point:anchor,transport,seed:4
-    }));
+    if(!isHomecoming){
+      const accommodationType=trip.accommodationType||'any';
+      const accommodationName=accommodationType==='camping'
+        ?'Specifieke camping wordt live gezocht'
+        :accommodationType==='hotel-bnb'
+          ?'Specifiek hotel/B&B wordt live gezocht'
+          :rule.accommodation;
+      recommendations.push(proposal({
+        day:day.day,type:'accommodation',name:accommodationName,accommodationType,
+        reason:accommodationType==='camping'
+          ?'Zoek uitsluitend een specifieke camping zo dicht mogelijk bij de geplande overnachtingsbasis.'
+          :accommodationType==='hotel-bnb'
+            ?'Zoek uitsluitend een specifiek hotel of B&B zo dicht mogelijk bij de geplande overnachtingsbasis.'
+            :'Specifiek verblijf zo dicht mogelijk bij de geplande overnachtingsbasis, met voertuiggeschikte toegang.',
+        point:anchor,transport,seed:4
+      }));
+    }
     if(!isTravel&&!isHomecoming)recommendations.push(proposal({
       day:day.day,type:'restaurant',name:rule.restaurant,
       reason:'Concreet restaurant bij de uitvalsbasis voor een verblijfsdag.',
