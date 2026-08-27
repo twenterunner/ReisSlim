@@ -38,7 +38,16 @@ function endpointLabel(endpoint){
 function elapsedSeconds(){
   return state.liveDiscoveryStartedAt?Math.max(0,Math.round((Date.now()-state.liveDiscoveryStartedAt)/1000)):0;
 }
+function updateManualLiveDiscoveryButton(){
+  const button=$('manualLiveDiscoveryBtn');
+  if(!button)return;
+  const available=Boolean(state.trip?.liveData);
+  button.classList.toggle('hidden',!available);
+  button.disabled=Boolean(state.retryDiscoveryQueued);
+  button.textContent=state.retryDiscoveryQueued?'Nieuwe poging staat klaar…':state.discoveryBusy?'↻ Opnieuw proberen na huidige zoekactie':'↻ Opnieuw proberen';
+}
 function renderLiveDiscoveryProgress(){
+  updateManualLiveDiscoveryButton();
   const box=$('liveDiscoveryProgress');
   if(!box)return;
   const p=state.liveDiscoveryProgress;
@@ -82,6 +91,7 @@ function startLiveDiscoveryProgress(){
   state.liveDiscoveryProgress={origin:state.trip.origin,reachKm:null,pass:0,totalPasses:1,candidateElements:0,liveDestinations:0,lastMessage:'Live OpenStreetMap-ontdekking voorbereiden…',complete:false,failed:false};
   document.body.dataset.liveDiscovery='running';
   renderLiveDiscoveryProgress();
+  updateManualLiveDiscoveryButton();
   state.liveDiscoveryTimer=setInterval(renderLiveDiscoveryProgress,1000);
 }
 function finishLiveDiscoveryProgress(){
@@ -89,6 +99,7 @@ function finishLiveDiscoveryProgress(){
   state.liveDiscoveryTimer=null;
   delete document.body.dataset.liveDiscovery;
   renderLiveDiscoveryProgress();
+  updateManualLiveDiscoveryButton();
 }
 function handleDiscoveryProgress(event){
   const p=state.liveDiscoveryProgress||(state.liveDiscoveryProgress={});
@@ -356,7 +367,7 @@ function refreshPortfolio(){
   if(state.trip)state.trip.allowStretch=true;
   state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:[...state.dismissedIds,...state.imageRejectedIds]}));
   state.ranked=state.ranking.visible;
-  renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();
+  renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();updateManualLiveDiscoveryButton();
 }
 async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   if(!state.trip?.liveData)return 0;
@@ -386,6 +397,7 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
     }finally{state.retryDiscoveryQueued=false}
   }
   state.discoveryBusy=true;
+  updateManualLiveDiscoveryButton();
   if(retry){
     state.discoveryCursor=Math.max(1,state.discoveryCursor+1);
     state.catalog=[...destinations];
@@ -479,6 +491,7 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
     return 0;
   }finally{
     state.discoveryBusy=false;
+    updateManualLiveDiscoveryButton();
     if(!quiet)finishLiveDiscoveryProgress();
   }
 }
@@ -848,6 +861,15 @@ function setupPremiumPlannerControls(){
 function initialize(){
   const newTripButton=$('newTripBtn');
   if(newTripButton)newTripButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();startNewTrip()});
+  const manualLiveButton=$('manualLiveDiscoveryBtn');
+  if(manualLiveButton)manualLiveButton.addEventListener('click',async()=>{
+    if(manualLiveButton.disabled)return;
+    manualLiveButton.disabled=true;
+    manualLiveButton.textContent=state.discoveryBusy?'Nieuwe poging staat klaar…':'Opnieuw zoeken…';
+    setStatus(state.discoveryBusy?'Nieuwe live zoekpoging staat klaar na de huidige zoekactie…':'Nieuwe live zoekpoging starten…');
+    try{await discoverLiveOptions({retry:true});refreshPortfolio()}
+    finally{updateManualLiveDiscoveryButton()}
+  });
   renderPreferenceGrid();setupPremiumPlannerControls();renderVehicleControls();$('versionLabel').textContent=`ReisSlim v${VERSION} · Build ${BUILD}`;$('orsApiKey').value=readRoutingSettings().orsApiKey;
   const restored=loadDraft();if(restored?.trip)rebuildFromRecord(restored);else resetState();renderDashboard(state,loadTrips());
   document.querySelectorAll('.nav-item').forEach(button=>button.addEventListener('click',()=>{showView(button.dataset.view);if(button.dataset.view==='mapView')invalidateMap()}));

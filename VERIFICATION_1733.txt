@@ -1,0 +1,22 @@
+ReisSlim v1.7.33 · Build 1733
+
+ROOT CAUSE
+The Opnieuw proberen button was rendered only inside liveDiscoveryProgress when p.failed===true. After reload or after the progress object was cleared/changed, the retry control disappeared even though the portfolio still had only a few options.
+
+FIX
+- Added a persistent Opnieuw proberen button directly in Reisportfolio.
+- It is independent of the transient progress/error card.
+- It remains visible whenever Live opties is enabled.
+- If a discovery is already running, tapping it queues the retry instead of doing nothing.
+- The button reports queued/running state and is restored after completion.
+
+app.js: PASS
+config.js: PASS
+ui-feature-flags.js: PASS
+service-worker.js: PASS
+persistent button in HTML: PASS
+button independent of failure box: PASS
+manual handler wired: PASS
+busy retry remains queueable: PASS
+button state updated after search: PASS
+version: PASS
