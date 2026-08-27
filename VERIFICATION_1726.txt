@@ -1,0 +1,27 @@
+ReisSlim v1.7.26 · Build 1726
+
+User acceptance fixes:
+- Proposal view selector exposes Tegels / Tabel / Kaart.
+- Each Table proposal has a working Kies action.
+- Each Map list item and map popup has a working Kies action.
+- All choose actions call the same chooseProposal() path as the normal proposal card.
+- Every currently visible proposal is queued for destination-photo hydration.
+- Tiles use full-width destination photos.
+- Table rows show a destination thumbnail.
+- Map rows and map popups show the same proposal destination photo.
+- Missing images show only a temporary loading surface until image-provider resolves them.
+- Portfolio is rerendered when images arrive, including after dismiss/refill cycles.
+
+syntax app.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+tiles/table/map selector tabs: PASS
+table choose button: PASS
+map choose button: PASS
+map popup choose: PASS
+table photo: PASS
+map photo: PASS
+all visible images hydrated: PASS
+selection event works: PASS
+revision: PASS

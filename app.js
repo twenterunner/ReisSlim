@@ -117,7 +117,13 @@ function handleDiscoveryProgress(event){
   renderLiveDiscoveryProgress();
 }
 
-async function hydrateProposalImages(){if(!state.trip?.liveData||!state.ranked.length)return;await enrichDestinationImages(state.ranked,{maximum:8});renderDestinations(state)}
+async function hydrateProposalImages(){
+  if(!state.trip?.liveData||!state.ranked.length)return;
+  const missing=state.ranked.filter(item=>!item.image?.url);
+  if(!missing.length)return;
+  await enrichDestinationImages(missing,{maximum:Math.min(12,missing.length)});
+  renderDestinations(state);renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();
+}
 function stateForStorage(){return{schemaVersion:STORAGE_SCHEMA_VERSION,engineVersion:ENGINE_VERSION,trip:state.trip,destinationId:state.destination?.destinationId||state.destination?.id||null,destinationProfile:state.destination?.dynamic?state.destination:null,compareIds:state.compareIds,savedProposalIds:state.savedProposalIds,dismissedIds:state.dismissedIds,selectedVariantId:state.selectedVariantId,optimized:state.optimized,plan:state.plan}}
 function exportState(){return{version:VERSION,build:BUILD,engineVersion:ENGINE_VERSION,generatedAt:new Date().toISOString(),trip:state.trip,destination:state.destination?{id:state.destination.id,name:state.destination.name,score:state.destination.score,confidence:state.destination.confidence}:null,plan:state.plan,budget:state.budget,validation:state.validation,planningQuality:state.quality}}
 function persistDraft(message='Automatisch opgeslagen'){try{saveDraft(stateForStorage());setStatus(message)}catch(error){console.error(error);setStatus('Opslaan mislukt')}}
@@ -321,11 +327,16 @@ function updateReviewProgress(){
   const visible=state.ranked.length,reviewed=state.dismissedIds.length;
   badge.textContent=`${visible} nu · ${reviewed}/100 beoordeeld`;
 }
+let portfolioImageHydrateTimer=null;
+function schedulePortfolioImages(){
+  clearTimeout(portfolioImageHydrateTimer);
+  portfolioImageHydrateTimer=setTimeout(()=>void hydrateProposalImages(),80);
+}
 function refreshPortfolio(){
   if(state.trip)state.trip.allowStretch=true;
   state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));
   state.ranked=state.ranking.visible;
-  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();
+  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();
 }
 async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
@@ -499,7 +510,7 @@ async function prefetchReviewReserve(){
 
 const comparisonPreferenceMap={
   natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',
-  kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'
+  kinderen:'family',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'
 };
 const comparisonLabels={
   score:'Totale match',budget:'Budgetmatch',driving:'Reisbelasting',season:'Seizoen / weer',
@@ -516,7 +527,7 @@ function comparisonSelected(){
 function metricValue(item,key){return key==='score'?Number(item.score):Number(item.dimensions?.[key])}
 function selectedComparisonRows(){
   const preferred=[...new Set((state.trip?.preferences||[]).map(id=>comparisonPreferenceMap[id]).filter(Boolean))];
-  return ['score','budget','driving','season','transport',...preferred].filter((key,index,array)=>array.indexOf(key)===index);
+  return ['score','budget','driving','season',...preferred].filter((key,index,array)=>array.indexOf(key)===index);
 }
 function comparisonWinnerIndexes(selected,key,{lower=false}={}){
   const values=selected.map(item=>key==='estimate'?Number(item.estimate):key==='distance'?Number(item.distanceKm):metricValue(item,key));
@@ -602,8 +613,8 @@ function portfolioMetric(item,key){
 }
 function portfolioTopMatch(item){
   const preferred=[...(state.trip?.preferences||[])];
-  const keyMap={natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'};
-  const labels={scenery:'Landschap',swimming:'Zwemmen',walking:'Wandelen',family:'Kindvriendelijk',transport:'Voertuigmatch',culture:'Cultuur',food:'Eten',budget:'Budget'};
+  const keyMap={natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',kinderen:'family',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'};
+  const labels={scenery:'Landschap',swimming:'Zwemmen',walking:'Wandelen',family:'Kindvriendelijk',culture:'Cultuur',food:'Eten',budget:'Budget'};
   const rows=[...new Set(preferred.map(p=>keyMap[p]).filter(Boolean))].map(key=>[key,Number(item.dimensions?.[key])]).filter(([,v])=>Number.isFinite(v)).sort((x,y)=>y[1]-x[1]);
   if(!rows.length)return 'Algemene match';
   return `${labels[rows[0][0]]||rows[0][0]} ${Math.round(rows[0][1])}`;
@@ -615,7 +626,18 @@ function portfolioWeakMatch(item){
 }
 function proposalHeroImage(item){
   const url=item.image?.url;
-  return url?`<img src="${url}" alt="" loading="lazy">`:`<div class="portfolio-fallback">${item.tags?.includes('bergen')?'🏔️':item.tags?.includes('kust')?'🌊':item.tags?.includes('cultuur')?'🏛️':'🌿'}</div>`;
+  return url?`<img src="${url}" alt="Beeld van ${item.name}" loading="lazy" referrerpolicy="no-referrer">`:`<div class="portfolio-fallback portfolio-fallback-photo" aria-label="Beeld voor ${item.name} wordt geladen"></div>`;
+}
+function proposalThumbImage(item,className='portfolio-thumb'){
+  const url=item.image?.url;
+  return url?`<img class="${className}" src="${url}" alt="" loading="lazy" referrerpolicy="no-referrer">`:`<span class="${className} portfolio-thumb-loading" aria-hidden="true"></span>`;
+}
+function portfolioVehicleAttribute(item){
+  const mode=state.trip?.transport||'car',label={motorcycle:'Motor',car:'Auto',motorhome:'Camper',caravan:'Caravan'}[mode]||'Voertuig';
+  const icon={motorcycle:'🏍️',car:'🚗',motorhome:'🚐',caravan:'🚙'}[mode]||'🚗';
+  const score=Number(item.dimensions?.transport);
+  const fit=!Number.isFinite(score)?'geschiktheid onbekend':score>=75?'geschikt':score>=55?'redelijk geschikt':'minder passend';
+  return `${icon} ${label} · ${fit}`;
 }
 function renderPortfolioNavigator(){
   const panel=$('destinationCards')?.closest('.panel');
@@ -650,6 +672,7 @@ function renderPortfolioNavigator(){
           <span><b>${Math.round(Number(item.distanceKm||0))} km</b><small>Afstand</small></span>
         </div>
         <div class="portfolio-quick-match"><span>✓ ${portfolioTopMatch(item)}</span><span class="weak">↓ ${portfolioWeakMatch(item)}</span></div>
+        <div class="portfolio-vehicle-attribute">${portfolioVehicleAttribute(item)}</div>
         <div class="portfolio-quick-actions">
           <button type="button" data-portfolio-select="${item.id}">Kies</button>
           <button type="button" class="secondary" data-portfolio-details="${item.id}">Details</button>
@@ -665,21 +688,23 @@ function renderPortfolioNavigator(){
     const bestScore=bestFor('score'),bestWeather=bestFor('weather');
     const minCost=Math.min(...items.map(i=>Number(i.estimate)).filter(Number.isFinite));
     const minDistance=Math.min(...items.map(i=>Number(i.distanceKm)).filter(Number.isFinite));
-    body.innerHTML=`<div class="portfolio-table-wrap"><table class="portfolio-table"><thead><tr><th>Reis</th><th>Match</th><th>Weer</th><th>Kosten</th><th>Afstand</th><th>Sterkste</th><th></th></tr></thead><tbody>${items.map(item=>{
+    body.innerHTML=`<div class="portfolio-table-wrap"><table class="portfolio-table"><thead><tr><th>Reis</th><th>Match</th><th>Weer</th><th>Kosten</th><th>Afstand</th><th>Sterkste</th><th>Voertuig</th><th>Keuze</th><th></th></tr></thead><tbody>${items.map(item=>{
       const weather=portfolioMetric(item,'weather'),cost=Number(item.estimate),distance=Number(item.distanceKm);
       return `<tr>
-        <th><strong>${item.name}</strong><small>${item.country||''}</small></th>
+        <th><div class="portfolio-table-trip">${proposalThumbImage(item,'portfolio-table-thumb')}<span><strong>${item.name}</strong><small>${item.country||''}</small></span></div></th>
         <td class="${Number(item.score)===bestScore?'winner':''}">${item.score}/100</td>
         <td class="${Number.isFinite(weather)&&weather===bestWeather?'winner':''}">${Number.isFinite(weather)?Math.round(weather)+'/100':'—'}</td>
         <td class="${cost===minCost?'winner':''}">€${Math.round(cost).toLocaleString('nl-NL')}</td>
         <td class="${distance===minDistance?'winner':''}">${Math.round(distance)} km</td>
         <td>${portfolioTopMatch(item)}</td>
-        <td><button type="button" data-portfolio-details="${item.id}">Bekijk</button></td>
+        <td class="portfolio-vehicle-cell">${portfolioVehicleAttribute(item)}</td>
+        <td><button type="button" class="portfolio-table-choose" data-portfolio-select="${item.id}">Kies</button></td>
+        <td><button type="button" class="secondary" data-portfolio-details="${item.id}">Bekijk</button></td>
       </tr>`;
     }).join('')}</tbody></table></div>`;
   }else{
     cards.classList.add('portfolio-full-hidden');
-    body.innerHTML=`<div id="portfolioMap" class="portfolio-map"></div><div class="portfolio-map-list">${items.map((item,index)=>`<button type="button" data-portfolio-map-item="${item.id}"><span>${index+1}</span><strong>${item.name}</strong><small>${item.score}/100 · ${Math.round(Number(item.distanceKm||0))} km</small></button>`).join('')}</div>`;
+    body.innerHTML=`<div id="portfolioMap" class="portfolio-map"></div><div class="portfolio-map-list">${items.map((item,index)=>`<div class="portfolio-map-row"><button type="button" class="portfolio-map-focus" data-portfolio-map-item="${item.id}">${proposalThumbImage(item,'portfolio-map-thumb')}<span>${index+1}</span><strong>${item.name}</strong><small>${item.score}/100 · ${Math.round(Number(item.distanceKm||0))} km · ${portfolioVehicleAttribute(item)}</small></button><button type="button" class="portfolio-map-choose" data-portfolio-select="${item.id}">Kies</button></div>`).join('')}</div>`;
     requestAnimationFrame(()=>renderPortfolioMap(items));
   }
 }
@@ -699,13 +724,42 @@ function renderPortfolioMap(items){
   }
   points.forEach(({item,point},index)=>{
     const marker=L.marker([point.lat,point.lon],{title:item.name}).addTo(portfolioMap);
-    marker.bindPopup(`<strong>${index+1}. ${item.name}</strong><br>${item.score}/100 · €${Math.round(Number(item.estimate||0)).toLocaleString('nl-NL')} · ${Math.round(Number(item.distanceKm||0))} km`);
+    marker.bindPopup(`<div class="portfolio-map-popup">${proposalThumbImage(item,'portfolio-popup-thumb')}<strong>${index+1}. ${item.name}</strong><br>${item.score}/100 · €${Math.round(Number(item.estimate||0)).toLocaleString('nl-NL')} · ${Math.round(Number(item.distanceKm||0))} km<br><small>${portfolioVehicleAttribute(item)}</small><button type="button" data-portfolio-select="${item.id}">Kies deze reis</button></div>`);
     marker.on('click',()=>document.querySelector(`[data-portfolio-map-item="${CSS.escape(item.id)}"]`)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
     bounds.push([point.lat,point.lon]);
   });
   if(bounds.length)portfolioMap.fitBounds(bounds,{padding:[28,28],maxZoom:7});
   setTimeout(()=>portfolioMap?.invalidateSize(),80);
 }
+document.addEventListener('click',event=>{
+  const viewButton=event.target.closest('[data-portfolio-view]');
+  if(viewButton){
+    portfolioView=viewButton.dataset.portfolioView||'tiles';
+    renderPortfolioNavigator();
+    return;
+  }
+  const choose=event.target.closest('[data-portfolio-select]');
+  if(choose){
+    const item=state.ranked.find(row=>row.id===choose.dataset.portfolioSelect);
+    if(item)chooseProposal(item);
+    return;
+  }
+  const details=event.target.closest('[data-portfolio-details]');
+  if(details){showProposalDetails(details.dataset.portfolioDetails);return}
+  const dismiss=event.target.closest('[data-portfolio-dismiss]');
+  if(dismiss){
+    state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.portfolioDismiss])];
+    void ensureReviewQueue();
+    return;
+  }
+  const focus=event.target.closest('[data-portfolio-map-item]');
+  if(focus&&portfolioMap){
+    const item=state.ranked.find(row=>row.id===focus.dataset.portfolioMapItem);
+    const point=item?.bases?.[0];
+    if(Number.isFinite(point?.lat)&&Number.isFinite(point?.lon))portfolioMap.setView([point.lat,point.lon],Math.max(portfolioMap.getZoom(),7),{animate:true});
+  }
+});
+
 function showProposalDetails(id){
   const cards=$('destinationCards');
   cards.classList.remove('portfolio-full-hidden');

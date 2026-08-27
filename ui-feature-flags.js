@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.24',build:'1724'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.26',build:'1726'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -84,7 +84,7 @@ function enhanceProposalWeather(){
   });
 }
 
-const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuigmatch',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
+const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuig',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
 
 function removeDeprecatedSections(){
   document.querySelectorAll('.inspiration-grid').forEach(grid=>grid.closest('section.panel')?.remove());
@@ -107,7 +107,7 @@ function enhanceProposalScores(){
     if(!scores)return;
     card.querySelector('.dimension-grid')?.classList.add('legacy-dimensions-hidden');
     let panel=card.querySelector('.score-extremes');
-    const entries=Object.entries(scores).filter(([,value])=>Number.isFinite(Number(value))).map(([key,value])=>[key,Number(value)]);
+    const entries=Object.entries(scores).filter(([key,value])=>key!=='transport'&&Number.isFinite(Number(value))).map(([key,value])=>[key,Number(value)]);
     if(entries.length<6)return;
     const top=[...entries].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,3);
     const bottom=[...entries].sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,3);
@@ -173,7 +173,7 @@ function visualiseProposalCards(){
     }
 
     if(scores){
-      const best=Object.entries(scores).filter(([,v])=>Number.isFinite(Number(v))).sort((a,b)=>b[1]-a[1]).slice(0,4);
+      const best=Object.entries(scores).filter(([key,v])=>key!=='transport'&&Number.isFinite(Number(v))).sort((a,b)=>b[1]-a[1]).slice(0,4);
       const strip=document.createElement('div');
       strip.className='proposal-pictogram-strip';
       strip.innerHTML=best.map(([key,value])=>`<span title="${criteriaLabels[key]||key} ${Math.round(value)}/100"><b>${criterionIcon(key)}</b><small>${criteriaLabels[key]||key}</small></span>`).join('');

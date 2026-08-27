@@ -1,28 +1,6 @@
-const CACHE='reisslim-v1.7.25-build-1725-photo-select';
-const ASSETS=['./progress-01.webp','./progress-02.webp','./progress-03.webp','./progress-04.webp','./progress-05.webp','./progress-06.webp','./progress-07.webp','./progress-08.webp','./progress-09.webp','./progress-10.webp','./progress-11.webp','./progress-12.webp','./progress-13.webp','./progress-14.webp','./progress-15.webp','./progress-16.webp','./progress-17.webp','./progress-18.webp','./progress-19.webp','./progress-20.webp','./progress-21.webp','./progress-22.webp','./progress-23.webp','./progress-24.webp','./planner-hero-clean.webp','./planner-hero-photo-v2.webp','./home-hero-photo-v2.webp','./home-hero-photo.webp','./planner-hero-photo.webp','./slovenie.webp','./dolomieten.webp','./harz.webp','./styles.css','./app.js','./','./index.html','./manifest.webmanifest','./icon.svg','./compact-ui.css','./config.js','./destinations.js','./destination-provider.js','./trip-model.js','./route-engine.js','./route-topology.js','./storage.js','./destination-engine.js','./proposal-engine.js','./constraint-engine.js','./plan-solver.js','./itinerary-engine.js','./itinerary-variants.js','./itinerary-validator.js','./budget-engine.js','./trip-quality-engine.js','./trip-optimizer.js','./vehicle-intelligence.js','./recommendation-engine.js','./routing-provider.js','./place-provider.js','./preference-engine.js','./assistant-engine.js','./weather-engine.js','./image-provider.js','./map-view.js','./gpx-generator.js','./ui-renderer.js','./ui-feature-flags.js','./ui-hotfix-compare-map.js','./ui-hotfix-1725.js'];
+const CACHE='reisslim-v1.7.26-build-1726-portfolio-views';
+const ASSETS=['./progress-01.webp','./progress-02.webp','./progress-03.webp','./progress-04.webp','./progress-05.webp','./progress-06.webp','./progress-07.webp','./progress-08.webp','./progress-09.webp','./progress-10.webp','./progress-11.webp','./progress-12.webp','./progress-13.webp','./progress-14.webp','./progress-15.webp','./progress-16.webp','./progress-17.webp','./progress-18.webp','./progress-19.webp','./progress-20.webp','./progress-21.webp','./progress-22.webp','./progress-23.webp','./progress-24.webp','./planner-hero-clean.webp','./planner-hero-photo-v2.webp','./home-hero-photo-v2.webp','./home-hero-photo.webp','./planner-hero-photo.webp','./slovenie.webp','./dolomieten.webp','./harz.webp','./styles.css','./app.js','./','./index.html','./manifest.webmanifest','./icon.svg','./compact-ui.css','./config.js','./destinations.js','./destination-provider.js','./trip-model.js','./route-engine.js','./route-topology.js','./storage.js','./destination-engine.js','./proposal-engine.js','./constraint-engine.js','./plan-solver.js','./itinerary-engine.js','./itinerary-variants.js','./itinerary-validator.js','./budget-engine.js','./trip-quality-engine.js','./trip-optimizer.js','./vehicle-intelligence.js','./recommendation-engine.js','./routing-provider.js','./place-provider.js','./preference-engine.js','./assistant-engine.js','./weather-engine.js','./image-provider.js','./map-view.js','./gpx-generator.js','./ui-renderer.js','./ui-feature-flags.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('reisslim-')&&key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim()});
 async function networkFirst(request){try{const fresh=await fetch(request,{cache:'reload'});if(fresh&&fresh.ok){const cache=await caches.open(CACHE);await cache.put(request,fresh.clone())}return fresh}catch(error){const cached=await caches.match(request);if(cached)return cached;throw error}}
-async function injectHotfix(response){
-  if(!response)return response;
-  const type=response.headers.get('content-type')||'';
-  if(!type.includes('text/html'))return response;
-  let text=await response.text();
-  if(!text.includes('ui-hotfix-compare-map.js'))text=text.replace('</body>','<script src="./ui-hotfix-compare-map.js?v=1724h1"></script></body>');
-  if(!text.includes('ui-hotfix-1725.js'))text=text.replace('</body>','<script src="./ui-hotfix-1725.js?v=1725"></script></body>');
-  const headers=new Headers(response.headers);
-  headers.set('content-length',String(new TextEncoder().encode(text).length));
-  return new Response(text,{status:response.status,statusText:response.statusText,headers});
-}
-self.addEventListener('fetch',event=>{
-  if(event.request.method!=='GET')return;
-  const url=new URL(event.request.url);
-  if(url.origin!==self.location.origin)return;
-  if(event.request.mode==='navigate'){
-    event.respondWith(networkFirst(event.request).then(injectHotfix).catch(async()=>injectHotfix(await caches.match('./index.html'))));
-    return;
-  }
-  const isCode=['script','style','worker'].includes(event.request.destination)||/\.(?:js|css|json|webmanifest)$/i.test(url.pathname);
-  if(isCode){event.respondWith(networkFirst(event.request));return}
-  event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request)));
-});
+self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.origin!==self.location.origin)return;if(event.request.mode==='navigate'){event.respondWith(networkFirst(event.request).catch(()=>caches.match('./index.html')));return}const isCode=['script','style','worker'].includes(event.request.destination)||/\.(?:js|css|json|webmanifest)$/i.test(url.pathname);if(isCode){event.respondWith(networkFirst(event.request));return}event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request)))});
