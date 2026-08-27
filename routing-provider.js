@@ -227,6 +227,56 @@ async function fetchSingleDayLoopRoute(trip,day,options,fetchImpl,timeoutMs){
   };
 }
 
+
+function styledViaPoints(origin,destination,{side=1,factor=.12,count=2}={}){
+  const direct=distanceKm(origin,destination);
+  if(!Number.isFinite(direct)||direct<22)return[];
+  const midLat=radians((origin.lat+destination.lat)/2);
+  const dLat=destination.lat-origin.lat,dLon=(destination.lon-origin.lon)*Math.cos(midLat),len=Math.hypot(dLat,dLon)||1;
+  const perpLat=-dLon/len,perpLon=dLat/len/Math.max(.25,Math.cos(midLat));
+  const offsetKm=Math.max(5,Math.min(28,direct*factor));
+  return Array.from({length:count},(_,i)=>{
+    const p=(i+1)/(count+1),envelope=.78+.22*Math.sin(Math.PI*p),deg=offsetKm*envelope/111;
+    return{
+      lat:Number((origin.lat+(destination.lat-origin.lat)*p+side*perpLat*deg).toFixed(5)),
+      lon:Number((origin.lon+(destination.lon-origin.lon)*p+side*perpLon*deg).toFixed(5)),
+      role:'route-style-via'
+    };
+  });
+}
+
+async function fetchStyledRoute(trip,request,options,fetchImpl,timeoutMs){
+  const style=request.vehicle?.routeStyle||'balanced';
+  const direct=await fetchRouteForRequest(trip,{...request,_skipStyle:true},options,fetchImpl,timeoutMs);
+  if(style==='fastest'||request._skipStyle)return direct;
+
+  const factor=style==='scenic'?.16:.08;
+  const maxRatio=style==='scenic'?1.38:1.15;
+  const overlapTarget=style==='scenic'?.72:.88;
+  const candidates=[direct];
+
+  for(const side of [1,-1]){
+    const waypoints=styledViaPoints(request.origin,request.destination,{side,factor,count:style==='scenic'?3:2});
+    if(!waypoints.length)continue;
+    try{
+      const alt=await fetchRouteForRequest(trip,{...request,waypoints:[...(request.waypoints||[]),...waypoints],_skipStyle:true},options,fetchImpl,Math.max(3200,Math.floor(timeoutMs*.8)));
+      const ratio=alt.distanceKm/Math.max(1,direct.distanceKm);
+      const overlap=geometryOverlap(direct.geometry,alt.geometry,5);
+      if(ratio<=maxRatio&&overlap<=overlapTarget)candidates.push({...alt,_styleOverlap:overlap,_styleRatio:ratio});
+    }catch{}
+  }
+
+  if(candidates.length===1)return direct;
+  if(style==='scenic'){
+    candidates.sort((a,b)=>(a._styleOverlap??1)-(b._styleOverlap??1)||(a._styleRatio??1)-(b._styleRatio??1));
+  }else{
+    candidates.sort((a,b)=>(a.distanceKm+Math.max(0,(a._styleRatio??1)-1)*direct.distanceKm*.8)-(b.distanceKm+Math.max(0,(b._styleRatio??1)-1)*direct.distanceKm*.8));
+  }
+  const winner=candidates[0];
+  delete winner._styleOverlap;delete winner._styleRatio;
+  return winner;
+}
+
 async function fetchRouteForRequest(trip,request,options,fetchImpl,timeoutMs){
   const gateway=options.apiUrl??routingEndpoint();
   if(gateway)return fetchWithTimeout(gateway,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(request)},fetchImpl,timeoutMs);
@@ -242,7 +292,7 @@ async function fetchRouteForDay(trip,day,options,fetchImpl,timeoutMs){
   if(trip.routeTopology==='loop'&&day.kind==='return'){
     return fetchLoopReturnRoute(trip,day,options,fetchImpl,timeoutMs);
   }
-  return fetchRouteForRequest(trip,buildRoutingRequest(trip,day),options,fetchImpl,timeoutMs);
+  return fetchStyledRoute(trip,buildRoutingRequest(trip,day),options,fetchImpl,timeoutMs);
 }
 const providerLabel=source=>({openrouteservice:'OpenRouteService wegroute',osrm:'OSRM wegroute'})[source]||'Live wegroute';
 export async function enrichPlanWithLiveRouting(trip,destination,plan,options={}){

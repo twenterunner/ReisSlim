@@ -525,7 +525,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 /* v1.7.19 optimizer score reconciliation */
 .optimizer-net-row{margin-top:.35rem;padding-top:.65rem;border-top:1px solid rgba(20,80,72,.15);font-weight:900}.optimizer-math-note{display:block;margin-top:.55rem;line-height:1.35;color:#667773}.optimizer-delta-row em{min-width:3.7rem;text-align:center}
 
-/* v1.7.20 compact UI cleanup, comparison and weather */
+/* v1.7.21 compact UI cleanup, comparison and weather */
 .stats-card[hidden],.tradeoff[hidden],#variantSection.hidden{display:none!important}
 .proposal-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;align-items:stretch}
 .proposal-actions>button[data-select]{grid-column:1/-1;width:100%!important}
@@ -547,3 +547,26 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 .weather-day{display:grid!important;grid-template-columns:auto 1fr;gap:2px 6px;align-items:center;padding:8px 9px!important;border-radius:12px;background:#fff;min-width:0}
 .weather-day .weather-icon{grid-row:1/3;font-size:1.2rem}.weather-day>strong,.weather-day>span,.weather-day>small{margin:0!important;line-height:1.15}.weather-day>small{grid-column:2;font-size:.6rem;color:#667974}
 @media(max-width:430px){.proposal-actions{grid-template-columns:1fr 1fr!important}.premium-comparison .comparison-table th,.premium-comparison .comparison-table td{min-width:105px}.proposal-weather-badge small{display:none}.weather-days{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+
+/* v1.7.21 compare viewport lock + proposal review flow */
+html,body{max-width:100%;overflow-x:hidden}
+#resultsSection,.card-grid,.destination-card,.proposal-actions,#compareSection,.premium-comparison{min-width:0!important;max-width:100%!important;box-sizing:border-box}
+.compare-dock{
+  left:max(8px,env(safe-area-inset-left))!important;
+  right:max(8px,env(safe-area-inset-right))!important;
+  width:auto!important;
+  max-width:none!important;
+  transform:none!important;
+  box-sizing:border-box!important;
+}
+.compare-dock>div{min-width:0;flex:1 1 auto}
+.compare-dock strong,.compare-dock small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compare-dock button{flex:0 0 auto;max-width:42vw}
+#compareSection{overflow:hidden}
+#comparisonTable{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#moreProposalsBtn{display:none!important}
+@media(max-width:430px){
+  .compare-dock{gap:7px;padding:9px 10px!important;border-radius:15px}
+  .compare-dock button{padding:8px 11px!important}
+}

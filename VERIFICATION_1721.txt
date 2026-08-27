@@ -1,0 +1,27 @@
+ReisSlim v1.7.21 · Build 1721
+
+Changes
+- Compare dock hard-locked inside viewport including mobile safe areas.
+- Body/results comparison overflow contained.
+- "Toon meer reisopties" removed.
+- "Niet voor mij" immediately refreshes the queue; when fewer than 8 remain it automatically requests another live batch.
+- Dismiss/review flow continues until at least 100 rejected/reviewed options, subject to available catalogue/live source data.
+- Route style now affects live road routing:
+  Fastest = direct provider route.
+  Balanced = direct route unless a modest alternative is available.
+  Scenic = tries both corridor sides and accepts a visibly different route with controlled detour.
+- Existing motor/car vehicle profiles remain active.
+
+syntax app.js: PASS
+syntax routing-provider.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+more button removed: PASS
+dismiss auto-refill present: PASS
+100 review horizon present: PASS
+compare dock viewport locked: PASS
+route style selector present: PASS
+fastest direct: PASS
+scenic alternate corridor: PASS
+revision consistent: PASS
