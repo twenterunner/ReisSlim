@@ -2,6 +2,7 @@ import { originCatalog, validCoordinate } from './config.js';
 import { haversineKm } from './route-engine.js';
 import { transportId } from './vehicle-intelligence.js';
 import { buildRecommendations } from './recommendation-engine.js';
+import { adaptPlanToWeather } from './weather-engine.js';
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const OVERPASS_ENDPOINTS = [
@@ -359,7 +360,7 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
 }
 
 function dateDifference(dateString,now=new Date()){ const date=new Date(`${dateString}T12:00:00`),today=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12); return Math.round((date-today)/86400000); }
-async function fetchWeather(trip,destination,options,fetchImpl,storage){
+export async function fetchWeatherForDestination(trip,destination,options={},fetchImpl=globalThis.fetch,storage=defaultStorage()){
   const leadDays=dateDifference(trip.startDate,options.now||new Date());
   if(leadDays<-1||leadDays>15||!validCoordinate(destination.bases?.[0]))return null;
   const point=destination.bases[0],url=new URL(options.weatherUrl||WEATHER_URL);
@@ -378,9 +379,9 @@ export async function enrichPlanWithPlaces(trip,destination,plan,options={}){
   const storage=options.storage===undefined?defaultStorage():options.storage,next=clone(plan);
   const [_,weather]=await Promise.all([
     resolveSpecificRecommendations(next,trip,options,fetchImpl,storage),
-    fetchWeather(trip,destination,options,fetchImpl,storage)
+    fetchWeatherForDestination(trip,destination,options,fetchImpl,storage)
   ]);
-  if(weather)next.weather=weather;
+  if(weather){next.weather=weather;adaptPlanToWeather(next,trip)}
   const missing=(next.days||[]).reduce((sum,day)=>sum+((day.kind!=='return'||day.to!==trip.origin)&&!day.recommendations?.some(item=>item.type==='accommodation')?1:0),0);
   next.placeData={
     live:next.recommendations.length>0,

@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.7.19-1719-preference-led-single-day-more-options">
+  <meta name="reisslim-build" content="1.7.20-1720-balanced-weather-comparison-cleanup">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1719">
+  <link rel="manifest" href="manifest.webmanifest?v=1720">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1719">
-  <link rel="stylesheet" href="compact-ui.css?v=1719">
+  <link rel="stylesheet" href="styles.css?v=1720">
+  <link rel="stylesheet" href="compact-ui.css?v=1720">
 </head>
 <body>
   <header class="topbar">
@@ -208,7 +208,7 @@
           </div>
         </div>
       </div>
-      <section id="variantSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Stap 2</p><h1>Kies de opbouw van je reis</h1></div></div><div id="variantCards" class="variant-grid"></div></section>
+      <section id="variantSection" class="panel hidden" aria-hidden="true"><div id="variantCards" class="variant-grid"></div></section>
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div><div id="planVisualHero" class="plan-visual-hero"><img id="planVisualImage" src="progress-03.webp" alt=""><div class="plan-visual-overlay"><p class="eyebrow">JOUW ROADTRIP</p><h2 id="planVisualTitle">Reisplan</h2><div class="plan-visual-chips"><span id="planVisualDays">— dagen</span><span id="planVisualRoute">Route</span><span id="planVisualBudget">Budget</span></div></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
@@ -251,9 +251,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.7.19 · Build 1719</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.7.20 · Build 1720</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1719"></script>
-  <script type="module" src="app.js?v=1719"></script>
+  <script src="ui-feature-flags.js?v=1720"></script>
+  <script type="module" src="app.js?v=1720"></script>
 </body>
 </html>

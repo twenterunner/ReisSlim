@@ -18,3 +18,38 @@ export function weatherSuitability(day, trip) {
   if (['snow', 'storm'].includes(condition.id)) score -= 35;
   return { ...condition, score: Math.max(0, Math.round(score)), suitable: score >= 60 };
 }
+
+export function weatherWindowScore(weather, trip) {
+  const days = weather?.days || [];
+  if (!days.length) return null;
+  const scores = days.map(day => weatherSuitability(day, trip).score);
+  const average = scores.reduce((sum, value) => sum + value, 0) / scores.length;
+  const worst = Math.min(...scores);
+  // The proposal weather score reflects the whole holiday, while still making
+  // one genuinely bad day matter. This avoids one sunny day masking a storm.
+  const score = Math.round(average * .78 + worst * .22);
+  return { score: Math.max(0, Math.min(100, score)), average: Math.round(average), worst };
+}
+
+export function adaptPlanToWeather(plan, trip) {
+  if (!plan?.weather?.days?.length || !Array.isArray(plan.days)) return plan;
+  const byDate = new Map(plan.weather.days.map(day => [day.date, day]));
+  for (const day of plan.days) {
+    const forecast = byDate.get(day.date);
+    if (!forecast) continue;
+    const suitability = weatherSuitability(forecast, trip);
+    day.weather = { ...forecast, ...suitability };
+    day.weatherAdjusted = false;
+    day.weatherAdvice = `${suitability.icon} ${suitability.label} · ${Math.round(forecast.minimumC)}–${Math.round(forecast.maximumC)}°C · geschiktheid ${suitability.score}/100`;
+
+    if (suitability.score < 60 && day.rainAlternative && !day.weatherOriginalPrimaryPlan) {
+      day.weatherOriginalPrimaryPlan = day.primaryPlan;
+      day.primaryPlan = `Weer aangepast: ${day.rainAlternative}`;
+      day.rainAlternative = `Als het weer verbetert: ${day.weatherOriginalPrimaryPlan}`;
+      day.weatherAdjusted = true;
+    } else if (suitability.score < 75 && !String(day.primaryPlan || '').startsWith('Weeradvies:')) {
+      day.primaryPlan = `Weeradvies: houd het programma flexibel. ${day.primaryPlan}`;
+    }
+  }
+  return plan;
+}

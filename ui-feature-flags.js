@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.19',build:'1719'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.20',build:'1720'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -42,11 +42,41 @@ function normalizeLegacyStatusText(){
 }
 
 
+
+function applyRequestedCleanup(){
+  const stats=document.querySelector('.stats-card');if(stats)stats.hidden=true;
+  const variants=document.getElementById('variantSection');if(variants)variants.classList.add('hidden');
+  document.querySelectorAll('.tradeoff').forEach(el=>el.hidden=true);
+}
+function highlightComparisonWinners(){
+  const table=document.querySelector('#comparisonTable .comparison-table');if(!table)return;
+  table.querySelectorAll('tbody tr').forEach(row=>{
+    const cells=[...row.querySelectorAll('td')];
+    const values=cells.map(cell=>Number(String(cell.querySelector('strong')?.textContent||'').replace(',','.')));
+    const finite=values.filter(Number.isFinite);if(!finite.length)return;
+    const best=Math.max(...finite);
+    cells.forEach((cell,index)=>cell.classList.toggle('comparison-winner',Number.isFinite(values[index])&&Math.abs(values[index]-best)<.001));
+  });
+}
+function enhanceProposalWeather(){
+  const weather=globalThis.__REISSLIM_PROPOSAL_WEATHER||{};
+  document.querySelectorAll('.destination-card').forEach(card=>{
+    const id=card.querySelector('[data-select]')?.dataset.select,data=id&&weather[id];
+    let badge=card.querySelector('.proposal-weather-badge');
+    if(!data){badge?.remove();return}
+    if(!badge){badge=document.createElement('div');badge.className='proposal-weather-badge';card.querySelector('h3')?.insertAdjacentElement('afterend',badge)}
+    const tone=data.score>=75?'good':data.score>=60?'mixed':'poor';
+    badge.className=`proposal-weather-badge ${tone}`;
+    badge.innerHTML=`<span>${data.score>=75?'☀️':data.score>=60?'🌦️':'🌧️'}</span><strong>Weerfit ${Math.round(data.score)}/100</strong><small>${data.days} dag${data.days===1?'':'en'} live verwachting</small>`;
+  });
+}
+
 const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuigmatch',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
 
 function removeDeprecatedSections(){
   document.querySelectorAll('.inspiration-grid').forEach(grid=>grid.closest('section.panel')?.remove());
   document.getElementById('allowStretch')?.closest('label')?.remove();
+  applyRequestedCleanup();
   const notice=document.getElementById('portfolioNotice');
   if(notice&&/^Waarom deze mix\?/i.test((notice.textContent||'').trim()))notice.innerHTML='';
 }
@@ -156,9 +186,10 @@ function enhanceComparisonUi(){
   const checked=document.querySelectorAll('[data-compare]:checked').length;
   if(checked>=2)section.classList.remove('hidden');
   section.classList.add('premium-comparison');
+  highlightComparisonWinners();
 }
 
-function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceComparisonUi();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceComparisonUi();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
+function applyReleaseUi(){loadCompactUi();addRevisionToHeader();hideTravelReadiness();setupTopology();enablePreferenceDrivenReplanning();installStrictGpxExport();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceProposalWeather();enhanceComparisonUi();let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{observer.disconnect();hideGenericPlaces();normalizeLegacyStatusText();preferLiveDestinationCards();removeDeprecatedSections();enhanceProposalScores();polishProposalCards();visualiseProposalCards();enhanceProposalWeather();enhanceComparisonUi();enablePreferenceDrivenReplanning();installStrictGpxExport();observer.observe(document.body,{childList:true,subtree:true});scheduled=false})});observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyReleaseUi,{once:true});else applyReleaseUi();
 
 window.addEventListener('reisslim:compare-updated',()=>setTimeout(enhanceComparisonUi,0));
@@ -169,3 +200,5 @@ function syncPremiumRouteRadios(){
 }
 new MutationObserver(()=>syncPremiumRouteRadios()).observe(document.body,{subtree:true,childList:true});
 document.addEventListener('change',event=>{if(event.target?.id==='routeTopology')syncPremiumRouteRadios()});
+
+window.addEventListener('reisslim:weather-proposals-updated',()=>{enhanceProposalWeather();highlightComparisonWinners()});

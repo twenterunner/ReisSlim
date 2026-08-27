@@ -14,14 +14,15 @@ import { downloadGpx, downloadJson } from './gpx-generator.js';
 import { invalidateMap, renderMap } from './map-view.js';
 import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js';
 import { evaluatePlanConstraints } from './constraint-engine.js';
-import { enrichPlanWithPlaces, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js';
+import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js';
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
 import { enrichDestinationImages } from './image-provider.js';
+import { weatherWindowScore } from './weather-engine.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
-const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null};
+const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
@@ -287,8 +288,34 @@ async function enhanceLiveData(destinationId,originalPlan){
   }
 }
 function applyDestination(destination,optimize=false){if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
-function chooseProposal(destination){learn('select',destination);state.destination=destination;if(state.trip?.liveData&&!destination.image)void enrichDestinationImages([destination],{maximum:1}).then(()=>{if(state.destination?.id===destination.id){syncPlanVisualHero();persistDraft('Routebeeld geladen')}});state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId=null;state.plan=null;renderItineraryVariants(state);$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen');showView('itineraryView')}
-function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state)}
+function chooseProposal(destination){learn('select',destination);state.destination=destination;if(state.trip?.liveData&&!destination.image)void enrichDestinationImages([destination],{maximum:1}).then(()=>{if(state.destination?.id===destination.id){syncPlanVisualHero();persistDraft('Routebeeld geladen')}});state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId='balanced';state.plan=null;$('variantSection').classList.add('hidden');$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen · gebalanceerde opbouw');showView('itineraryView');applyVariant('balanced')}
+let portfolioWeatherTimer=null;
+function schedulePortfolioWeather(){clearTimeout(portfolioWeatherTimer);portfolioWeatherTimer=setTimeout(()=>void enrichPortfolioWeather(),180)}
+async function enrichPortfolioWeather(){
+  if(!state.trip?.liveData||!state.ranked?.length)return;
+  const run=++state.weatherPortfolioRun,targets=state.ranked.slice(0,10);
+  await Promise.allSettled(targets.map(async item=>{
+    const weather=await fetchWeatherForDestination(state.trip,item,{weatherTimeoutMs:3200});
+    if(run!==state.weatherPortfolioRun||!weather?.days?.length)return;
+    const window=weatherWindowScore(weather,state.trip);if(!window)return;
+    item.weatherBaseSeason??=Number(item.dimensions?.season||50);
+    item.weatherBaseScore??=Number(item.score||50);
+    item.weatherBasePortfolioScore??=Number(item.portfolioScore||item.score||50);
+    const liveSeason=Math.round(item.weatherBaseSeason*.35+window.score*.65);
+    const overallDelta=Math.round((liveSeason-item.weatherBaseSeason)*.10);
+    item.liveWeather=weather;item.liveWeatherScore=window.score;item.liveWeatherWorst=window.worst;
+    item.dimensions.season=liveSeason;item.score=Math.max(0,Math.min(100,item.weatherBaseScore+overallDelta));item.portfolioScore=item.weatherBasePortfolioScore+overallDelta;
+    globalThis.__REISSLIM_PROPOSAL_SCORES=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
+    if(globalThis.__REISSLIM_PROPOSAL_SCORES[item.id])globalThis.__REISSLIM_PROPOSAL_SCORES[item.id].season=liveSeason;
+    globalThis.__REISSLIM_PROPOSAL_WEATHER=globalThis.__REISSLIM_PROPOSAL_WEATHER||{};
+    globalThis.__REISSLIM_PROPOSAL_WEATHER[item.id]={score:window.score,worst:window.worst,days:weather.days.length};
+  }));
+  if(run!==state.weatherPortfolioRun)return;
+  const sort=(a,b)=>Number(b.portfolioScore||b.score)-Number(a.portfolioScore||a.score);
+  state.ranking.exact.sort(sort);state.ranking.stretched.sort(sort);state.ranking.visible=[...state.ranking.exact,...state.ranking.stretched].slice(0,12);state.ranked=state.ranking.visible;
+  renderDestinations(state);renderComparison(state);window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
+}
+function refreshPortfolio(){if(state.trip)state.trip.allowStretch=true;state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));state.ranked=state.ranking.visible;renderDestinations(state);renderComparison(state);schedulePortfolioWeather()}
 async function discoverLiveOptions({append=false,retry=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
   state.discoveryBusy=true;
