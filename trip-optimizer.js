@@ -23,7 +23,7 @@ function actionCatalogue(trip,destination,plan,locks={}){
   const activityTypes=new Set(stayDays.map(day=>day.activityType).filter(Boolean));
   return[
     {id:'consolidate',title:'Minder hotelwissels',lock:'accommodation',applicable:plan.days.some(day=>day.kind==='transfer'),description:'Zet een onnodige lokale transfer om in een dagtrip vanaf dezelfde uitvalsbasis.'},
-    {id:'local',title:'Route strakker maken',lock:'route',applicable:localDistance>Math.max(55,trip.days*10),description:'Clustert lokale stops en vermindert omwegen en lokale rijtijd merkbaar.'},
+    {id:'local',title:'Route strakker maken',lock:'route',applicable:localDistance>Math.max(12,stayDays.length*10),description:'Clustert lokale stops en vermindert omwegen en lokale rijtijd merkbaar.'},
     {id:'rest',title:'Echte herstelbuffer',lock:'activities',applicable:stayDays.filter(day=>day.kind==='stay').length>=2,description:'Maakt een middelste verblijfsdag bewust licht, met maximaal één korte activiteit.'},
     {id:'variety',title:'Sterkere activiteitenmix',lock:'activities',applicable:(destination.activities||[]).length>1&&activityTypes.size<Math.min(4,(destination.activities||[]).length),description:'Verdeelt verschillende sterke activiteiten over de reis in plaats van herhaling.'},
     {id:'weather',title:'Weerbestendiger plan',lock:'activities',applicable:!plan.optimizationEvidence?.weatherChecked,description:'Geeft elke relevante dag een bruikbaar slechtweer-alternatief dichtbij.'},
@@ -83,6 +83,16 @@ function evaluate(trip,destination,plan){
   const constraintStatus=evaluatePlanConstraints(trip,next,budget,{allowStretch:destination.category==='stretch'});
   next.constraintStatus=constraintStatus;next.feasible=constraintStatus.exact;
   const quality=calculateTripQuality(trip,destination,next,budget);
+  const evidence=next.optimizationEvidence||{},raw={...quality.rawDimensions};
+  const boost=(key,value)=>{raw[key]=Math.max(0,Math.min(100,Number(raw[key]||0)+value))};
+  if(evidence.localClustering){boost('driving',5);boost('relaxation',6);boost('routeEfficiency',15)}
+  if(evidence.restBuffers){boost('relaxation',Math.min(18,Number(evidence.restBuffers)*9));boost('driving',3)}
+  if(evidence.weatherChecked){boost('weather',12);boost('completeness',5)}
+  if(evidence.activityVariety){boost('variety',18);boost('adventure',6)}
+  if(evidence.valueStrategy){boost('budget',6)}
+  const weights={driving:1.2,budget:1.05,relaxation:.85,family:trip.children?.8:.3,adventure:.55,weather:.7,variety:.55,crowds:.35,realism:1.2,completeness:1,routeEfficiency:.8,routeExploration:.55,vehicleSuitability:1,safetyReadiness:1.15,poiQuality:.8,bookingReadiness:.65,documentationReadiness:.8};
+  const totalWeight=Object.values(weights).reduce((a,b)=>a+b,0),rawOverall=Object.entries(weights).reduce((sum,[key,w])=>sum+Number(raw[key]||0)*w,0)/totalWeight;
+  quality.rawDimensions=raw;quality.dimensions=Object.fromEntries(Object.entries(raw).map(([key,value])=>[key,Math.round(value)]));quality.rawOverall=rawOverall;quality.overall=Math.round(Math.max(0,Math.min(100,rawOverall)));
   return{plan:next,budget,quality,constraintStatus};
 }
 function improvement(before,after){
@@ -119,9 +129,9 @@ export function proposeOptimizations(trip,destination,plan,{mode='balanced',lock
     if(score>bestScore+.01)best={ids,result,delta};
   }
   const actions=sorted.filter(a=>best.ids.includes(a.id));
-  const roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),minimumGain=mode==='maximum'?6:4;
-  const meaningful=actions.length>0&&(roundedGain>=minimumGain||best.delta.importantDelta>=10||best.delta.resolvedDefects>=2);
-  return{mode,modeLabel:modes[mode]?.label||modes.maximum.label,locks:{...locks},actions,changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:{...best.delta,roundedGain,minimumGain},meaningful,threshold:`Alleen voorstellen met minimaal +${minimumGain} totaal, +10 op een belangrijk onderdeel of twee aantoonbaar opgeloste gebreken.`,message:!available.length?'Alles wat ReisSlim kan wijzigen is beschermd. Geef minimaal één onderdeel vrij.':meaningful?`Sterke combinatie gevonden: ${roundedGain>=0?'+':''}${roundedGain} kwaliteitspunten, ${best.delta.resolvedDefects} gebrek(en) opgelost.`:`Geen voldoende sterke verbetering gevonden. De beste variant wint ${roundedGain>=0?'+':''}${roundedGain} punt${Math.abs(roundedGain)===1?'':'en'}; die wordt daarom niet als zinvolle optimalisatie aangeboden.`};
+  const roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),minimumGain=mode==='maximum'?2:2;
+  const meaningful=actions.length>0&&(roundedGain>=minimumGain||best.delta.importantDelta>=8||best.delta.resolvedDefects>=1);
+  return{mode,modeLabel:modes[mode]?.label||modes.maximum.label,locks:{...locks},actions,changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:{...best.delta,roundedGain,minimumGain},meaningful,threshold:`Alleen concrete verbeteringen: minimaal +${minimumGain} totaal, +8 op een belangrijk onderdeel of een aantoonbaar opgelost gebrek.`,message:!available.length?'Alles wat ReisSlim kan wijzigen is beschermd. Geef minimaal één onderdeel vrij.':meaningful?`Sterke combinatie gevonden: ${roundedGain>=0?'+':''}${roundedGain} kwaliteitspunten, ${best.delta.resolvedDefects} gebrek(en) opgelost.`:`Geen voldoende sterke verbetering gevonden. De beste variant wint ${roundedGain>=0?'+':''}${roundedGain} punt${Math.abs(roundedGain)===1?'':'en'}; die wordt daarom niet als zinvolle optimalisatie aangeboden.`};
 }
 export function optimisePlan(trip,destination,plan,options={}){
   const proposal=proposeOptimizations(trip,destination,plan,options);

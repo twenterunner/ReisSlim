@@ -101,6 +101,25 @@ function accommodationFits(place,vehicle){
   if(['motorhome','caravan'].includes(vehicle))return camping;
   return !camping;
 }
+
+function routeDistanceKm(point,geometry=[]){
+  if(!validCoordinate(point)||!Array.isArray(geometry)||geometry.length<2)return Infinity;
+  const lat0=point.lat*Math.PI/180,kx=111.32*Math.cos(lat0),ky=110.57;
+  let best=Infinity;
+  for(let i=1;i<geometry.length;i++){
+    const a=geometry[i-1],b=geometry[i];if(!validCoordinate(a)||!validCoordinate(b))continue;
+    const ax=(a.lon-point.lon)*kx,ay=(a.lat-point.lat)*ky,bx=(b.lon-point.lon)*kx,by=(b.lat-point.lat)*ky;
+    const dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy,t=den?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/den)):0;
+    const x=ax+t*dx,y=ay+t*dy;best=Math.min(best,Math.hypot(x,y));
+  }
+  return best;
+}
+function corridorLimitKm(item){
+  if(['fuel','rest','restaurant','service'].includes(item.type))return 2.5;
+  if(item.type==='accommodation')return 5;
+  return 7;
+}
+
 function suitability(place,item,trip,distanceKm){
   const vehicle=transportId(trip.transport);
   let score=140-distanceKm*4+(place.evidenceScore||0);
@@ -295,11 +314,11 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
     options.onProgress?.({type:'place-search',day:day.day,itemType:item.type,itemName:item.name,completed,total,found:foundCount});
     const candidates=await fetchSpecificCandidates(item,options,fetchImpl,storage);
     const ranked=candidates
-      .map(place=>({place,distanceKm:haversineKm(item.point,place.point)}))
-      .filter(x=>Number.isFinite(x.distanceKm))
-      .sort((a,b)=>suitability(b.place,item,trip,b.distanceKm)-suitability(a.place,item,trip,a.distanceKm)||a.distanceKm-b.distanceKm);
+      .map(place=>({place,distanceKm:haversineKm(item.point,place.point),routeDistanceKm:routeDistanceKm(place.point,day.geometry||[])}))
+      .filter(x=>Number.isFinite(x.distanceKm)&&Number.isFinite(x.routeDistanceKm)&&x.routeDistanceKm<=corridorLimitKm(item))
+      .sort((a,b)=>suitability(b.place,item,trip,b.distanceKm)-suitability(a.place,item,trip,a.distanceKm)||a.routeDistanceKm-b.routeDistanceKm||a.distanceKm-b.distanceKm);
     if(ranked[0]){
-      applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);foundCount++;
+      applyLivePlace(item,ranked[0].place,ranked[0].distanceKm,day);item.routeDistanceKm=Number(ranked[0].routeDistanceKm.toFixed(1));item.reason=`${item.reason} Afstand tot de echte dagroute: ± ${item.routeDistanceKm} km.`;foundCount++;
     }else{
       // A finished lookup must never remain visually stuck in a pending state.
       Object.assign(item,{live:false,genericFallback:false,lookupComplete:true,lookupMissing:true,

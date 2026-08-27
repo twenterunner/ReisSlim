@@ -1,0 +1,30 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax image-provider.js: PASS
+syntax trip-model.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax constraint-engine.js: PASS
+syntax map-view.js: PASS
+hero no random progress: PASS
+route-specific image cache: PASS
+POI route corridor filter: PASS
+operational POI max 2.5km: PASS
+optimizer local applicable short trips: PASS
+optimizer quality bonuses: PASS
+optimizer meaningful threshold: PASS
+summary spacing: PASS
+day details stack mobile: PASS
+top recommendations duplicate number hidden: PASS
+revision config: PASS
+revision header: PASS
+revision footer: PASS
