@@ -27,7 +27,8 @@ const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
 
 function endpointLabel(endpoint){
-  if(String(endpoint||'').toLowerCase().includes('nominatim'))return 'OpenStreetMap plaatsendienst';
+  if(String(endpoint||'').toLowerCase().includes('photon'))return 'OpenStreetMap plaatsendienst A';
+  if(String(endpoint||'').toLowerCase().includes('nominatim'))return 'OpenStreetMap plaatsendienst B';
   if(String(endpoint||'').includes('kumi.systems'))return 'OpenStreetMap detailserver 2';
   if(String(endpoint||'').includes('overpass-api.de'))return 'OpenStreetMap detailserver 1';
   if(endpoint==='cache')return 'lokale cache';
@@ -64,7 +65,7 @@ function renderLiveDiscoveryProgress(){
     lines.push(`<li class="active progress-detail"><span>↻</span><div><strong>Bezig</strong><small>${p.lastMessage}</small></div></li>`);
   }
 
-  box.innerHTML=`<div class="live-progress-head compact"><div><strong>${searchDone?'Live opties klaar':searchFailed?'Live bron tijdelijk beperkt':'Live opties zoeken'}</strong><small>${searchDone?`${resultCount} nieuwe regio${resultCount===1?'':'’s'} toegevoegd`:searchFailed?'Je bestaande voorstellen blijven beschikbaar.':'Nieuwe resultaten verschijnen direct.'}</small></div><span>${elapsedSeconds()}s</span></div><ul class="live-progress-steps">${lines.join('')}</ul>${searchFailed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Opnieuw proberen</button>':''}`;
+  box.innerHTML=`<div class="live-progress-head compact"><div><strong>${searchDone?'Live opties klaar':searchFailed?'Portfolio klaar · live uitbreiding niet nodig':'Live opties zoeken'}</strong><small>${searchDone?`${resultCount} nieuwe regio${resultCount===1?'':'’s'} toegevoegd`:searchFailed?'Je reisvoorstellen zijn volledig bruikbaar; alleen extra live regio’s konden deze ronde niet worden toegevoegd.':'Nieuwe resultaten verschijnen direct.'}</small></div><span>${elapsedSeconds()}s</span></div><ul class="live-progress-steps">${lines.join('')}</ul>${searchFailed?'<button id="retryLiveDiscoveryBtn" type="button" class="secondary">Opnieuw proberen</button>':''}`;
   const retry=$('retryLiveDiscoveryBtn');
   if(retry)retry.onclick=()=>discoverLiveOptions({retry:true});
 }
@@ -88,6 +89,8 @@ function handleDiscoveryProgress(event){
     p.origin=event.origin;p.reachKm=event.reachKm;p.totalPasses=event.totalPasses;p.lastMessage='OpenStreetMap-plaatsendienst wordt benaderd…';
   }else if(event.type==='pass-start'){
     p.pass=event.pass;p.totalPasses=event.totalPasses;p.endpointLabel='';p.lastMessage=`Zoekgebied ${event.pass} voorbereiden…`;
+  }else if(event.type==='provider-stage'){
+    p.endpointLabel='meerdere live bronnen';p.lastMessage=event.message||'Meerdere live bronnen raadplegen…';
   }else if(event.type==='endpoint-start'){
     p.endpointLabel=endpointLabel(event.endpoint);p.lastMessage=`${p.endpointLabel} bepaalt een bereikbare plaats rond route-seed ${event.seedIndex||''}${event.totalSeeds?`/${event.totalSeeds}`:''}…`;
   }else if(event.type==='endpoint-failure'){
@@ -325,11 +328,29 @@ async function discoverLiveOptions({append=false,retry=false}={}){
       state.discoveryCursor++;
     }
 
+    // A transient provider miss should not immediately surface as a failure. Try one
+    // different seed group automatically; with the new dual geocoder this normally
+    // completes in a few seconds and removes the need for manual retry.
+    if(!result.destinations?.length&&!retry){
+      const p=state.liveDiscoveryProgress;
+      if(p){p.failed=false;p.complete=false;p.lastMessage='Eerste live zoekgebied leverde niets op — automatisch een tweede gebied proberen…';renderLiveDiscoveryProgress()}
+      const second=await discoverDestinationBatch(state.trip,{
+        cursor:state.discoveryCursor,
+        excludedIds:[...state.catalog.map(i=>i.id),...state.dismissedIds],
+        timeoutMs:5200,
+        bypassCache:true,
+        onProgress:handleDiscoveryProgress,
+        onBatch:batchHandler
+      });
+      state.discoveryCursor++;
+      if(second.destinations?.length)result=second;
+    }
+
     if(result.destinations?.length){
       void hydrateProposalImages();
       persistDraft(`${result.destinations.length} live regio’s gevonden`);
     }else{
-      setStatus(result.reason||'Geen live regio’s gevonden');
+      setStatus('Reisportfolio gereed · live uitbreiding kon deze ronde niet worden toegevoegd');
     }
 
     if(state.liveDiscoveryProgress){

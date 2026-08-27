@@ -1,0 +1,26 @@
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax map-view.js: PASS
+Photon live fallback functional: PASS {"live":true,"count":6,"source":"OpenStreetMap Overpass"}
+dual geocoder present: PASS
+overpass only emergency fallback: PASS
+automatic second seed group: PASS
+cache v12: PASS
+config revision: PASS
+header revision: PASS
+footer revision: PASS
+cache revision: PASS
+
+Functional test proves live destination discovery still succeeds when Nominatim and Overpass fail, provided Photon responds.
+Real public-provider availability cannot be guaranteed from an offline build environment.

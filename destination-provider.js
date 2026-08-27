@@ -3,9 +3,10 @@ import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
 
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
+const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const DEFAULT_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const GOLDEN_ANGLE=137.507764;
-const DEFAULT_BATCH_SEEDS=4;
+const DEFAULT_BATCH_SEEDS=6;
 const DEFAULT_RESULT_LIMIT=72;
 const DISCOVERY_PASSES=1;
 const countryNames={
@@ -80,6 +81,57 @@ export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],lim
   const deduped=[];for(const item of candidates){const nameKey=item.name.toLocaleLowerCase('nl-NL');if(seenNames.has(nameKey))continue;const geoKey=spatialKey(item),geoCount=seenSpatial.get(geoKey)||0;if(geoCount>=3)continue;seenNames.add(nameKey);seenSpatial.set(geoKey,geoCount+1);deduped.push(item);if(deduped.length>=limit)break}return deduped
 }
 
+
+function photonElement(feature,seedIndex){
+  const properties=feature?.properties||{},coordinates=feature?.geometry?.coordinates||[];
+  const lon=Number(coordinates[0]),lat=Number(coordinates[1]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
+  const name=properties.city||properties.name||properties.county||properties.state;
+  if(!name)return null;
+  const rawType=String(properties.type||properties.osm_value||'').toLowerCase();
+  const place=rawType.includes('city')?'city':rawType.includes('town')?'town':'village';
+  return{
+    type:'node',
+    id:Number(properties.osm_id)||800000000+seedIndex,
+    lat,lon,
+    tags:{
+      name,
+      place,
+      'is_in:country_code':String(properties.countrycode||properties.country_code||'').toUpperCase(),
+      'is_in:country':String(properties.country||'')
+    }
+  };
+}
+async function fetchPhotonSeed(seed,seedIndex,fetchImpl,timeoutMs,onProgress,context){
+  const controller=new AbortController(),startedAt=Date.now();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  const url=new URL(PHOTON_REVERSE);
+  url.search=new URLSearchParams({lat:String(seed.lat),lon:String(seed.lon)});
+  onProgress?.({...context,type:'endpoint-start',endpoint:'Photon OpenStreetMap',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,startedAt});
+  try{
+    const response=await fetchImpl(url,{headers:{accept:'application/json'},signal:controller.signal});
+    if(!response.ok)throw new Error(`Photon ${response.status}`);
+    const payload=await response.json();
+    const feature=Array.isArray(payload?.features)?payload.features[0]:null;
+    const element=photonElement(feature,seedIndex);
+    onProgress?.({...context,type:'endpoint-success',endpoint:'Photon OpenStreetMap',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,elapsedMs:Date.now()-startedAt,candidateElements:element?1:0});
+    return element;
+  }catch(error){
+    const timeout=error?.name==='AbortError';
+    onProgress?.({...context,type:'endpoint-failure',endpoint:'Photon OpenStreetMap',seedIndex:seedIndex+1,totalSeeds:DEFAULT_BATCH_SEEDS,elapsedMs:Date.now()-startedAt,timeout,error:timeout?'timeout':String(error?.message||error)});
+    return null;
+  }finally{clearTimeout(timer)}
+}
+async function discoverViaPhoton(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs}){
+  const seeds=discoverySeeds(trip,cursor,DEFAULT_BATCH_SEEDS);
+  // Photon is used as the fast first live source. Seed lookups are independent and
+  // can safely run together, keeping mobile discovery under a few seconds.
+  const rows=await Promise.all(
+    seeds.map((seed,index)=>fetchPhotonSeed(seed,index,fetchImpl,Math.min(timeoutMs,2800),onProgress,{pass,totalPasses,cursor}))
+  );
+  return rows.filter(Boolean);
+}
+
 function nominatimElement(row,seedIndex){
   if(!row)return null;
   const lat=Number(row.lat),lon=Number(row.lon),address=row.address||{};
@@ -118,10 +170,10 @@ async function fetchNominatimSeed(seed,seedIndex,fetchImpl,timeoutMs,onProgress,
     return null;
   }finally{clearTimeout(timer)}
 }
-async function discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs}){
-  const seeds=discoverySeeds(trip,cursor,DEFAULT_BATCH_SEEDS),elements=[];
+async function discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs,count=2}){
+  const seeds=discoverySeeds(trip,cursor,Math.max(1,Math.min(DEFAULT_BATCH_SEEDS,count))),elements=[];
   for(let index=0;index<seeds.length;index++){
-    const element=await fetchNominatimSeed(seeds[index],index,fetchImpl,Math.min(timeoutMs,3200),onProgress,{pass,totalPasses,cursor});
+    const element=await fetchNominatimSeed(seeds[index],index,fetchImpl,Math.min(timeoutMs,2800),onProgress,{pass,totalPasses,cursor});
     if(element)elements.push(element);
     if(index<seeds.length-1)await new Promise(resolve=>setTimeout(resolve,1050));
   }
@@ -155,7 +207,7 @@ async function fetchEndpoint(endpoint,query,fetchImpl,timeoutMs,onProgress,conte
 
 async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,onProgress,pass,totalPasses,timeoutMs=6500,bypassCache=false}){
   const context={pass,totalPasses,cursor};
-  const key=`reisslim.destination-discovery.v11:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
+  const key=`reisslim.destination-discovery.v12:${trip.origin}:${trip.destinationQuery||''}:${trip.days}:${trip.maxDrive}:${trip.transport}:${cursor}`;
 
   if(!bypassCache){
     try{
@@ -168,9 +220,18 @@ async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,on
     }catch{}
   }else onProgress?.({...context,type:'cache-bypass',endpoint:'live'});
 
-  const nominatimElements=await discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs});
-  if(nominatimElements.length){
-    return{payload:{elements:nominatimElements},cached:false,endpoint:'OpenStreetMap Nominatim',cacheKey:key};
+  // Use two independent OSM geocoding paths first. Photon handles the wider seed
+  // fan quickly; Nominatim adds a smaller standards-friendly cross-check. This
+  // removes the old single-source failure mode seen repeatedly on mobile.
+  onProgress?.({...context,type:'provider-stage',stage:'geocoding',message:'Twee onafhankelijke OpenStreetMap-plaatsendiensten raadplegen…'});
+  const [photonElements,nominatimElements]=await Promise.all([
+    discoverViaPhoton(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs}),
+    discoverViaNominatim(trip,cursor,{fetchImpl,onProgress,pass,totalPasses,timeoutMs,count:2})
+  ]);
+  const geocoded=[...photonElements,...nominatimElements];
+  if(geocoded.length){
+    const endpoint=photonElements.length&&nominatimElements.length?'Photon + OpenStreetMap Nominatim':photonElements.length?'Photon OpenStreetMap':'OpenStreetMap Nominatim';
+    return{payload:{elements:geocoded},cached:false,endpoint,cacheKey:key};
   }
 
   // Emergency fallback only: one lightweight Overpass query, with mirrors raced
@@ -188,7 +249,7 @@ async function fetchDiscoveryPayload(trip,cursor,{fetchImpl,endpoints,storage,on
     return{payload:result.payload,cached:false,endpoint:result.endpoint,cacheKey:key};
   }catch{
     controllers.forEach(controller=>{if(!controller.signal.aborted)controller.abort('race-won')});
-    return{payload:null,cached:false,reason:'Live plaatsontdekking is tijdelijk beperkt; de beschikbare voorstellen blijven direct bruikbaar.'};
+    return{payload:null,cached:false,reason:'De live plaatsendiensten reageerden deze ronde niet. ReisSlim gebruikt je volledige lokale portfolio en probeert live uitbreiding automatisch opnieuw bij de volgende zoekactie.'};
   }
 }
 
@@ -312,7 +373,7 @@ export const destinationDiscoveryConfig=Object.freeze({
   discoveryPasses:DISCOVERY_PASSES,
   resultLimit:DEFAULT_RESULT_LIMIT,
   progressive:true,
-  primaryProvider:'OpenStreetMap Nominatim',
-  cacheVersion:11,
+  primaryProvider:'Photon OpenStreetMap + OpenStreetMap Nominatim',
+  cacheVersion:12,
   endpointTimeoutMs:3200
 });
