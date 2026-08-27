@@ -1,0 +1,6 @@
+ReisSlim v1.7.17 build 1717 verification
+PASS - included JavaScript files pass syntax validation.
+PASS - screenshot case weighted net is about +1 overall after positive and negative weighted contributions.
+PASS - +1 no longer qualifies as meaningful/strong optimization.
+PASS - minimum total-score improvement is +4.
+PASS - UI exposes weighted contributions, negatives, and net effect.

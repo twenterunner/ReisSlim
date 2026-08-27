@@ -92,7 +92,7 @@ function evaluate(trip,destination,plan){
   if(evidence.valueStrategy){boost('budget',6)}
   const weights={driving:1.2,budget:1.05,relaxation:.85,family:trip.children?.8:.3,adventure:.55,weather:.7,variety:.55,crowds:.35,realism:1.2,completeness:1,routeEfficiency:.8,routeExploration:.55,vehicleSuitability:1,safetyReadiness:1.15,poiQuality:.8,bookingReadiness:.65,documentationReadiness:.8};
   const totalWeight=Object.values(weights).reduce((a,b)=>a+b,0),rawOverall=Object.entries(weights).reduce((sum,[key,w])=>sum+Number(raw[key]||0)*w,0)/totalWeight;
-  quality.rawDimensions=raw;quality.dimensions=Object.fromEntries(Object.entries(raw).map(([key,value])=>[key,Math.round(value)]));quality.rawOverall=rawOverall;quality.overall=Math.round(Math.max(0,Math.min(100,rawOverall)));
+  quality.rawDimensions=raw;quality.dimensions=Object.fromEntries(Object.entries(raw).map(([key,value])=>[key,Math.round(value)]));quality.optimizationWeights={...weights};quality.optimizationTotalWeight=totalWeight;quality.rawOverall=rawOverall;quality.overall=Math.round(Math.max(0,Math.min(100,rawOverall)));
   return{plan:next,budget,quality,constraintStatus};
 }
 function improvement(before,after){
@@ -129,9 +129,9 @@ export function proposeOptimizations(trip,destination,plan,{mode='balanced',lock
     if(score>bestScore+.01)best={ids,result,delta};
   }
   const actions=sorted.filter(a=>best.ids.includes(a.id));
-  const roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),minimumGain=mode==='maximum'?2:2;
-  const meaningful=actions.length>0&&(roundedGain>=minimumGain||best.delta.importantDelta>=8||best.delta.resolvedDefects>=1);
-  return{mode,modeLabel:modes[mode]?.label||modes.maximum.label,locks:{...locks},actions,changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:{...best.delta,roundedGain,minimumGain},meaningful,threshold:`Alleen concrete verbeteringen: minimaal +${minimumGain} totaal, +8 op een belangrijk onderdeel of een aantoonbaar opgelost gebrek.`,message:!available.length?'Alles wat ReisSlim kan wijzigen is beschermd. Geef minimaal één onderdeel vrij.':meaningful?`Sterke combinatie gevonden: ${roundedGain>=0?'+':''}${roundedGain} kwaliteitspunten, ${best.delta.resolvedDefects} gebrek(en) opgelost.`:`Geen voldoende sterke verbetering gevonden. De beste variant wint ${roundedGain>=0?'+':''}${roundedGain} punt${Math.abs(roundedGain)===1?'':'en'}; die wordt daarom niet als zinvolle optimalisatie aangeboden.`};
+  const roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),minimumGain=4;
+  const meaningful=actions.length>0&&roundedGain>=minimumGain;
+  return{mode,modeLabel:modes[mode]?.label||modes.maximum.label,locks:{...locks},actions,changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:{...best.delta,roundedGain,minimumGain},meaningful,threshold:`Alleen toepassen bij minimaal +${minimumGain} punten op de totale reisscore. Deelverbeteringen alleen zijn niet voldoende.`,message:!available.length?'Alles wat ReisSlim kan wijzigen is beschermd. Geef minimaal één onderdeel vrij.':meaningful?`Sterke combinatie gevonden: ${roundedGain>=0?'+':''}${roundedGain} kwaliteitspunten, ${best.delta.resolvedDefects} gebrek(en) opgelost.`:`Geen voldoende sterke verbetering gevonden. De beste variant wint ${roundedGain>=0?'+':''}${roundedGain} punt${Math.abs(roundedGain)===1?'':'en'}; die wordt daarom niet als zinvolle optimalisatie aangeboden.`};
 }
 export function optimisePlan(trip,destination,plan,options={}){
   const proposal=proposeOptimizations(trip,destination,plan,options);

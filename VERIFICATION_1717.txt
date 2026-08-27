@@ -1,0 +1,19 @@
+ReisSlim v1.7.17 build 1717
+ROOT CAUSE VERIFIED in v1.7.16:
+- UI moved to 24% immediately before live routing.
+- live routing had no progress callback, so it could visually remain at 24% for the whole routing phase.
+- route days were processed sequentially.
+- each day used a 25 s timeout; OSRM had two fallback endpoints, each previously able to consume the full timeout.
+
+FIX:
+- per-day route progress now advances 24% -> 47%.
+- routing timeout reduced to 7 s per day.
+- OSRM timeout budget divided across its fallback endpoints.
+- independent route days processed in batches of 3.
+- failed live route segments fall back instead of blocking completion.
+- release/cache identifiers bumped to 1.7.17 / 1717.
+
+VERIFICATION:
+- 17 JavaScript files pass node --check.
+- assertions confirm progress callback, 7 s timeout, batch routing, endpoint timeout split and matching release identifiers.
+- actual public routing-server latency cannot be reproduced offline here.

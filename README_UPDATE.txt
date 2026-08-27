@@ -1,4 +1,4 @@
-ReisSlim v1.7.15 · Build 1715
+ReisSlim v1.7.17 · Build 1717
 
 PREFERENCE-LED SCORING
 - Selected preferences are now the basis for positive destination-property scoring.
