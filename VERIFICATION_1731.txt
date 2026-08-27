@@ -1,0 +1,36 @@
+ReisSlim v1.7.31 · Build 1731
+
+STRICT TRIP-SPECIFIC IMAGE ACCEPTANCE
+
+Hard requirement:
+A proposal is displayed only when its image passes BOTH:
+1. photographic-quality validation; and
+2. specific destination relevance validation.
+
+Rejected automatically:
+- paper/documents/scans/brochures/flyers/posters/pages;
+- maps/locator maps/flags/logos/diagrams/icons;
+- signs/plaques/tickets/menus/postcards;
+- drawings/illustrations/paintings/engravings;
+- weak/small/extreme-aspect images;
+- images whose metadata/title does not name the actual proposed region/destination.
+
+The previous image cache is intentionally invalidated, so already cached weak
+images such as the reported "piece of paper" cannot survive the update.
+
+If no qualifying image exists, the proposal remains hidden and another candidate
+must be used. There is no generic stock-photo fallback.
+
+syntax image-provider.js: PASS
+syntax app.js: PASS
+syntax config.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax service-worker.js: PASS
+paper/document rejection regression: PASS
+old weak image cache invalidated: PASS
+document/map/logo rejection: PASS
+destination token required: PASS
+photographic size/aspect gate: PASS
+generic travel query removed: PASS
+app accepts only validated specific images: PASS
+revision: PASS

@@ -117,7 +117,7 @@ function handleDiscoveryProgress(event){
   renderLiveDiscoveryProgress();
 }
 
-function hasProposalImage(item){return /^https:\/\//i.test(String(item?.image?.url||''))}
+function hasProposalImage(item){return /^https:\/\//i.test(String(item?.image?.url||''))&&item?.image?.validatedPhoto===true&&item?.image?.relevance==='destination-specific'}
 function imageReadyState(){
   const filter=list=>(list||[]).filter(hasProposalImage);
   const ranking=state.ranking?{...state.ranking,exact:filter(state.ranking.exact),stretched:filter(state.ranking.stretched),visible:filter(state.ranking.visible)}:null;
