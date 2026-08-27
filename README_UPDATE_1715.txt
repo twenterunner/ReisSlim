@@ -1,4 +1,4 @@
-ReisSlim v1.7.17 · Build 1717
+ReisSlim v1.7.18 · Build 1718
 
 ACCOMMODATION TYPE
 - Planner now has: Geen voorkeur / Camping / Hotel-B&B.

@@ -1,4 +1,4 @@
-ReisSlim v1.7.17 build 1717
+ReisSlim v1.7.18 build 1718
 ROOT CAUSE VERIFIED in v1.7.16:
 - UI moved to 24% immediately before live routing.
 - live routing had no progress callback, so it could visually remain at 24% for the whole routing phase.
@@ -11,7 +11,7 @@ FIX:
 - OSRM timeout budget divided across its fallback endpoints.
 - independent route days processed in batches of 3.
 - failed live route segments fall back instead of blocking completion.
-- release/cache identifiers bumped to 1.7.17 / 1717.
+- release/cache identifiers bumped to 1.7.18 / 1718.
 
 VERIFICATION:
 - 17 JavaScript files pass node --check.

@@ -76,11 +76,28 @@ export function routingEndpoint(){return String(globalThis.REISSLIM_ROUTING_API_
 export function routingConfigured(trip=null,settings=readRoutingSettings()){if(trip?.liveData===false)return false;if(trip?.travelMode&&trip.travelMode!=='direct')return false;if(/^https:\/\//.test(routingEndpoint())||settings.orsApiKey)return true;return trip?['car','motorcycle'].includes(transportId(trip.transport)):false}
 export function buildRoutingRequest(trip,day){
   const origin={lat:day.fromPoint.lat,lon:day.fromPoint.lon},destination={lat:day.toPoint.lat,lon:day.toPoint.lon};
-  const daytripVia=day.kind==='daytrip'&&validCoordinate(day.destinationPoint)?[{lat:day.destinationPoint.lat,lon:day.destinationPoint.lon}]:[];
+  let daytripVia=[];
+  if(day.kind==='daytrip'&&validCoordinate(day.destinationPoint)){
+    const target={lat:day.destinationPoint.lat,lon:day.destinationPoint.lon};
+    if(trip.routeTopology==='loop'){
+      // A one-day loop must START AND FINISH at the real trip origin.
+      // Travel outward to the selected highlight, then force the return onto
+      // a separated corridor. This avoids the old local/open route around the
+      // destination and avoids simply retracing the outbound road.
+      const returnControls=loopControlPoints(target,origin,{side:1,offsetFactor:.24,viaCount:2});
+      daytripVia=[target,...returnControls];
+    }else{
+      daytripVia=[target];
+    }
+  }
   return{day:day.day,origin,destination,waypoints:daytripVia,vehicle:vehicleSpec(trip)}
 }
 function waypointsOnGeometry(geometry,timing,transport){const count=Math.max(0,timing.stopCount||0);if(geometry.length<2||!count)return[];return Array.from({length:count},(_,index)=>{const position=Math.min(geometry.length-1,Math.max(1,Math.round((index+1)*(geometry.length-1)/(count+1))));return{...geometry[position],name:timing.fuelStops>index?`Brandstof- en ruststop ${index+1}`:`Ruststop ${index+1}`,role:timing.fuelStops>index?'fuel':'rest',transport,approximate:false}})}
-function applyResult(trip,day,result){const geometry=Array.isArray(result.geometry)?result.geometry.filter(validCoordinate):[];if(geometry.length<10||!Number.isFinite(result.distanceKm)||!Number.isFinite(result.roadHours))return false;const timing=estimateLegTiming(trip,{distanceKm:result.distanceKm,roadHours:result.roadHours,arrival:day.kind!=='return'||day.to!==trip.origin});Object.assign(day,{distanceKm:Math.round(result.distanceKm),roadHours:timing.roadHours,driveHours:timing.elapsedHours,elapsedHours:timing.elapsedHours,breakHours:timing.breakHours,restStops:timing.restStops,fuelStops:timing.fuelStops,stopCount:timing.stopCount,waypoints:waypointsOnGeometry(geometry,timing,trip.transport),geometry,routeSource:result.provider||'live-provider',routeOverlap:Number.isFinite(result.loopOverlap)?result.loopOverlap:null,exceedsDailyLimit:timing.elapsedHours>trip.maxDrive+.05});return true}
+function applyResult(trip,day,result){const geometry=Array.isArray(result.geometry)?result.geometry.filter(validCoordinate):[];if(geometry.length<10||!Number.isFinite(result.distanceKm)||!Number.isFinite(result.roadHours))return false;
+if(day.kind==='daytrip'&&trip.routeTopology==='loop'){
+  const start=geometry[0],end=geometry.at(-1);
+  if(!validCoordinate(start)||!validCoordinate(end)||distanceKm(start,end)>.8)return false;
+}const timing=estimateLegTiming(trip,{distanceKm:result.distanceKm,roadHours:result.roadHours,arrival:day.kind!=='return'||day.to!==trip.origin});Object.assign(day,{distanceKm:Math.round(result.distanceKm),roadHours:timing.roadHours,driveHours:timing.elapsedHours,elapsedHours:timing.elapsedHours,breakHours:timing.breakHours,restStops:timing.restStops,fuelStops:timing.fuelStops,stopCount:timing.stopCount,waypoints:waypointsOnGeometry(geometry,timing,trip.transport),geometry,routeSource:result.provider||'live-provider',routeOverlap:Number.isFinite(result.loopOverlap)?result.loopOverlap:null,exceedsDailyLimit:timing.elapsedHours>trip.maxDrive+.05});return true}
 async function fetchWithTimeout(url,options,fetchImpl,timeoutMs){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetchImpl(url,{...options,signal:controller.signal});if(!response.ok)throw new Error(`Routeprovider ${response.status}`);return response.json()}finally{clearTimeout(timer)}}
 function normalizeOsrmRoute(payload){const route=payload?.routes?.[0],coordinates=route?.geometry?.coordinates||[];if(!route||coordinates.length<10)throw new Error('Geen volledige OSRM route');return{provider:'osrm',distanceKm:route.distance/1000,roadHours:route.duration/3600,geometry:coordinates.map(([lon,lat])=>({lat,lon}))}}
 async function fetchOsrmRoute(request,fetchImpl,timeoutMs,urls=OSRM_URLS){const{origin,destination}=request;let lastError;for(const baseUrl of urls){try{const clean=baseUrl.replace(/\/$/,'');
@@ -180,6 +197,6 @@ export async function enrichPlanWithLiveRouting(trip,destination,plan,options={}
   const singleProvider=new Set(providers).size===1?providers[0]:'mixed';
   next.routeMetrics.routeSource=applied===routeDays.length?singleProvider:'mixed'; if(Number.isFinite(loopOverlap))next.routeMetrics.liveLoopOverlap=loopOverlap;
   applyDaySchedules(trip,next.days); next.recommendations=buildRecommendations(trip,destination,next.days);
-  next.routing={source:applied===routeDays.length?singleProvider:'mixed',label:trip.routeTopology==='loop'&&Number.isFinite(loopOverlap)?`Live lus · ${Math.round(loopOverlap*100)}% overlap`:applied===routeDays.length?providerLabel(singleProvider):'Gedeeltelijk live',live:applied===routeDays.length,completedSegments:applied,totalSegments:routeDays.length,loopOverlap,error:applied<routeDays.length?'Niet alle segmenten konden live worden berekend.':null};
+  next.routing={source:applied===routeDays.length?singleProvider:'mixed',label:Number(trip.days)===1&&trip.routeTopology==='loop'?'Live daglus · start = finish':trip.routeTopology==='loop'&&Number.isFinite(loopOverlap)?`Live lus · ${Math.round(loopOverlap*100)}% overlap`:applied===routeDays.length?providerLabel(singleProvider):'Gedeeltelijk live',live:applied===routeDays.length,completedSegments:applied,totalSegments:routeDays.length,loopOverlap,error:applied<routeDays.length?'Niet alle segmenten konden live worden berekend.':null};
   options.onProgress?.({type:'routing-complete',completed,total,applied}); return next;
 }

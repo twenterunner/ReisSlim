@@ -133,11 +133,15 @@ export function renderMap(plan,elementId='map'){
   });
 
   routePoints.forEach((point,index)=>{
+    // For a closed one-day loop, start and finish are intentionally the same
+    // coordinate. Render one combined marker instead of two ambiguous circles.
+    if(index>0&&routePoints.length===2&&distanceKmLocal(routePoints[0],point)<.8)return;
     bounds.push([point.lat,point.lon]);
+    const closedDayLoop=routePoints.length===2&&index===0&&distanceKmLocal(routePoints[0],routePoints[1])<.8;
     const color=index===0?'#123f3a':dayColor(point.day||1);
     L.circleMarker([point.lat,point.lon],{radius:index===0?8:6,color,fillColor:'#ffffff',fillOpacity:1,weight:4})
       .addTo(overnightLayer)
-      .bindPopup(`<strong>${index===0?'Vertrek':point.role==='return'?'Terugkomst':`Dag ${point.day||''}`}</strong><br>${escapeHtml(point.name)}`)
+      .bindPopup(`<strong>${closedDayLoop?'Start & finish':index===0?'Vertrek':point.role==='return'?'Terugkomst':`Dag ${point.day||''}`}</strong><br>${escapeHtml(point.name)}`)
   });
 
   proposals.forEach((item,index)=>{

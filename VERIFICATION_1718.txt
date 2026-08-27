@@ -1,0 +1,42 @@
+ReisSlim 1.7.18 build 1718
+
+ROOT CAUSE OF REPORTED ONE-DAY LOOP:
+The single-day builder preferred first.outbound[0] over first.metrics.origin.
+That could make the day route start from a generated/destination-side corridor
+point instead of the actual trip origin. The live daytrip request then used
+that incorrect point as both start and finish.
+
+FIX:
+- actual resolved trip origin is authoritative for a one-day trip;
+- destination base is authoritative as the loop highlight;
+- one-day + Loop now has its own topology 'day-loop';
+- live routing is explicitly origin -> highlight -> separated return controls -> origin;
+- live result is rejected unless its first/last points close within 0.8 km;
+- map renders one 'Start & finish' marker for a closed one-day loop;
+- UI labels it 'Daglus'.
+
+syntax itinerary-engine.js: PASS
+syntax destination-engine.js: PASS
+syntax service-worker.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax recommendation-engine.js: PASS
+syntax place-provider.js: PASS
+syntax route-topology.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax routing-provider.js: PASS
+syntax image-provider.js: PASS
+syntax trip-model.js: PASS
+syntax trip-optimizer.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax constraint-engine.js: PASS
+syntax map-view.js: PASS
+single-day uses resolved origin first: PASS
+single-day target uses actual destination: PASS
+one-day loop topology preserved: PASS
+loop route start=end request: PASS
+closed geometry validated: PASS
+combined start-finish marker: PASS
+hero says Daglus: PASS
+revision consistent: PASS

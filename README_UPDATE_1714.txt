@@ -1,4 +1,4 @@
-ReisSlim v1.7.17 · Build 1717
+ReisSlim v1.7.18 · Build 1718
 
 - Plan hero uses the selected destination/route image only; no random progress image fallback.
 - Wikimedia image lookup is destination + country specific and invalidates the old image cache.
