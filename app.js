@@ -18,41 +18,11 @@ import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepar
 import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js';
 import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js';
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
-const IMAGE_CACHE_KEY='reisslim-destination-images-v2';
-const imageCache=(()=>{try{return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY)||'{}')}catch{return {}}})();
-const saveImageCache=()=>{try{localStorage.setItem(IMAGE_CACHE_KEY,JSON.stringify(imageCache))}catch{}};
-const cleanImageTerm=value=>String(value||'').replace(/\([^)]*\)/g,' ').replace(/[^\p{L}\p{N} .,'’&-]+/gu,' ').replace(/\s+/g,' ').trim();
-async function fetchWikimediaDestinationImage(destination){
-  const name=cleanImageTerm(destination?.name),country=cleanImageTerm(destination?.country);
-  if(!name)return null;
-  const cacheKey=`${name}|${country}`.toLowerCase();
-  if(imageCache[cacheKey])return imageCache[cacheKey];
-  const terms=[`${name} ${country} landscape`,`${name} ${country} tourism`,`${name} landscape`,name];
-  for(const term of terms){
-    try{
-      const params=new URLSearchParams({action:'query',generator:'search',gsrsearch:`${term} filetype:bitmap`,gsrnamespace:'6',gsrlimit:'8',prop:'imageinfo',iiprop:'url|mime',iiurlwidth:'1200',format:'json',origin:'*'});
-      const response=await fetch(`https://commons.wikimedia.org/w/api.php?${params}`,{mode:'cors',cache:'force-cache'});
-      if(!response.ok)continue;
-      const data=await response.json();
-      const pages=Object.values(data?.query?.pages||{});
-      const hit=pages.find(page=>{const info=page.imageinfo?.[0];return info&&/^image\/(?:jpeg|png|webp)$/i.test(info.mime||'')&&(info.thumburl||info.url)});
-      const info=hit?.imageinfo?.[0],url=info?.thumburl||info?.url;
-      if(url){const image={url,source:'Wikimedia Commons',query:term};imageCache[cacheKey]=image;saveImageCache();return image}
-    }catch(error){console.warn('Destination image lookup failed',term,error)}
-  }
-  return null;
-}
-async function enrichDestinationImages(destinations,{maximum=12}={}){
-  const targets=(destinations||[]).filter(item=>item&&!item.image?.url).slice(0,Math.max(1,maximum));
-  let cursor=0;
-  async function worker(){while(cursor<targets.length){const item=targets[cursor++];const image=await fetchWikimediaDestinationImage(item);if(image)item.image=image}}
-  await Promise.all(Array.from({length:Math.min(3,targets.length)},worker));
-  return destinations;
-}
+import { enrichDestinationImages } from './image-provider.js';
 import { weatherWindowScore } from './weather-engine.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
-const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0};
+const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
@@ -147,12 +117,26 @@ function handleDiscoveryProgress(event){
   renderLiveDiscoveryProgress();
 }
 
+function hasProposalImage(item){return /^https:\/\//i.test(String(item?.image?.url||''))}
+function imageReadyState(){
+  const filter=list=>(list||[]).filter(hasProposalImage);
+  const ranking=state.ranking?{...state.ranking,exact:filter(state.ranking.exact),stretched:filter(state.ranking.stretched),visible:filter(state.ranking.visible)}:null;
+  return{...state,ranked:filter(state.ranked),ranking};
+}
 async function hydrateProposalImages(){
-  if(!state.trip?.liveData||!state.ranked.length)return;
-  const missing=state.ranked.filter(item=>!item.image?.url);
-  if(!missing.length)return;
-  await enrichDestinationImages(missing,{maximum:Math.min(12,missing.length)});
-  renderDestinations(state);renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();
+  if(state.imageHydrationBusy||!state.ranked.length)return;
+  state.imageHydrationBusy=true;
+  try{
+    const missing=state.ranked.filter(item=>!hasProposalImage(item)&&!state.imageRejectedIds.includes(item.id));
+    if(missing.length)await enrichDestinationImages(missing,{});
+    const unresolved=missing.filter(item=>!hasProposalImage(item));
+    if(unresolved.length)state.imageRejectedIds=[...new Set([...state.imageRejectedIds,...unresolved.map(item=>item.id)])];
+    renderDestinations(imageReadyState());renderPortfolioNavigator();renderComparison(imageReadyState());renderEnhancedComparison();
+    const ready=state.ranked.filter(hasProposalImage).length;
+    if(ready<8&&state.trip?.liveData&&!state.discoveryBusy&&state.dismissedIds.length<100){
+      await discoverLiveOptions({append:true,quiet:true});
+    }
+  }finally{state.imageHydrationBusy=false}
 }
 function stateForStorage(){return{schemaVersion:STORAGE_SCHEMA_VERSION,engineVersion:ENGINE_VERSION,trip:state.trip,destinationId:state.destination?.destinationId||state.destination?.id||null,destinationProfile:state.destination?.dynamic?state.destination:null,compareIds:state.compareIds,savedProposalIds:state.savedProposalIds,dismissedIds:state.dismissedIds,selectedVariantId:state.selectedVariantId,optimized:state.optimized,plan:state.plan}}
 function exportState(){return{version:VERSION,build:BUILD,engineVersion:ENGINE_VERSION,generatedAt:new Date().toISOString(),trip:state.trip,destination:state.destination?{id:state.destination.id,name:state.destination.name,score:state.destination.score,confidence:state.destination.confidence}:null,plan:state.plan,budget:state.budget,validation:state.validation,planningQuality:state.quality}}
@@ -349,7 +333,7 @@ async function enrichPortfolioWeather(){
   if(run!==state.weatherPortfolioRun)return;
   const sort=(a,b)=>Number(b.portfolioScore||b.score)-Number(a.portfolioScore||a.score);
   state.ranking.exact.sort(sort);state.ranking.stretched.sort(sort);state.ranking.visible=[...state.ranking.exact,...state.ranking.stretched].slice(0,12);state.ranked=state.ranking.visible;
-  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
+  renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
 }
 function updateReviewProgress(){
   const badge=$('resultCount');
@@ -364,9 +348,9 @@ function schedulePortfolioImages(){
 }
 function refreshPortfolio(){
   if(state.trip)state.trip.allowStretch=true;
-  state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));
+  state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:[...state.dismissedIds,...state.imageRejectedIds]}));
   state.ranked=state.ranking.visible;
-  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();
+  renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();
 }
 async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
@@ -839,7 +823,7 @@ function initialize(){
   $('startPlanningBtn').addEventListener('click',()=>showView('plannerView'));$('continueTripBtn').addEventListener('click',()=>showView('plannerView'));
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
-  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData){await discoverLiveOptions();refreshPortfolio();scheduleReviewPrefetch()}});
+  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData){await discoverLiveOptions();refreshPortfolio();scheduleReviewPrefetch()}});
   let saveTimer;const autosave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{state.trip=readTripForm(state.trip);persistDraft()},300)};$('tripForm').addEventListener('input',autosave);$('tripForm').addEventListener('change',autosave);
   $('tripForm').addEventListener('reisslim:preferences-changed',()=>{
     const scrollY=window.scrollY;
@@ -854,7 +838,7 @@ function initialize(){
     persistDraft(`${state.dismissedIds.length}/100 reisopties beoordeeld`);
     await ensureReviewQueue({target:REVIEW_VISIBLE_TARGET,maxRounds:REVIEW_SEARCH_ROUNDS});
   }
-  $('destinationCards').addEventListener('click',event=>{const select=event.target.closest('[data-select]');if(select){const d=state.ranked.find(i=>i.id===select.dataset.select);if(d)chooseProposal(d)}const dismiss=event.target.closest('[data-dismiss-proposal]');if(dismiss){state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.dismissProposal])];void refillAfterDismiss()}const save=event.target.closest('[data-save-proposal]');if(save){const id=save.dataset.saveProposal;state.savedProposalIds=state.savedProposalIds.includes(id)?state.savedProposalIds.filter(i=>i!==id):[...state.savedProposalIds,id];renderDestinations(state)}});
+  $('destinationCards').addEventListener('click',event=>{const select=event.target.closest('[data-select]');if(select){const d=state.ranked.find(i=>i.id===select.dataset.select);if(d)chooseProposal(d)}const dismiss=event.target.closest('[data-dismiss-proposal]');if(dismiss){state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.dismissProposal])];void refillAfterDismiss()}const save=event.target.closest('[data-save-proposal]');if(save){const id=save.dataset.saveProposal;state.savedProposalIds=state.savedProposalIds.includes(id)?state.savedProposalIds.filter(i=>i!==id):[...state.savedProposalIds,id];renderDestinations(imageReadyState())}});
   $('destinationCards').addEventListener('change',event=>{
     if(!event.target.matches('[data-compare]'))return;
     const id=event.target.dataset.compare;
@@ -865,14 +849,14 @@ function initialize(){
         setStatus('Vergelijk maximaal 4 reisconcepten');
       }
     }else state.compareIds=state.compareIds.filter(i=>i!==id);
-    renderDestinations(state);
+    renderDestinations(imageReadyState());
     renderComparison(state);renderEnhancedComparison();
     persistDraft(state.compareIds.length>=2?`${state.compareIds.length} reizen geselecteerd voor vergelijking`:'Vergelijking bijgewerkt');
     const section=$('compareSection');
     if(state.compareIds.length>=2)section?.classList.remove('hidden');
     window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:state.compareIds.length}}));
   });
-  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(state);renderComparison(state);renderEnhancedComparison();persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
+  $('clearCompareBtn').addEventListener('click',()=>{state.compareIds=[];renderDestinations(imageReadyState());renderComparison(state);renderEnhancedComparison();persistDraft('Vergelijking gewist');window.dispatchEvent(new CustomEvent('reisslim:compare-updated',{detail:{count:0}}))});
   $('compareSection').addEventListener('click',event=>{
     const tab=event.target.closest('[data-compare-view]');
     if(tab){

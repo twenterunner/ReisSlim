@@ -1,0 +1,13 @@
+ReisSlim v1.7.28 · Build 1728
+
+app.js: PASS
+image-provider.js: PASS
+destination-provider.js: PASS
+config.js: PASS
+service-worker.js: PASS
+Sauerland anchor: PASS
+Eifel anchor: PASS
+anchors survive Overpass failure: PASS
+hard image gate retained: PASS
+icon file exists: PASS
+manifest references icon: PASS
