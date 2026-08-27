@@ -313,7 +313,7 @@ async function enrichPortfolioWeather(){
   if(run!==state.weatherPortfolioRun)return;
   const sort=(a,b)=>Number(b.portfolioScore||b.score)-Number(a.portfolioScore||a.score);
   state.ranking.exact.sort(sort);state.ranking.stretched.sort(sort);state.ranking.visible=[...state.ranking.exact,...state.ranking.stretched].slice(0,12);state.ranked=state.ranking.visible;
-  renderDestinations(state);updateReviewProgress();renderComparison(state);renderEnhancedComparison();window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
+  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();window.dispatchEvent(new CustomEvent('reisslim:weather-proposals-updated'));
 }
 function updateReviewProgress(){
   const badge=$('resultCount');
@@ -325,7 +325,7 @@ function refreshPortfolio(){
   if(state.trip)state.trip.allowStretch=true;
   state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:state.dismissedIds}));
   state.ranked=state.ranking.visible;
-  renderDestinations(state);updateReviewProgress();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();
+  renderDestinations(state);updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();
 }
 async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   if(!state.trip.liveData||state.discoveryBusy)return 0;
@@ -586,6 +586,135 @@ function renderEnhancedComparison(){
   if(comparisonView==='map')requestAnimationFrame(()=>renderComparisonMap(selected));
 }
 
+
+let portfolioView='tiles';
+let portfolioMap=null;
+
+function portfolioCandidates(){
+  return state.ranked.filter(Boolean);
+}
+function portfolioMetric(item,key){
+  if(key==='score')return Number(item.score);
+  if(key==='weather')return Number(item.liveWeatherScore);
+  if(key==='cost')return Number(item.estimate);
+  if(key==='distance')return Number(item.distanceKm);
+  return Number(item.dimensions?.[key]);
+}
+function portfolioTopMatch(item){
+  const preferred=[...(state.trip?.preferences||[])];
+  const keyMap={natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'};
+  const labels={scenery:'Landschap',swimming:'Zwemmen',walking:'Wandelen',family:'Kindvriendelijk',transport:'Voertuigmatch',culture:'Cultuur',food:'Eten',budget:'Budget'};
+  const rows=[...new Set(preferred.map(p=>keyMap[p]).filter(Boolean))].map(key=>[key,Number(item.dimensions?.[key])]).filter(([,v])=>Number.isFinite(v)).sort((x,y)=>y[1]-x[1]);
+  if(!rows.length)return 'Algemene match';
+  return `${labels[rows[0][0]]||rows[0][0]} ${Math.round(rows[0][1])}`;
+}
+function portfolioWeakMatch(item){
+  const labels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuig',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',family:'Gezin'};
+  const rows=Object.entries(item.dimensions||{}).filter(([,v])=>Number.isFinite(Number(v))).sort((x,y)=>Number(x[1])-Number(y[1]));
+  return rows.length?`${labels[rows[0][0]]||rows[0][0]} ${Math.round(rows[0][1])}`:'—';
+}
+function proposalHeroImage(item){
+  const url=item.image?.url;
+  return url?`<img src="${url}" alt="" loading="lazy">`:`<div class="portfolio-fallback">${item.tags?.includes('bergen')?'🏔️':item.tags?.includes('kust')?'🌊':item.tags?.includes('cultuur')?'🏛️':'🌿'}</div>`;
+}
+function renderPortfolioNavigator(){
+  const panel=$('destinationCards')?.closest('.panel');
+  if(!panel)return;
+  let shell=document.getElementById('portfolioNavigator');
+  if(!shell){
+    shell=document.createElement('section');
+    shell.id='portfolioNavigator';
+    shell.className='portfolio-navigator';
+    $('destinationCards').insertAdjacentElement('beforebegin',shell);
+  }
+  const items=portfolioCandidates();
+  if(!items.length){shell.innerHTML='';shell.classList.add('hidden');return}
+  shell.classList.remove('hidden');
+  const reviewed=state.dismissedIds.length;
+  shell.innerHTML=`<div class="portfolio-view-head"><div><strong>Vergelijk je opties</strong><small>${items.length} voorstellen nu · ${reviewed}/100 beoordeeld</small></div><div class="portfolio-view-tabs" role="tablist"><button type="button" data-portfolio-view="tiles" class="${portfolioView==='tiles'?'active':''}">Tegels</button><button type="button" data-portfolio-view="table" class="${portfolioView==='table'?'active':''}">Tabel</button><button type="button" data-portfolio-view="map" class="${portfolioView==='map'?'active':''}">Kaart</button></div></div>
+  <div id="portfolioViewBody"></div>`;
+
+  const body=document.getElementById('portfolioViewBody');
+  const cards=$('destinationCards');
+
+  if(portfolioView==='tiles'){
+    cards.classList.add('portfolio-full-hidden');
+    body.innerHTML=`<div class="portfolio-quick-grid">${items.map((item,index)=>`<article class="portfolio-quick-card">
+      ${proposalHeroImage(item)}
+      <div class="portfolio-quick-body">
+        <div class="portfolio-quick-rank"><span>#${index+1} ${item.country||''}</span><strong>${item.score}/100</strong></div>
+        <h3>${item.name}</h3>
+        <div class="portfolio-quick-kpis">
+          <span><b>${Number.isFinite(portfolioMetric(item,'weather'))?Math.round(portfolioMetric(item,'weather'))+'/100':'—'}</b><small>Weer</small></span>
+          <span><b>€${Math.round(Number(item.estimate||0)).toLocaleString('nl-NL')}</b><small>Kosten</small></span>
+          <span><b>${Math.round(Number(item.distanceKm||0))} km</b><small>Afstand</small></span>
+        </div>
+        <div class="portfolio-quick-match"><span>✓ ${portfolioTopMatch(item)}</span><span class="weak">↓ ${portfolioWeakMatch(item)}</span></div>
+        <div class="portfolio-quick-actions">
+          <button type="button" data-portfolio-select="${item.id}">Kies</button>
+          <button type="button" class="secondary" data-portfolio-details="${item.id}">Details</button>
+          <button type="button" class="ghost" data-portfolio-dismiss="${item.id}">Niet voor mij</button>
+        </div>
+      </div></article>`).join('')}</div>`;
+  }else if(portfolioView==='table'){
+    cards.classList.add('portfolio-full-hidden');
+    const bestFor=key=>{
+      const vals=items.map(i=>portfolioMetric(i,key)).filter(Number.isFinite);
+      return vals.length?Math.max(...vals):null;
+    };
+    const bestScore=bestFor('score'),bestWeather=bestFor('weather');
+    const minCost=Math.min(...items.map(i=>Number(i.estimate)).filter(Number.isFinite));
+    const minDistance=Math.min(...items.map(i=>Number(i.distanceKm)).filter(Number.isFinite));
+    body.innerHTML=`<div class="portfolio-table-wrap"><table class="portfolio-table"><thead><tr><th>Reis</th><th>Match</th><th>Weer</th><th>Kosten</th><th>Afstand</th><th>Sterkste</th><th></th></tr></thead><tbody>${items.map(item=>{
+      const weather=portfolioMetric(item,'weather'),cost=Number(item.estimate),distance=Number(item.distanceKm);
+      return `<tr>
+        <th><strong>${item.name}</strong><small>${item.country||''}</small></th>
+        <td class="${Number(item.score)===bestScore?'winner':''}">${item.score}/100</td>
+        <td class="${Number.isFinite(weather)&&weather===bestWeather?'winner':''}">${Number.isFinite(weather)?Math.round(weather)+'/100':'—'}</td>
+        <td class="${cost===minCost?'winner':''}">€${Math.round(cost).toLocaleString('nl-NL')}</td>
+        <td class="${distance===minDistance?'winner':''}">${Math.round(distance)} km</td>
+        <td>${portfolioTopMatch(item)}</td>
+        <td><button type="button" data-portfolio-details="${item.id}">Bekijk</button></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+  }else{
+    cards.classList.add('portfolio-full-hidden');
+    body.innerHTML=`<div id="portfolioMap" class="portfolio-map"></div><div class="portfolio-map-list">${items.map((item,index)=>`<button type="button" data-portfolio-map-item="${item.id}"><span>${index+1}</span><strong>${item.name}</strong><small>${item.score}/100 · ${Math.round(Number(item.distanceKm||0))} km</small></button>`).join('')}</div>`;
+    requestAnimationFrame(()=>renderPortfolioMap(items));
+  }
+}
+function renderPortfolioMap(items){
+  const host=document.getElementById('portfolioMap');if(!host)return;
+  if(portfolioMap){portfolioMap.remove();portfolioMap=null}
+  const L=globalThis.L;
+  const origin=state.trip?.originPoint;
+  const points=items.map(item=>({item,point:item.bases?.[0]})).filter(x=>Number.isFinite(x.point?.lat)&&Number.isFinite(x.point?.lon));
+  if(!L||!points.length){host.innerHTML='<div class="compare-map-empty">Geen kaartcoördinaten beschikbaar.</div>';return}
+  portfolioMap=L.map(host,{zoomControl:true,scrollWheelZoom:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap-bijdragers'}).addTo(portfolioMap);
+  const bounds=[];
+  if(Number.isFinite(origin?.lat)&&Number.isFinite(origin?.lon)){
+    L.circleMarker([origin.lat,origin.lon],{radius:8,weight:3,fillOpacity:1}).addTo(portfolioMap).bindTooltip(state.trip.origin||'Vertrek');
+    bounds.push([origin.lat,origin.lon]);
+  }
+  points.forEach(({item,point},index)=>{
+    const marker=L.marker([point.lat,point.lon],{title:item.name}).addTo(portfolioMap);
+    marker.bindPopup(`<strong>${index+1}. ${item.name}</strong><br>${item.score}/100 · €${Math.round(Number(item.estimate||0)).toLocaleString('nl-NL')} · ${Math.round(Number(item.distanceKm||0))} km`);
+    marker.on('click',()=>document.querySelector(`[data-portfolio-map-item="${CSS.escape(item.id)}"]`)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
+    bounds.push([point.lat,point.lon]);
+  });
+  if(bounds.length)portfolioMap.fitBounds(bounds,{padding:[28,28],maxZoom:7});
+  setTimeout(()=>portfolioMap?.invalidateSize(),80);
+}
+function showProposalDetails(id){
+  const cards=$('destinationCards');
+  cards.classList.remove('portfolio-full-hidden');
+  const target=cards.querySelector(`[data-select="${CSS.escape(id)}"]`)?.closest('.destination-card');
+  target?.scrollIntoView({behavior:'smooth',block:'start'});
+  target?.classList.add('proposal-focus-flash');
+  setTimeout(()=>target?.classList.remove('proposal-focus-flash'),1400);
+}
+
 function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
@@ -671,6 +800,25 @@ function initialize(){
     if(choose){
       const d=comparisonSelected().find(item=>item.id===choose.dataset.compareChoose);
       if(d)chooseProposal(d);
+    }
+  });
+  document.addEventListener('click',event=>{
+    const view=event.target.closest('[data-portfolio-view]');
+    if(view){portfolioView=view.dataset.portfolioView;renderPortfolioNavigator();return}
+    const details=event.target.closest('[data-portfolio-details]');
+    if(details){showProposalDetails(details.dataset.portfolioDetails);return}
+    const select=event.target.closest('[data-portfolio-select]');
+    if(select){const d=state.ranked.find(i=>i.id===select.dataset.portfolioSelect);if(d)chooseProposal(d);return}
+    const dismiss=event.target.closest('[data-portfolio-dismiss]');
+    if(dismiss){
+      state.dismissedIds=[...new Set([...state.dismissedIds,dismiss.dataset.portfolioDismiss])];
+      void refillAfterDismiss();return;
+    }
+    const mapItem=event.target.closest('[data-portfolio-map-item]');
+    if(mapItem){
+      const d=state.ranked.find(i=>i.id===mapItem.dataset.portfolioMapItem);
+      const point=d?.bases?.[0];
+      if(portfolioMap&&Number.isFinite(point?.lat)&&Number.isFinite(point?.lon))portfolioMap.setView([point.lat,point.lon],8,{animate:true});
     }
   });
   $('proposalFocus').addEventListener('change',refreshPortfolio);

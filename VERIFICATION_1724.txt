@@ -1,0 +1,25 @@
+ReisSlim v1.7.24 · Build 1724
+
+Implemented:
+- Proposal portfolio itself now starts with an intuitive visual comparison before the user selects trips for the dedicated compare feature.
+- Three portfolio views: Tegels, Tabel and Kaart.
+- Tegels is the default: compact two-column cards show score, weather, cost, distance, strongest match and weakest point.
+- Tabel gives a dense at-a-glance comparison and highlights the winner for match, weather, cost and distance.
+- Kaart plots all currently proposed destinations together and provides a compact proposal strip below it.
+- Each compact proposal can be chosen, expanded to full details, or dismissed directly.
+- The floating Vergelijk bar has been removed completely. It can no longer flash, intercept taps, or overflow the mobile viewport.
+- The existing dedicated comparison section remains available after selecting proposals with their inline compare controls.
+
+syntax app.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+proposal view tabs: PASS
+default intuitive tile compare: PASS
+proposal table winner highlight: PASS
+proposal map: PASS
+direct choose/details/dismiss: PASS
+floating compare removed: PASS
+no ensureCompareDock: PASS
+compact mobile grid: PASS
+revision: PASS

@@ -525,7 +525,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 /* v1.7.19 optimizer score reconciliation */
 .optimizer-net-row{margin-top:.35rem;padding-top:.65rem;border-top:1px solid rgba(20,80,72,.15);font-weight:900}.optimizer-math-note{display:block;margin-top:.55rem;line-height:1.35;color:#667773}.optimizer-delta-row em{min-width:3.7rem;text-align:center}
 
-/* v1.7.23 compact UI cleanup, comparison and weather */
+/* v1.7.24 compact UI cleanup, comparison and weather */
 .stats-card[hidden],.tradeoff[hidden],#variantSection.hidden{display:none!important}
 .proposal-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important;align-items:stretch}
 .proposal-actions>button[data-select]{grid-column:1/-1;width:100%!important}
@@ -549,7 +549,7 @@ main,.app-view,.panel{max-width:100%;box-sizing:border-box}
 @media(max-width:430px){.proposal-actions{grid-template-columns:1fr 1fr!important}.premium-comparison .comparison-table th,.premium-comparison .comparison-table td{min-width:105px}.proposal-weather-badge small{display:none}.weather-days{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 
 
-/* v1.7.23 compare viewport lock + proposal review flow */
+/* v1.7.24 compare viewport lock + proposal review flow */
 html,body{max-width:100%;overflow-x:hidden}
 #resultsSection,.card-grid,.destination-card,.proposal-actions,#compareSection,.premium-comparison{min-width:0!important;max-width:100%!important;box-sizing:border-box}
 .compare-dock{
@@ -571,12 +571,12 @@ html,body{max-width:100%;overflow-x:hidden}
   .compare-dock button{padding:8px 11px!important}
 }
 
-/* v1.7.23 preference + proposal cleanup */
+/* v1.7.24 preference + proposal cleanup */
 .proposal-evidence{display:none!important}
 .premium-preferences select[data-priority]{pointer-events:auto!important;opacity:1!important;cursor:pointer}
 .premium-preferences select[data-priority]:disabled{opacity:1!important;color:inherit!important}
 
-/* v1.7.23 continuous review + comparison experience */
+/* v1.7.24 continuous review + comparison experience */
 .destination-card .card-body>p.muted{display:none!important}
 .review-queue-status,.review-exhausted{
   margin:10px 0 16px;padding:14px 16px;border-radius:16px;background:#edf8f4;
@@ -618,4 +618,58 @@ html,body{max-width:100%;overflow-x:hidden}
  .compare-kpis{grid-template-columns:1fr 1fr}
  .proposal-compare-map{height:340px}
  .compare-tabs button{font-size:.82rem}
+}
+
+/* v1.7.24: compare proposals before selecting; floating compare dock removed */
+#compareDock,.compare-dock{display:none!important}
+.portfolio-full-hidden{display:none!important}
+.portfolio-navigator{margin:12px 0 16px;min-width:0}
+.portfolio-view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
+.portfolio-view-head>div:first-child{display:grid;gap:2px}
+.portfolio-view-head strong{font-size:1.05rem}
+.portfolio-view-head small{color:#667a74}
+.portfolio-view-tabs{display:flex;gap:5px;padding:4px;background:#edf4f2;border-radius:14px;flex:0 0 auto}
+.portfolio-view-tabs button{border:0;background:transparent;color:#4e6d66;padding:8px 10px;border-radius:10px;font-weight:850;min-height:0}
+.portfolio-view-tabs button.active{background:#147965;color:white;box-shadow:0 4px 10px rgba(16,108,89,.17)}
+.portfolio-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.portfolio-quick-card{min-width:0;background:white;border:1px solid rgba(18,74,64,.12);border-radius:18px;overflow:hidden;box-shadow:0 6px 18px rgba(15,69,59,.06)}
+.portfolio-quick-card>img,.portfolio-fallback{width:100%;height:105px;object-fit:cover;display:grid;place-items:center;font-size:2.4rem;background:#eaf3f0}
+.portfolio-quick-body{padding:11px;min-width:0}
+.portfolio-quick-rank{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.portfolio-quick-rank span{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#628078;font-weight:850;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.portfolio-quick-rank strong{font-size:1rem;color:#0e6656;white-space:nowrap}
+.portfolio-quick-card h3{font-size:1rem;line-height:1.1;margin:5px 0 9px;min-height:2.2em}
+.portfolio-quick-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.portfolio-quick-kpis span{display:grid;text-align:center;padding:6px 2px;background:#f2f7f5;border-radius:9px;min-width:0}
+.portfolio-quick-kpis b{font-size:.72rem;overflow-wrap:anywhere}
+.portfolio-quick-kpis small{font-size:.58rem;color:#6b7d78}
+.portfolio-quick-match{display:grid;gap:4px;margin:8px 0;font-size:.7rem}
+.portfolio-quick-match span{padding:5px 7px;border-radius:8px;background:#e7f6ef;color:#25695d}
+.portfolio-quick-match .weak{background:#fff7e7;color:#775e30}
+.portfolio-quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.portfolio-quick-actions button{padding:8px 6px;font-size:.72rem;min-height:0}
+.portfolio-quick-actions .ghost{grid-column:1/-1;background:transparent;color:#6b746f;border:1px solid #dfe7e4}
+.portfolio-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid rgba(18,74,64,.12);border-radius:16px}
+.portfolio-table{border-collapse:collapse;width:max-content;min-width:100%;background:white}
+.portfolio-table th,.portfolio-table td{padding:10px 9px;border-bottom:1px solid #edf1ef;text-align:left;white-space:nowrap;font-size:.8rem}
+.portfolio-table th:first-child{position:sticky;left:0;background:white;z-index:1;min-width:155px}
+.portfolio-table th small{display:block;color:#71827d;font-weight:500}
+.portfolio-table .winner{background:#e4f6ef;color:#0b6d5b;font-weight:900}
+.portfolio-table .winner::after{content:' ✓';font-size:.68rem}
+.portfolio-map{height:360px;border-radius:18px;overflow:hidden;background:#e8f1ee}
+.portfolio-map-list{display:flex;gap:8px;overflow-x:auto;padding:9px 2px 2px;scroll-snap-type:x mandatory}
+.portfolio-map-list button{flex:0 0 190px;scroll-snap-align:start;display:grid;grid-template-columns:28px 1fr;column-gap:7px;text-align:left;padding:9px;border-radius:12px;border:1px solid #dfe8e5;background:white;color:#264f47}
+.portfolio-map-list button>span{grid-row:1/3;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#137966;color:white;font-weight:900}
+.portfolio-map-list strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.portfolio-map-list small{color:#70817d}
+.proposal-focus-flash{animation:proposalFocusFlash 1.4s ease}
+@keyframes proposalFocusFlash{0%,100%{box-shadow:0 0 0 0 rgba(19,121,102,0)}30%{box-shadow:0 0 0 5px rgba(19,121,102,.25)}}
+@media(max-width:430px){
+  .portfolio-view-head{align-items:stretch;flex-direction:column}
+  .portfolio-view-tabs{width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
+  .portfolio-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .portfolio-quick-kpis{grid-template-columns:1fr}
+  .portfolio-quick-kpis span{display:flex;justify-content:space-between;padding:5px 7px}
+  .portfolio-quick-card h3{font-size:.94rem}
+  .portfolio-map{height:330px}
 }

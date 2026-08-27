@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.23',build:'1723'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.24',build:'1724'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -183,39 +183,11 @@ function visualiseProposalCards(){
   });
 }
 
-let compareDockDismissedSignature='';
-function compareSelectionSignature(){
-  return [...document.querySelectorAll('[data-compare]:checked')].map(box=>box.dataset.compare).sort().join('|');
+function removeCompareDock(){
+  document.getElementById('compareDock')?.remove();
 }
-function ensureCompareDock(){
-  let dock=document.getElementById('compareDock');
-  if(!dock){
-    dock=document.createElement('div');
-    dock.id='compareDock';
-    dock.className='compare-dock hidden';
-    dock.innerHTML='<div><span>⇄</span><strong>Vergelijk reizen</strong><small id="compareDockCount">0 geselecteerd</small></div><button type="button" id="openCompareDock">Vergelijk</button>';
-    document.body.appendChild(dock);
-    dock.querySelector('#openCompareDock')?.addEventListener('click',()=>{
-      const section=document.getElementById('compareSection');
-      compareDockDismissedSignature=compareSelectionSignature();
-      dock.classList.add('hidden');
-      if(section){
-        section.classList.remove('hidden');
-        section.scrollIntoView({behavior:'smooth',block:'start'});
-      }
-    });
-  }
-  const count=document.querySelectorAll('[data-compare]:checked').length;
-  const signature=compareSelectionSignature();
-  if(count<2)compareDockDismissedSignature='';
-  const dismissed=count>=2&&signature===compareDockDismissedSignature;
-  dock.classList.toggle('hidden',count<2||dismissed);
-  const countEl=dock.querySelector('#compareDockCount');
-  if(countEl)countEl.textContent=`${count} geselecteerd`;
-}
-
 function enhanceComparisonUi(){
-  ensureCompareDock();
+  removeCompareDock();
   const section=document.getElementById('compareSection');
   if(!section)return;
   const checked=document.querySelectorAll('[data-compare]:checked').length;
