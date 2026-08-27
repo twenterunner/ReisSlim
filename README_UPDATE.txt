@@ -1,18 +1,15 @@
-ReisSlim v1.7.11 · Build 1711
+ReisSlim v1.7.12 · Build 1712
 
-LIVE DISCOVERY RELIABILITY FIX
+VERBETER REIS
+- Maximum improvement is the default.
+- Old/restored lock states are cleared at startup.
+- Checked locks now clearly mean “ReisSlim mag dit niet veranderen”.
+- Maximum mode refuses weak proposals below +6 total unless >= +10 on a key dimension or >= 2 defects are solved.
+- Preview shows exact score before/after, total gain, dimension deltas, trade-offs and concrete changes.
+- Applying a proposal keeps a permanent before/after summary.
+- Route compression, cost optimisation and recovery buffers are stronger.
 
-Root cause:
-The Planner could still end in “Live bron tijdelijk beperkt” when the Nominatim reverse-seed
-requests returned nothing and the emergency Overpass request also timed out/failed. In practice
-the UI was still too dependent on the same public OSM path that had failed in earlier releases.
-
-Changes:
-- Added Photon/OpenStreetMap as a second independent live geocoder.
-- Six Photon route seeds are queried quickly; two rate-conscious Nominatim seeds cross-check them.
-- Overpass is now only the final emergency fallback.
-- If the first seed group yields no extra regions, ReisSlim automatically tries a second seed group.
-- The existing eight portfolio proposals remain immediately usable and live failure is presented
-  as optional expansion not being available, rather than an application error.
-- Discovery cache schema bumped to v12 to avoid stale failed-search cache behaviour.
-- Flat package retained.
+GUI
+- Reisplan now has a photographic hero with destination, days, route type and budget.
+- Optimizer rebuilt as a visual score-change experience rather than a long settings form.
+- Flat ZIP, no folders.

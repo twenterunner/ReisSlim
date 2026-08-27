@@ -1,4 +1,4 @@
-ReisSlim v1.7.11 · Build 1711
+ReisSlim v1.7.12 · Build 1712
 
 This package addresses the deployment/update problem as well as retaining the
 v1.6.1 loop-route geometry fix.
@@ -8,19 +8,19 @@ Upload EVERY file from this ZIP to the SAME GitHub Pages repository/folder that
 serves ReisSlim. Replace the existing files.
 
 Deployment identity:
-- Header/app version: 1.7.11 / 1711
-- HTML fingerprint: 1.7.11-1711-loopfix
-- Service-worker cache: reisslim-v1.7.11-build-1711
-- JS/CSS references are cache-busted with ?v=1711
+- Header/app version: 1.7.12 / 1712
+- HTML fingerprint: 1.7.12-1712-loopfix
+- Service-worker cache: reisslim-v1.7.12-build-1712
+- JS/CSS references are cache-busted with ?v=1712
 - New service worker calls skipWaiting() and clients.claim()
 - Activation deletes obsolete caches.
 
-After GitHub Pages deploys, opening/reloading ReisSlim should show v1.7.11 · 1711.
+After GitHub Pages deploys, opening/reloading ReisSlim should show v1.7.12 · 1712.
 If it still shows 1.6.0/1600 or 1.6.1/1601, the browser is not receiving the
 new repository files; that is then a deployment/path issue rather than the
 application package.
 
-Build 1711 live-discovery repair:
+Build 1712 live-discovery repair:
 - Private.coffee is now primary; obsolete Kumi endpoint removed.
 - Discovery query reduced from 8 seeds x 5 feature families to 4 seed place lookups.
 - Two progressive passes maximum; returns immediately after 6 usable live regions.

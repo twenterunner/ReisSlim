@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.7.11-1711-resilient-live-discovery">
+  <meta name="reisslim-build" content="1.7.12-1712-meaningful-optimizer-premium-plan">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1711">
+  <link rel="manifest" href="manifest.webmanifest?v=1712">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1711">
-  <link rel="stylesheet" href="compact-ui.css?v=1711">
+  <link rel="stylesheet" href="styles.css?v=1712">
+  <link rel="stylesheet" href="compact-ui.css?v=1712">
 </head>
 <body>
   <header class="topbar">
@@ -209,7 +209,7 @@
       </div>
       <section id="variantSection" class="panel hidden"><div class="section-heading"><div><p class="eyebrow">Stap 2</p><h1>Kies de opbouw van je reis</h1></div></div><div id="variantCards" class="variant-grid"></div></section>
       <section id="planSection" class="panel hidden">
-        <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div>
+        <div class="section-heading"><div><p class="eyebrow">Gekozen reis</p><h1 id="planTitle">Reisplan</h1></div><div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="exportJsonBtn" class="secondary" type="button">JSON</button><button id="exportGpxBtn" type="button">GPX</button></div><small id="exportStatus" class="export-status" role="status" aria-live="polite"></small></div></div><div id="planVisualHero" class="plan-visual-hero"><img id="planVisualImage" src="progress-03.webp" alt=""><div class="plan-visual-overlay"><p class="eyebrow">JOUW ROADTRIP</p><h2 id="planVisualTitle">Reisplan</h2><div class="plan-visual-chips"><span id="planVisualDays">— dagen</span><span id="planVisualRoute">Route</span><span id="planVisualBudget">Budget</span></div></div></div>
         <div class="summary-grid" id="summaryGrid"></div>
         <div id="planWarnings" aria-live="polite"></div>
         <div id="weatherSummary" class="weather-summary"></div>
@@ -229,9 +229,9 @@
             <div class="quality-hero"><div class="quality-ring"><strong id="qualityScore">—</strong><span>/100</span></div><div><strong id="qualityVerdict">Nog niet berekend</strong></div></div>
             <p id="qualityDisclaimer"></p><div id="qualityDimensions"></div><div id="qualityDeductions"></div><div class="recommendation-box"><h3>Topaanbevelingen</h3><ol id="qualityRecommendations"></ol></div>
             <div id="optimizationSummary"></div>
-            <label>Optimalisatiemodus<select id="optimizationMode"><option value="balanced">Gebalanceerd</option><option value="relaxed">Meer rust</option><option value="value">Lagere kosten</option><option value="active">Meer beleven</option></select></label>
-            <div class="optimizer-locks"><strong>Vergrendel</strong><label><input type="checkbox" data-optimizer-lock="route"> Route</label><label><input type="checkbox" data-optimizer-lock="accommodation"> Verblijven</label><label><input type="checkbox" data-optimizer-lock="activities"> Activiteiten</label><label><input type="checkbox" data-optimizer-lock="budget"> Budgetkeuzes</label></div>
-            <div id="optimizationPreview"></div><button id="improveTripBtn" type="button">Verbeter reis</button><button id="applyOptimizationBtn" class="hidden" type="button">Pas verbeteringen toe</button><button id="rejectOptimizationBtn" class="secondary hidden" type="button">Sluit voorstel</button><button id="undoOptimizeBtn" class="secondary hidden" type="button">Ongedaan maken</button>
+            <label class="optimizer-mode-label"><span>Optimalisatiemodus</span><select id="optimizationMode"><option value="maximum" selected>Maximale verbetering</option><option value="balanced">Gebalanceerd</option><option value="relaxed">Meer rust</option><option value="value">Lagere kosten</option><option value="active">Meer beleven</option></select></label>
+            <div class="optimizer-locks"><div class="optimizer-lock-head"><div><strong>Bescherm onderdelen</strong><small>Aangevinkt = ReisSlim mag dit niet veranderen.</small></div><button id="unlockOptimizerBtn" class="secondary optimizer-unlock" type="button">Alles vrijgeven</button></div><div class="optimizer-lock-grid"><label><input type="checkbox" autocomplete="off" data-optimizer-lock="route"><span>Route</span></label><label><input type="checkbox" autocomplete="off" data-optimizer-lock="accommodation"><span>Verblijven</span></label><label><input type="checkbox" autocomplete="off" data-optimizer-lock="activities"><span>Activiteiten</span></label><label><input type="checkbox" autocomplete="off" data-optimizer-lock="budget"><span>Budgetkeuzes</span></label></div></div>
+            <div id="optimizationPreview"></div><div class="optimizer-buttons"><button id="improveTripBtn" type="button">✦ Zoek sterke verbetering</button><button id="applyOptimizationBtn" class="hidden" type="button">Pas verbeteringen toe</button><button id="rejectOptimizationBtn" class="secondary hidden" type="button">Sluit voorstel</button><button id="undoOptimizeBtn" class="secondary hidden" type="button">Ongedaan maken</button></div>
           </aside>
         </div>
       </section>
@@ -250,9 +250,9 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.7.11 · Build 1711</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.7.12 · Build 1712</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="ui-feature-flags.js?v=1711"></script>
-  <script type="module" src="app.js?v=1711"></script>
+  <script src="ui-feature-flags.js?v=1712"></script>
+  <script type="module" src="app.js?v=1712"></script>
 </body>
 </html>

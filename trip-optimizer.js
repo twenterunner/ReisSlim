@@ -10,6 +10,7 @@ export const createUndoSnapshot=plan=>clone(plan);
 export const restorePlan=snapshot=>clone(snapshot);
 
 const modes=Object.freeze({
+  maximum:{label:'Maximale verbetering',order:['consolidate','rest','local','variety','weather','value']},
   balanced:{label:'Gebalanceerd',order:['consolidate','local','rest','variety','weather','value']},
   relaxed:{label:'Meer rust',order:['rest','consolidate','local','weather','value','variety']},
   value:{label:'Lagere kosten',order:['value','consolidate','local','rest','weather','variety']},
@@ -44,18 +45,19 @@ function applyAction(plan,id,trip,destination){
   }
   if(id==='local'){
     next.days.filter(d=>['stay','flex'].includes(d.kind)).forEach(day=>{
-      day.distanceKm=Math.max(5,Math.round(Number(day.distanceKm||0)*.55));
-      day.roadHours=Number((Number(day.roadHours||day.driveHours||0)*.55).toFixed(1));
+      day.distanceKm=Math.max(5,Math.round(Number(day.distanceKm||0)*.38));
+      day.roadHours=Number((Number(day.roadHours||day.driveHours||0)*.42).toFixed(1));
       day.driveHours=day.roadHours;day.elapsedHours=day.roadHours;
       day.primaryPlan=`${day.primaryPlan||''} Stops geografisch geclusterd; omwegen actief verwijderd.`.trim();
     });
     next.optimizationEvidence.localClustering=true;
   }
   if(id==='rest'){
-    const eligible=next.days.filter(d=>d.kind==='stay');
-    const day=eligible[Math.floor(eligible.length/2)];
-    if(day)Object.assign(day,{kind:'flex',typeLabel:'Hersteldag',activityType:'rust',distanceKm:6,driveHours:.1,roadHours:.1,elapsedHours:.1,breakHours:0,waypoints:[],primaryPlan:'Herstelbuffer: rustig ontbijt, vrije tijd en hoogstens één korte activiteit dichtbij.',rainAlternative:'Volledige hersteldag of één rustige binnenactiviteit dichtbij.'});
-    next.optimizationEvidence.restBuffers=Number(next.optimizationEvidence.restBuffers||0)+1;
+    const eligible=next.days.filter(d=>d.kind==='stay'),targetCount=eligible.length>=6?2:1,picks=[];
+    if(eligible.length)picks.push(eligible[Math.floor(eligible.length*.38)]);
+    if(targetCount>1&&eligible.length>3)picks.push(eligible[Math.floor(eligible.length*.72)]);
+    [...new Set(picks)].forEach(day=>Object.assign(day,{kind:'flex',typeLabel:'Hersteldag',activityType:'rust',distanceKm:6,driveHours:.1,roadHours:.1,elapsedHours:.1,breakHours:0,waypoints:[],primaryPlan:'Herstelbuffer: rustig ontbijt, vrije tijd en hoogstens één korte activiteit dichtbij.',rainAlternative:'Volledige hersteldag of één rustige binnenactiviteit dichtbij.'}));
+    next.optimizationEvidence.restBuffers=Number(next.optimizationEvidence.restBuffers||0)+Math.max(1,[...new Set(picks)].length);
   }
   if(id==='weather'){
     next.days.filter(d=>!['outward','return'].includes(d.kind)).forEach(day=>{if(!day.rainAlternative)day.rainAlternative=`Kies een museum, markt, wellness of overdekte attractie in ${day.location} zonder extra transfer.`});
@@ -63,11 +65,11 @@ function applyAction(plan,id,trip,destination){
   }
   if(id==='variety'){
     const acts=destination.activities||[];
-    next.days.filter(d=>d.kind==='stay').forEach((day,index)=>{const a=acts[index%acts.length];if(a)Object.assign(day,{activityType:a.type,primaryPlan:a.title,rainAlternative:a.rainAlternative||day.rainAlternative})});
+    next.days.filter(d=>['stay','flex'].includes(d.kind)).forEach((day,index)=>{const a=acts[index%acts.length];if(a)Object.assign(day,{activityType:a.type,primaryPlan:a.title,rainAlternative:a.rainAlternative||day.rainAlternative})});
     next.optimizationEvidence.activityVariety=true;
   }
   if(id==='value'){
-    next.costStrategy={accommodationFactor:.84,restaurantFactor:.72,activityFactor:.76,label:'Slimmere verblijf- en activiteitkeuzes'};
+    next.costStrategy={accommodationFactor:.72,restaurantFactor:.60,activityFactor:.62,label:'Slimmere verblijf- en activiteitkeuzes'};
     next.optimizationEvidence.valueStrategy=true;
   }
   next.accommodationChanges=countAccommodationChanges(next.days,trip.origin);
@@ -117,15 +119,9 @@ export function proposeOptimizations(trip,destination,plan,{mode='balanced',lock
     if(score>bestScore+.01)best={ids,result,delta};
   }
   const actions=sorted.filter(a=>best.ids.includes(a.id));
-  const meaningful=actions.length>0&&best.delta.meaningful;
-  return{
-    mode,modeLabel:modes[mode]?.label||modes.balanced.label,locks:{...locks},actions,
-    changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:best.delta,meaningful,
-    threshold:'Minimaal +4 totaal, +8 op een belangrijk onderdeel of één aantoonbaar opgelost gebrek.',
-    message:!available.length?'Geen toepasbare verbetering binnen de huidige vergrendelingen.':
-      meaningful?`Beste combinatie gevonden: ${best.delta.overallDelta>=0?'+':''}${best.delta.overallDelta.toFixed(1)} kwaliteitspunten en ${best.delta.resolvedDefects} opgelost(e) gebrek(en).`:
-      'Geen wijziging verbeterde de reis voldoende zonder een harde grens te verslechteren.'
-  };
+  const roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),minimumGain=mode==='maximum'?6:4;
+  const meaningful=actions.length>0&&(roundedGain>=minimumGain||best.delta.importantDelta>=10||best.delta.resolvedDefects>=2);
+  return{mode,modeLabel:modes[mode]?.label||modes.maximum.label,locks:{...locks},actions,changes:actions.map(a=>a.description),before:baseline,after:best.result,improvement:{...best.delta,roundedGain,minimumGain},meaningful,threshold:`Alleen voorstellen met minimaal +${minimumGain} totaal, +10 op een belangrijk onderdeel of twee aantoonbaar opgeloste gebreken.`,message:!available.length?'Alles wat ReisSlim kan wijzigen is beschermd. Geef minimaal één onderdeel vrij.':meaningful?`Sterke combinatie gevonden: ${roundedGain>=0?'+':''}${roundedGain} kwaliteitspunten, ${best.delta.resolvedDefects} gebrek(en) opgelost.`:`Geen voldoende sterke verbetering gevonden. De beste variant wint ${roundedGain>=0?'+':''}${roundedGain} punt${Math.abs(roundedGain)===1?'':'en'}; die wordt daarom niet als zinvolle optimalisatie aangeboden.`};
 }
 export function optimisePlan(trip,destination,plan,options={}){
   const proposal=proposeOptimizations(trip,destination,plan,options);

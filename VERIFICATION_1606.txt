@@ -1,4 +1,4 @@
-ReisSlim v1.7.11 · Build 1711
+ReisSlim v1.7.12 · Build 1712
 Live discovery architecture repair
 
 JS syntax: PASS
