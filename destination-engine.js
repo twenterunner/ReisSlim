@@ -52,54 +52,124 @@ function proposalStory(trip,destination,preference,route,budgetMargin,constraint
 }
 
 function preferenceScore(trip,destination){
-  if(!trip.preferences.length)return{score:55,matches:[],coverage:0,essentialMisses:[],reasons:[],purity:0};
-  const possible=trip.preferences.reduce((sum,id)=>sum+(trip.preferenceWeights[id]||2),0);
-  const matches=trip.preferences.filter(id=>destination.tags?.includes(id));
-  const matched=matches.reduce((sum,id)=>sum+(trip.preferenceWeights[id]||2),0);
-  const essentialMisses=trip.preferences.filter(id=>(trip.preferenceWeights[id]||2)>=3&&!destination.tags?.includes(id));
+  const selected=Array.isArray(trip.preferences)?trip.preferences:[];
+  if(!selected.length)return{score:null,matches:[],coverage:null,essentialMisses:[],reasons:[],purity:null};
+  const possible=selected.reduce((sum,id)=>sum+(trip.preferenceWeights?.[id]||2),0);
+  const matches=selected.filter(id=>destination.tags?.includes(id));
+  const matched=matches.reduce((sum,id)=>sum+(trip.preferenceWeights?.[id]||2),0);
+  const essentialMisses=selected.filter(id=>(trip.preferenceWeights?.[id]||2)>=3&&!destination.tags?.includes(id));
   const coverage=matched/Math.max(1,possible);
-
-  // Preference purity makes a narrow request visibly different from a broad one.
-  // Example: with only 'cultuur' selected, a culture-focused city outranks a
-  // generic mixed destination carrying many unrelated tags.
-  const relevantTags=(destination.tags||[]).filter(tag=>['natuur','bergen','zwemmen','wandelen','kinderen','motor','cultuur','eten','kust','budget'].includes(tag));
-  const selectedSet=new Set(trip.preferences);
-  const matchedRelevant=relevantTags.filter(tag=>selectedSet.has(tag)).length;
-  const purity=relevantTags.length?matchedRelevant/relevantTags.length:0;
-
-  const score=roundScore(
-    5
-    + 78*coverage
-    + 17*purity
-    - Math.min(35,essentialMisses.length*20)
-  );
+  // IMPORTANT: unrelated tags are deliberately ignored. A destination is not
+  // penalised for having culture, family or camper attributes when the user did
+  // not ask for them; nor can those attributes improve the score.
+  const score=roundScore(Math.max(0,100*coverage-Math.min(35,essentialMisses.length*18)));
   const reasons=matches.map(id=>`${id}: ${prefReason[id]||'relevante kenmerken'}`);
-  return{score,matches,coverage,essentialMisses,reasons,purity}
+  return{score,matches,coverage,essentialMisses,reasons,purity:null}
 }
 function budgetScore(total,budget){const ratio=total/Math.max(1,budget);if(ratio<=.9)return 100;return roundScore(100-(ratio-.9)*150)}
 function destinationIntentScore(trip,destination){const query=String(trip.destinationQuery||'').trim().toLocaleLowerCase('nl-NL');if(!query)return 0;const words=query.split(/\s+/).filter(word=>word.length>2),haystack=[destination.name,destination.country,destination.summary,...(destination.tags||[])].join(' ').toLocaleLowerCase('nl-NL'),matches=words.filter(word=>haystack.includes(word)).length;return matches?Math.min(30,18+matches*6):-12}
 function roadReachStatus(trip,destination){const origin=resolveOrigin(trip),point=destination.bases?.[0];if(!origin||!point)return{ok:true};const straight=haversineKm(origin,point);if(!Number.isFinite(straight))return{ok:true};const speed=trip.transport==='motorcycle'?72:trip.transport==='caravan'?62:trip.transport==='motorhome'?66:78,singleDay=Number(trip.days)===1,outboundDays=trip.routeTopology==='open-ended'?Math.max(1,trip.days-1):Math.max(1,Math.floor((trip.days-1)/2)),roadReach=singleDay?trip.maxDrive*speed*.48:trip.maxDrive*speed*outboundDays,estimatedRoad=straight*1.18;return{ok:estimatedRoad<=roadReach*1.08,estimatedRoad,roadReach,singleDay}}
-export function scoreDestination(trip,destination){const month=new Date(`${trip.startDate}T12:00:00`).getMonth()+1,route=calculateRouteMetrics(trip,destination),relaxedRoute=route.requiredLegs*2+1>trip.days?calculateRouteMetrics({...trip,maxDrive:trip.maxDrive+STRETCH_LIMITS.maxDriveHours},destination):route,budget=buildBudget(trip,destination),preference=preferenceScore(trip,destination),season=destination.season?.includes(month)?90:40,vehicle=transportId(trip.transport),transport=vehicle==='motorcycle'?destination.motorcycle*10:['motorhome','caravan'].includes(vehicle)?destination.camper*10:destination.family*10,constraintStatus=evaluateDestinationConstraints(trip,{route,relaxedRoute,budget}),road=roadReachStatus(trip,destination);if(!road.ok){constraintStatus.violations.push({key:'road-reach',label:'Roadtripbereik',detail:`${destination.name} ligt buiten het realistische roadtripbereik.`,adjustment:'Kies dichterbij, meer reisdagen of een hogere daglimiet.',stretchable:false});Object.assign(constraintStatus,{category:'rejected',exact:false,stretch:false,selectable:false,summary:constraintStatus.violations.map(item=>item.detail).join(' ')})}
- const minimumDays=Number(trip.days)===1?1:trip.routeTopology==='open-ended'?Math.max(2,route.requiredLegs+1):constraintStatus.minimumDays,driving=roundScore(100-Math.max(0,route.requiredLegs-1)*15-Math.max(0,minimumDays-trip.days)*15),budgetFit=budgetScore(budget.total,trip.budget);
- const selected=new Set(trip.preferences||[]),neutral=50,selectedTag=(id,matched=90,unmatched=45)=>selected.has(id)?tagScore(destination,id,matched,unmatched):neutral;
- const scenicSelected=['natuur','bergen','kust'].filter(id=>selected.has(id));
- const scenery=scenicSelected.length?roundScore(scenicSelected.reduce((sum,id)=>sum+tagScore(destination,id),0)/scenicSelected.length):neutral;
- const dimensions={budget:budgetFit,driving,season,transport,family:selected.has('kinderen')?destination.family*10:neutral,motorcycle:selected.has('motor')?destination.motorcycle*10:neutral,camper:destination.camper*10,scenery,walking:selectedTag('wandelen'),swimming:selectedTag('zwemmen'),food:selectedTag('eten',90,55),culture:selectedTag('cultuur',90,50),crowds:destination.crowds*10};
- const routePreferenceValues=[selected.has('natuur')?tagScore(destination,'natuur'):null,selected.has('bergen')?tagScore(destination,'bergen'):null,selected.has('motor')?destination.motorcycle*10:null].filter(Number.isFinite);
- const routePotential=roundScore(((routePreferenceValues.length?routePreferenceValues.reduce((a,b)=>a+b,0)/routePreferenceValues.length:neutral)+transport)/2);
- const intentScore=destinationIntentScore(trip,destination),score=roundScore(preference.score*.62+budgetFit*.10+season*.07+transport*.09+driving*.12+intentScore-(constraintStatus.category==='stretch'?12:0)),matchSentence=preference.reasons.length?preference.reasons.join('; '):'geen specifieke inhoudelijke voorkeur geselecteerd',budgetMargin=Math.max(0,trip.budget-budget.total);
+export function scoreDestination(trip,destination){
+ const month=new Date(`${trip.startDate}T12:00:00`).getMonth()+1;
+ const route=calculateRouteMetrics(trip,destination);
+ const relaxedRoute=route.requiredLegs*2+1>trip.days?calculateRouteMetrics({...trip,maxDrive:trip.maxDrive+STRETCH_LIMITS.maxDriveHours},destination):route;
+ const budget=buildBudget(trip,destination),preference=preferenceScore(trip,destination);
+ const season=destination.season?.includes(month)?90:40,vehicle=transportId(trip.transport);
+ const constraintStatus=evaluateDestinationConstraints(trip,{route,relaxedRoute,budget}),road=roadReachStatus(trip,destination);
+ if(!road.ok){
+   constraintStatus.violations.push({key:'road-reach',label:'Roadtripbereik',detail:`${destination.name} ligt buiten het realistische roadtripbereik.`,adjustment:'Kies dichterbij, meer reisdagen of een hogere daglimiet.',stretchable:false});
+   Object.assign(constraintStatus,{category:'rejected',exact:false,stretch:false,selectable:false,summary:constraintStatus.violations.map(item=>item.detail).join(' ')})
+ }
+ const minimumDays=Number(trip.days)===1?1:trip.routeTopology==='open-ended'?Math.max(2,route.requiredLegs+1):constraintStatus.minimumDays;
+ const driving=roundScore(100-Math.max(0,route.requiredLegs-1)*15-Math.max(0,minimumDays-trip.days)*15);
+ const budgetFit=budgetScore(budget.total,trip.budget);
+ const selected=new Set(trip.preferences||[]);
+ const selectedValue=id=>{
+   if(id==='kinderen')return destination.family*10;
+   if(id==='motor')return destination.motorcycle*10;
+   if(id==='budget')return budgetFit;
+   return tagScore(destination,id,id==='eten'?90:90,id==='eten'?55:id==='cultuur'?50:45);
+ };
+ const dimensions={
+   budget:budgetFit,driving,season,
+   motorcycle:destination.motorcycle*10,camper:destination.camper*10,family:destination.family*10,
+   natuur:tagScore(destination,'natuur'),bergen:tagScore(destination,'bergen'),
+   swimming:tagScore(destination,'zwemmen'),walking:tagScore(destination,'wandelen'),
+   food:tagScore(destination,'eten',90,55),culture:tagScore(destination,'cultuur',90,50),
+   kust:tagScore(destination,'kust'),crowds:destination.crowds*10
+ };
+
+ // Build the ONLY criteria that are allowed to influence this trip.
+ // Entered constraints always matter; vehicle-specific suitability matters only
+ // for vehicles where we actually have destination-specific data.
+ const criteria={budget:budgetFit,driving,season};
+ const weights={budget:1.10,driving:1.35,season:.75};
+
+ if(vehicle==='motorcycle'){
+   criteria.transport=destination.motorcycle*10; weights.transport=1.15;
+ }else if(['motorhome','caravan'].includes(vehicle)){
+   criteria.transport=destination.camper*10; weights.transport=1.15;
+ }
+ // Cars are intentionally not scored through "family" suitability. We have no
+ // destination-specific car-access dimension, so inventing one would distort rank.
+
+ // Children make family suitability relevant even if "kindvriendelijk" was not
+ // separately ticked. Solo/adult-only trips never receive a family criterion.
+ if(Number(trip.children||0)>0){
+   criteria.family=destination.family*10; weights.family=1.25;
+ }
+
+ const prefKeyMap={
+   natuur:'natuur',bergen:'bergen',zwemmen:'swimming',wandelen:'walking',
+   kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'kust',budget:'budget'
+ };
+ for(const id of selected){
+   const key=prefKeyMap[id];
+   if(!key)continue;
+   criteria[key]=selectedValue(id);
+   const priority=Math.max(1,Math.min(3,Number(trip.preferenceWeights?.[id]||2)));
+   weights[key]=Math.max(weights[key]||0,priority===3?1.8:priority===2?1.3:.9);
+ }
+
+ // Relaxed pace makes crowd/rest character relevant because the user explicitly
+ // asked for a less hectic trip. Otherwise "crowds" is not scored.
+ if(trip.tripPace==='relaxed'){
+   criteria.crowds=destination.crowds*10; weights.crowds=.65;
+ }
+
+ const activeEntries=Object.entries(criteria).filter(([,value])=>Number.isFinite(Number(value)));
+ const weightTotal=activeEntries.reduce((sum,[key])=>sum+(weights[key]||1),0);
+ let score=roundScore(activeEntries.reduce((sum,[key,value])=>sum+Number(value)*(weights[key]||1),0)/Math.max(.01,weightTotal));
+ const intentScore=destinationIntentScore(trip,destination);
+ // Destination/richtung text is a user input too, but keep it a bounded nudge
+ // rather than letting it overwhelm all other criteria.
+ score=roundScore(clamp(score+(intentScore>0?Math.min(7,intentScore/4):intentScore<0?-3:0),0,100));
+ if(constraintStatus.category==='stretch')score=roundScore(Math.max(0,score-10));
+
+ const budgetMargin=Math.max(0,trip.budget-budget.total);
  const story=proposalStory(trip,destination,preference,route,budgetMargin,constraintStatus);
- const criteria={budget:dimensions.budget,driving:dimensions.driving,season:dimensions.season,transport:dimensions.transport};
- if(selected.has('natuur')||selected.has('bergen')||selected.has('kust'))criteria.scenery=dimensions.scenery;
- if(selected.has('wandelen'))criteria.walking=dimensions.walking;
- if(selected.has('zwemmen'))criteria.swimming=dimensions.swimming;
- if(selected.has('eten'))criteria.food=dimensions.food;
- if(selected.has('cultuur'))criteria.culture=dimensions.culture;
+
  globalThis.__REISSLIM_PROPOSAL_SCORES=globalThis.__REISSLIM_PROPOSAL_SCORES||{};
+ globalThis.__REISSLIM_PROPOSAL_SCORE_META=globalThis.__REISSLIM_PROPOSAL_SCORE_META||{};
  globalThis.__REISSLIM_PROPOSAL_SCORES[destination.id]=criteria;
- return{...destination,summary:story,score,dimensions,estimate:budget.total,budget,route,matches:preference.matches,preferenceCoverage:preference.coverage,preferencePurity:preference.purity,preferenceReasons:preference.reasons,essentialMisses:preference.essentialMisses,intentMatch:intentScore>0,minimumDays,feasible:constraintStatus.exact,category:constraintStatus.category,constraintStatus,confidence:route.originKnown?'redelijk':'beperkt',compromises:constraintStatus.violations.map(item=>item.detail),
- cardMetrics:{preference:preference.score,roadtrip:driving,route:routePotential,budget:budgetFit,budgetMargin},
- explanation:story}
+ globalThis.__REISSLIM_PROPOSAL_SCORE_META[destination.id]={criteria:{...criteria},weights:{...weights},active:Object.keys(criteria)};
+
+ const routePreferenceValues=[
+   selected.has('natuur')?dimensions.natuur:null,
+   selected.has('bergen')?dimensions.bergen:null,
+   selected.has('motor')?destination.motorcycle*10:null
+ ].filter(Number.isFinite);
+ const routePotential=roundScore(routePreferenceValues.length?routePreferenceValues.reduce((a,b)=>a+b,0)/routePreferenceValues.length:driving);
+
+ return{...destination,summary:story,score,dimensions,estimate:budget.total,budget,route,
+   matches:preference.matches,preferenceCoverage:preference.coverage,preferencePurity:null,
+   preferenceReasons:preference.reasons,essentialMisses:preference.essentialMisses,
+   intentMatch:intentScore>0,minimumDays,feasible:constraintStatus.exact,category:constraintStatus.category,
+   constraintStatus,confidence:route.originKnown?'redelijk':'beperkt',
+   compromises:constraintStatus.violations.map(item=>item.detail),
+   cardMetrics:{preference:preference.score,roadtrip:driving,route:routePotential,budget:budgetFit,budgetMargin},
+   scoringContext:{criteria:{...criteria},weights:{...weights}},
+   explanation:story}
 }
 const byMatch=(a,b)=>Number(b.intentMatch)-Number(a.intentMatch)||b.preferenceCoverage-a.preferenceCoverage||b.score-a.score||a.estimate-b.estimate||a.name.localeCompare(b.name,'nl');
 
@@ -125,12 +195,12 @@ function cheapCatalogPreselect(trip, destinationList, maximum = 40) {
     const tagScore=matchingTags.reduce((sum,tag)=>sum+weightFor(tag),0);
     const selectedCoverage=selectedPrefs.size?matchingTags.length/selectedPrefs.size:0;
     const relevantTags=(destination.tags||[]).filter(tag=>['natuur','bergen','zwemmen','wandelen','kinderen','motor','cultuur','eten','kust','budget'].includes(tag));
-    const purity=relevantTags.length?matchingTags.length/relevantTags.length:0;
+    const purity=0; // unrelated destination tags are neutral, never a ranking penalty
     const intent=String(trip.destinationQuery||'').trim().toLocaleLowerCase('nl-NL');
     const haystack=`${destination.name||''} ${destination.country||''} ${(destination.tags||[]).join(' ')}`.toLocaleLowerCase('nl-NL');
     const intentBonus=intent&&haystack.includes(intent)?80:0;
     const proximity=Number.isFinite(estimatedRoadKm)?Math.max(0,15-estimatedRoadKm/220):0;
-    const preferenceMerit=selectedPrefs.size?(selectedCoverage*120+purity*45+tagScore*18):0;
+    const preferenceMerit=selectedPrefs.size?(selectedCoverage*135+tagScore*18):0;
     return{destination,index,withinReach,preferenceMatch:matchingTags.length,merit:preferenceMerit+intentBonus+proximity};
   });
 

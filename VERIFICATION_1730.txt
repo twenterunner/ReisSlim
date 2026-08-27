@@ -1,0 +1,50 @@
+ReisSlim v1.7.30 · Build 1730
+
+CONTEXT-DRIVEN DESTINATION SCORING
+
+Principle:
+A destination attribute can affect the score only when it is relevant to the
+actual trip the user configured.
+
+Examples:
+- Solo/adult-only trip: family suitability is not a scoring criterion.
+- Car: family suitability is NOT used as a fake car-suitability score.
+- Motorcycle: motorcycle suitability is relevant automatically.
+- Camper/caravan: camper suitability is relevant automatically.
+- Culture: scored only if Culture was selected.
+- Walking, swimming, food, nature, mountains, coast: scored only when selected.
+- Children > 0: family suitability becomes relevant automatically.
+- Relaxed pace: quiet/crowd character becomes mildly relevant.
+- Budget, travel load and season/weather remain relevant because the user
+  explicitly entered budget, trip duration/max driving time and travel dates.
+
+Unselected attributes are neutral in the strongest possible sense:
+they are not present in the active score and therefore cannot improve OR reduce
+the overall proposal score.
+
+The overall 0–100 score is now a normalized weighted average of only the active
+criteria. Preference priority changes the weight of that criterion.
+
+UI:
+- proposal positives/negatives read from the same active criteria registry;
+- tile view can no longer show "Gezin 50" for a solo trip unless children/family
+  is actually relevant;
+- comparison rows use only criteria active for the compared trips;
+- "Aandachtspunten" replaces generic bottom scores.
+
+syntax destination-engine.js: PASS
+syntax app.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax config.js: PASS
+syntax service-worker.js: PASS
+unrelated purity removed: PASS
+car no longer uses family as vehicle score: PASS
+solo trip family excluded: PASS
+culture only if selected: PASS
+camper only for camper/caravan: PASS
+motorcycle suitability context driven: PASS
+overall score weighted from active criteria: PASS
+tile strengths use active registry: PASS
+tile weaknesses use active registry: PASS
+comparison uses active criteria: PASS
+revision: PASS

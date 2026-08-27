@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.29',build:'1729'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.30',build:'1730'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -84,7 +84,7 @@ function enhanceProposalWeather(){
   });
 }
 
-const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuig',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
+const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen / weer',transport:'Voertuigmatch',family:'Kindvriendelijk',natuur:'Natuur',bergen:'Bergen',kust:'Kust / water',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
 
 function removeDeprecatedSections(){
   document.querySelectorAll('.inspiration-grid').forEach(grid=>grid.closest('section.panel')?.remove());
@@ -107,11 +107,14 @@ function enhanceProposalScores(){
     if(!scores)return;
     card.querySelector('.dimension-grid')?.classList.add('legacy-dimensions-hidden');
     let panel=card.querySelector('.score-extremes');
-    const entries=Object.entries(scores).filter(([key,value])=>key!=='transport'&&Number.isFinite(Number(value))).map(([key,value])=>[key,Number(value)]);
-    if(entries.length<6)return;
-    const top=[...entries].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,3);
-    const bottom=[...entries].sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,3);
-    const content=`<div class="score-extremes-head"><div><span>STERKSTE MATCH</span><strong>Top 3 relevant</strong></div><div><span>ZWAKSTE MATCH</span><strong>Bottom 3 relevant</strong></div></div><div class="score-extremes-grid"><div>${top.map(([key,value])=>criterionRow(key,value,'positive')).join('')}</div><div>${bottom.map(([key,value])=>criterionRow(key,value,'negative')).join('')}</div></div>`;
+    const entries=Object.entries(scores).filter(([,value])=>Number.isFinite(Number(value))).map(([key,value])=>[key,Number(value)]);
+    if(entries.length<2)return;
+    const topCount=Math.min(3,Math.ceil(entries.length/2));
+    const top=[...entries].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,topCount);
+    const topKeys=new Set(top.map(([key])=>key));
+    let bottom=[...entries].filter(([key])=>!topKeys.has(key)).sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,3);
+    if(!bottom.length)bottom=[...entries].sort((a,b)=>a[1]-b[1]).slice(0,Math.min(2,entries.length));
+    const content=`<div class="score-extremes-head"><div><span>STERKSTE MATCH</span><strong>Top 3 relevant</strong></div><div><span>AANDACHTSPUNTEN</span><strong>Alleen voor jouw reis</strong></div></div><div class="score-extremes-grid"><div>${top.map(([key,value])=>criterionRow(key,value,'positive')).join('')}</div><div>${bottom.map(([key,value])=>criterionRow(key,value,'negative')).join('')}</div></div>`;
     if(!panel){
       panel=document.createElement('section');
       panel.className='score-extremes';
@@ -136,7 +139,7 @@ function polishProposalCards(){
 
 const transportIcons={car:'🚗',motorcycle:'🏍️',motorhome:'🚐',caravan:'🚙'};
 function currentTransportIcon(){return transportIcons[document.getElementById('transport')?.value]||'🚗'}
-const visualCriterionIcons={budget:'€',driving:'🛣️',season:'☀️',scenery:'🏔️',walking:'🥾',swimming:'🏊',food:'🍽️',culture:'🏛️',crowds:'🌿'};
+const visualCriterionIcons={budget:'€',driving:'🛣️',season:'☀️',family:'👨‍👩‍👧',natuur:'🌲',bergen:'🏔️',kust:'🌊',walking:'🥾',swimming:'🏊',food:'🍽️',culture:'🏛️',crowds:'🌿'};
 function criterionIcon(key){return key==='transport'?currentTransportIcon():(visualCriterionIcons[key]||'★')}
 function syncTransportVisuals(){
   const select=document.getElementById('transport');

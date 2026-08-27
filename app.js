@@ -523,13 +523,13 @@ async function prefetchReviewReserve(){
 }
 
 const comparisonPreferenceMap={
-  natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',
-  kinderen:'family',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'
+  natuur:'natuur',bergen:'bergen',zwemmen:'swimming',wandelen:'walking',
+  kinderen:'family',motor:'transport',cultuur:'culture',eten:'food',kust:'kust',budget:'budget'
 };
 const comparisonLabels={
   score:'Totale match',budget:'Budgetmatch',driving:'Reisbelasting',season:'Seizoen / weer',
-  transport:'Voertuigmatch',family:'Kindvriendelijk',scenery:'Landschap',walking:'Wandelen',
-  swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'
+  transport:'Voertuigmatch',family:'Kindvriendelijk',natuur:'Natuur',bergen:'Bergen',kust:'Kust / water',
+  walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'
 };
 let proposalCompareMap=null;
 let comparisonView='overview';
@@ -538,10 +538,13 @@ function comparisonSelected(){
   const all=[...(state.ranking?.candidates||[]),...state.ranked,...state.catalog];
   return state.compareIds.map(id=>all.find(item=>item.id===id)).filter(Boolean).filter((item,index,array)=>array.findIndex(x=>x.id===item.id)===index);
 }
-function metricValue(item,key){return key==='score'?Number(item.score):Number(item.dimensions?.[key])}
+function activeProposalScores(item){return globalThis.__REISSLIM_PROPOSAL_SCORES?.[item.id]||item.scoringContext?.criteria||{}}
+function metricValue(item,key){return key==='score'?Number(item.score):Number(activeProposalScores(item)?.[key])}
 function selectedComparisonRows(){
-  const preferred=[...new Set((state.trip?.preferences||[]).map(id=>comparisonPreferenceMap[id]).filter(Boolean))];
-  return ['score','budget','driving','season',...preferred].filter((key,index,array)=>array.indexOf(key)===index);
+  const selected=comparisonSelected();
+  const active=[...new Set(selected.flatMap(item=>Object.keys(activeProposalScores(item)||{})))];
+  const ordered=['budget','driving','season','transport','family','natuur','bergen','kust','walking','swimming','food','culture','crowds'];
+  return ['score',...ordered.filter(key=>active.includes(key))];
 }
 function comparisonWinnerIndexes(selected,key,{lower=false}={}){
   const values=selected.map(item=>key==='estimate'?Number(item.estimate):key==='distance'?Number(item.distanceKm):metricValue(item,key));
@@ -626,16 +629,14 @@ function portfolioMetric(item,key){
   return Number(item.dimensions?.[key]);
 }
 function portfolioTopMatch(item){
-  const preferred=[...(state.trip?.preferences||[])];
-  const keyMap={natuur:'scenery',bergen:'scenery',zwemmen:'swimming',wandelen:'walking',kinderen:'family',cultuur:'culture',eten:'food',kust:'scenery',budget:'budget'};
-  const labels={scenery:'Landschap',swimming:'Zwemmen',walking:'Wandelen',family:'Kindvriendelijk',culture:'Cultuur',food:'Eten',budget:'Budget'};
-  const rows=[...new Set(preferred.map(p=>keyMap[p]).filter(Boolean))].map(key=>[key,Number(item.dimensions?.[key])]).filter(([,v])=>Number.isFinite(v)).sort((x,y)=>y[1]-x[1]);
+  const labels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen / weer',transport:'Voertuigmatch',family:'Kindvriendelijk',natuur:'Natuur',bergen:'Bergen',kust:'Kust / water',swimming:'Zwemmen',walking:'Wandelen',culture:'Cultuur',food:'Eten',crowds:'Rust'};
+  const rows=Object.entries(activeProposalScores(item)).filter(([,v])=>Number.isFinite(Number(v))).sort((x,y)=>Number(y[1])-Number(x[1]));
   if(!rows.length)return 'Algemene match';
   return `${labels[rows[0][0]]||rows[0][0]} ${Math.round(rows[0][1])}`;
 }
 function portfolioWeakMatch(item){
-  const labels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen',transport:'Voertuig',scenery:'Landschap',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',family:'Gezin'};
-  const rows=Object.entries(item.dimensions||{}).filter(([,v])=>Number.isFinite(Number(v))).sort((x,y)=>Number(x[1])-Number(y[1]));
+  const labels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen / weer',transport:'Voertuigmatch',family:'Kindvriendelijk',natuur:'Natuur',bergen:'Bergen',kust:'Kust / water',swimming:'Zwemmen',walking:'Wandelen',food:'Eten',culture:'Cultuur',crowds:'Rust'};
+  const rows=Object.entries(activeProposalScores(item)).filter(([,v])=>Number.isFinite(Number(v))).sort((x,y)=>Number(x[1])-Number(y[1]));
   return rows.length?`${labels[rows[0][0]]||rows[0][0]} ${Math.round(rows[0][1])}`:'—';
 }
 function proposalHeroImage(item){
@@ -649,7 +650,7 @@ function proposalThumbImage(item,className='portfolio-thumb'){
 function portfolioVehicleAttribute(item){
   const mode=state.trip?.transport||'car',label={motorcycle:'Motor',car:'Auto',motorhome:'Camper',caravan:'Caravan'}[mode]||'Voertuig';
   const icon={motorcycle:'🏍️',car:'🚗',motorhome:'🚐',caravan:'🚙'}[mode]||'🚗';
-  const score=Number(item.dimensions?.transport);
+  const score=Number(activeProposalScores(item)?.transport);
   const fit=!Number.isFinite(score)?'geschiktheid onbekend':score>=75?'geschikt':score>=55?'redelijk geschikt':'minder passend';
   return `${icon} ${label} · ${fit}`;
 }
