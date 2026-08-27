@@ -1,14 +1,15 @@
 import { originCatalog, validCoordinate } from './config.js';
 import { haversineKm } from './route-engine.js';
 import { transportId } from './vehicle-intelligence.js';
+import { buildRecommendations } from './recommendation-engine.js';
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
+  'https://overpass.private.coffee/api/interpreter'
 ];
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
-const CACHE_PREFIX = 'reisslim.live.v9.';
+const CACHE_PREFIX = 'reisslim.live.v10.';
 
 const clone = value => typeof globalThis.structuredClone === 'function'
   ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -120,7 +121,7 @@ async function queryEndpoint(query,endpoint,fetchImpl,timeoutMs){
 
 
 async function fetchNominatimCategory(item,fetchImpl,timeoutMs=3500){
-  const qMap={accommodation:['hotel','guest house','camping'],restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area'],service:['fuel'],activity:['museum','attraction','viewpoint']};
+  const qMap={accommodation:['hotel','guest house','camping'],restaurant:['restaurant','cafe'],fuel:['fuel'],rest:['rest area','service area','cafe'],service:['fuel'],activity:['museum','attraction','viewpoint']};
   const queries=qMap[item.type]||qMap.activity,delta=.22,viewbox=[item.point.lon-delta,item.point.lat+delta,item.point.lon+delta,item.point.lat-delta].join(',');
   for(const q of queries){
     try{
@@ -176,16 +177,56 @@ function applyLivePlace(item,place,distanceKm,day){
   });
 }
 
+
+async function reverseGeocodePoint(point,fetchImpl,timeoutMs=3200){
+  if(!validCoordinate(point))return null;
+  const url=new URL('https://nominatim.openstreetmap.org/reverse');
+  url.search=new URLSearchParams({lat:String(point.lat),lon:String(point.lon),format:'jsonv2',zoom:'10',addressdetails:'1'});
+  try{
+    const row=await fetchJson(url,{headers:{accept:'application/json'}},timeoutMs,fetchImpl),address=row?.address||{};
+    const name=address.city||address.town||address.village||address.municipality||address.county||String(row?.display_name||'').split(',')[0];
+    return name?{lat:Number(row.lat)||point.lat,lon:Number(row.lon)||point.lon,name,country:String(address.country||''),countryCode:String(address.country_code||'').toUpperCase()}:null;
+  }catch{return null}
+}
+async function resolveGeneratedExplorationStops(plan,fetchImpl,options={}){
+  for(const day of plan.days||[]){
+    if(!day.toPoint?.generatedExploration)continue;
+    const resolved=await reverseGeocodePoint(day.toPoint,fetchImpl,options.nominatimTimeoutMs||3200);
+    if(!resolved)continue;
+    const oldName=day.to;
+    day.to=resolved.name;day.location=resolved.name;day.overnight=resolved.name;day.toPoint={...day.toPoint,...resolved,name:resolved.name};
+    if(day.primaryPlan)day.primaryPlan=day.primaryPlan.replace(oldName,resolved.name);
+    const next=(plan.days||[]).find(candidate=>candidate.day===day.day+1);
+    if(next&&next.from===oldName){next.from=resolved.name;next.fromPoint={...next.fromPoint,...resolved,name:resolved.name}}
+  }
+  return plan;
+}
+
 async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storage){
+  await resolveGeneratedExplorationStops(plan,fetchImpl,options);
+  // Rebuild recommendations after live routing so rest/food/fuel anchors follow the
+  // actual road geometry rather than the earlier straight-line corridor.
+  buildRecommendations(trip,{bases:[plan.days?.find(day=>day.toPoint)?.toPoint].filter(Boolean)},plan.days||[]);
+  plan.recommendations=(plan.days||[]).flatMap(day=>day.recommendations||[]);
+
   const jobs=[];
   for(const day of plan.days||[]){
     const recommendations=(day.recommendations||[]).filter(item=>validCoordinate(item.point));
     const picked=[];
-    const add=item=>{if(item&&!picked.includes(item))picked.push(item)};
+    const seen=new Set();
+    const add=item=>{
+      if(!item)return;
+      const key=`${item.type}:${item.point.lat.toFixed(4)}:${item.point.lon.toFixed(4)}`;
+      if(seen.has(key))return;
+      seen.add(key);picked.push(item);
+    };
+
+    // Resolve every operational route point. This is the core fix: the previous code
+    // resolved only ONE restaurant and ONE fuel/rest item per day, then deleted the rest.
+    recommendations.filter(item=>['rest','fuel','restaurant'].includes(item.type)).forEach(add);
     add(recommendations.find(item=>item.type==='accommodation'));
-    add(recommendations.find(item=>item.type==='restaurant'));
-    add(recommendations.find(item=>item.type==='fuel'||item.type==='rest'));
     add(recommendations.find(item=>item.type==='activity'));
+    add(recommendations.find(item=>item.type==='service'));
     jobs.push(...picked.map(item=>({day,item})));
   }
   const total=jobs.length;let completed=0,foundCount=0;
@@ -202,7 +243,13 @@ async function resolveSpecificRecommendations(plan,trip,options,fetchImpl,storag
     options.onProgress?.({type:ranked[0]?'place-found':'place-missing',day:day.day,itemType:item.type,name:ranked[0]?.place?.name||null,completed,total,found:foundCount});
   });
   for(const day of plan.days||[]){
-    day.recommendations=(day.recommendations||[]).filter(item=>item.live&&item.name&&validCoordinate(item.point));
+    day.recommendations=(day.recommendations||[]).filter(item=>{
+      if(!item.name||!validCoordinate(item.point))return false;
+      if(item.live)return true;
+      // Operational route targets remain visible if the external live lookup misses;
+      // the UI clearly shows them as planned route targets until a named place is found.
+      return ['rest','fuel','restaurant'].includes(item.type);
+    });
     day.sleepProposal=day.recommendations.find(item=>item.type==='accommodation')||null;
   }
   plan.recommendations=(plan.days||[]).flatMap(day=>day.recommendations||[]);

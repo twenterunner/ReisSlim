@@ -84,7 +84,7 @@
   .priority-item select{height:36px!important;width:104px!important;min-width:104px!important;max-width:104px!important;font-size:.82rem!important}
 }
 
-/* v1.7.5 spacing repairs */
+/* v1.7.8 spacing repairs */
 .current-trip-details{display:grid;gap:6px}
 .current-trip-details div{display:grid!important;grid-template-columns:minmax(92px,auto) 1fr;column-gap:10px;align-items:baseline}
 .current-trip-details span{display:block;color:var(--muted);line-height:1.25}
@@ -97,7 +97,7 @@
 }
 
 
-/* v1.7.5 premium visual system */
+/* v1.7.8 premium visual system */
 :root{
   --premium-ink:#173833;
   --premium-muted:#60746f;
@@ -174,7 +174,7 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 }
 
 
-/* v1.7.5 visual-first cleanup */
+/* v1.7.8 visual-first cleanup */
 .live-discovery-progress{padding:12px!important}
 .live-progress-head.compact{margin-bottom:8px}
 .live-progress-steps{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;margin:0!important;padding:0!important}
@@ -232,11 +232,11 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .proposal-pictogram-strip span{min-height:54px}
   .compare-dock{bottom:78px}
 }
-/* v1.7.5 premium visual redesign */
+/* v1.7.8 premium visual redesign */
 :root{--premium:#07584f;--premium2:#0b7567;--mint:#d9f8e9;--ink:#173b38}
 .premium-hero{position:relative;overflow:hidden;border-radius:30px;min-height:390px;padding:34px;color:white;background-size:cover;background-position:center;box-shadow:0 18px 44px rgba(12,66,59,.18)}
-.home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('assets/home-hero.webp')}
-.planner-hero{background-image:linear-gradient(90deg,rgba(4,42,38,.84),rgba(4,42,38,.18)),url('assets/planner-hero.webp');display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:0}
+.home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('home-hero.webp')}
+.planner-hero{background-image:linear-gradient(90deg,rgba(4,42,38,.84),rgba(4,42,38,.18)),url('planner-hero.webp');display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:0}
 .premium-hero .hero-copy{position:relative;z-index:2;max-width:650px}.premium-hero h1{font-size:clamp(2.35rem,7vw,4.4rem);line-height:.98;margin:10px 0 20px;color:#fff;letter-spacing:-.045em}.premium-hero h1 em{font-family:cursive;font-weight:500;color:#48e3b6}.premium-hero .eyebrow{color:#62e8c2}.hero-chips,.feature-row{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}.hero-chips span,.feature-row span{background:rgba(7,38,35,.65);border:1px solid rgba(255,255,255,.2);padding:9px 13px;border-radius:999px;backdrop-filter:blur(8px)}.hero-actions{display:flex;gap:12px;flex-wrap:wrap}.hero-actions button{font-size:1rem;padding:15px 20px}.hero-actions .hero-secondary{background:rgba(4,55,50,.68);color:white;border:1px solid rgba(255,255,255,.3)}
 .hero-glass,.hero-save{position:relative;z-index:2;background:rgba(5,42,39,.78);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.18);border-radius:22px;padding:20px;min-width:230px;box-shadow:0 14px 36px rgba(0,0,0,.22)}.hero-glass ul{list-style:none;padding:0;margin:14px 0;line-height:2}.hero-glass span{color:#68e8c3;font-weight:800}.hero-save{align-self:flex-end;max-width:260px}.hero-save small{display:block;color:#d8eee9;margin-top:5px}
 .premium-grid{margin-top:-24px;position:relative;z-index:3}.premium-current,.premium-stats{border:0;box-shadow:0 15px 36px rgba(25,60,55,.12)}.premium-current #currentTripSummary{background:linear-gradient(135deg,#f0f8f6,#fff);border-radius:18px;padding:18px}.premium-stats .stat-grid>div{background:#f2f8f6;border-radius:18px;padding:16px}.premium-stats .stat-grid span{font-size:1.4rem}.premium-stats .stat-grid small{display:block;color:#6c7d7a}
@@ -245,17 +245,17 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
 #plannerView #intakeSection{border:0;box-shadow:0 14px 36px rgba(20,60,55,.1)}#plannerView .form-grid>label,#plannerView .vehicle-profile-panel,#plannerView fieldset{border-radius:18px}#plannerView input,#plannerView select,#plannerView textarea{border-radius:14px}#plannerView .check-option{min-height:58px;border-radius:16px}#plannerView button[type=submit]{min-height:58px;font-size:1.08rem;background:linear-gradient(90deg,var(--premium),var(--premium2))}
 @media(max-width:720px){.premium-hero{min-height:430px;padding:24px 20px;border-radius:24px}.premium-hero h1{font-size:2.6rem}.planner-hero{display:block}.hero-glass{display:none}.hero-save{margin-top:22px;min-width:0}.premium-grid{grid-template-columns:1fr}.inspiration-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}.inspire-card{min-width:78vw;scroll-snap-align:start}.planner-steps{margin:-12px 8px 12px;padding:10px 8px}.planner-steps span{font-size:.72rem;display:block;text-align:center}.planner-steps b{margin:0 auto 4px}.feature-row{gap:6px}.feature-row span{font-size:.78rem;padding:7px 9px}}
 
-/* v1.7.5 faithful premium planner layout */
+/* v1.7.8 faithful premium planner layout */
 .home-hero{
   background-image:
     linear-gradient(90deg,rgba(4,42,38,.80) 0%,rgba(4,42,38,.48) 46%,rgba(4,42,38,.18) 100%),
-    url('assets/home-hero.webp')!important;
+    url('home-hero.webp')!important;
   background-size:cover!important;background-position:center!important;
 }
 .planner-hero.clean-photo-hero{
   background-image:
     linear-gradient(90deg,rgba(3,38,34,.88) 0%,rgba(3,38,34,.60) 48%,rgba(3,38,34,.20) 100%),
-    url('assets/planner-hero.webp')!important;
+    url('planner-hero.webp')!important;
   min-height:430px;background-size:cover!important;background-position:center 54%!important;
   align-items:center!important;
 }
@@ -309,14 +309,14 @@ input,select,textarea{border-radius:14px!important;background:#fff!important;bor
   .vehicle-profile-panel{grid-template-columns:1fr!important}.more-options-grid{grid-template-columns:1fr}
 }
 
-/* v1.7.5 header cleanup */
+/* v1.7.8 header cleanup */
 .topbar{grid-template-columns:minmax(0,1fr) auto!important}
 .topbar .brand-static{cursor:default!important;pointer-events:none!important;background:transparent!important;border:0!important;padding:0!important}
 .topbar>button:not(#newTripBtn){display:none!important}
 #newTripBtn{display:inline-flex!important;align-items:center!important;justify-content:center!important}
 
 
-/* v1.7.5 mobile containment + interaction-safe layout */
+/* v1.7.8 mobile containment + interaction-safe layout */
 html,body{width:100%;max-width:100%;overflow-x:hidden}
 .app-shell,.app-view,.premium-hero,.panel,#tripForm,.planner-primary-grid,.planner-subsection{width:100%;max-width:100%;min-width:0}
 .app-shell{overflow-x:clip}
@@ -324,8 +324,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
 .planner-field-card,.planner-field-card *,.field-copy,.subsection-heading>*{min-width:0}
 .planner-field-card input,.planner-field-card select,.planner-field-card textarea{max-width:100%}
 #newTripBtn,#startPlanningBtn,.planner-search-bar button[type="submit"]{pointer-events:auto!important;position:relative;z-index:5}
-.home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('assets/home-hero.webp')!important}
-.planner-hero.clean-photo-hero{background-image:linear-gradient(90deg,rgba(3,38,34,.88) 0%,rgba(3,38,34,.60) 48%,rgba(3,38,34,.20) 100%),url('assets/planner-hero.webp')!important}
+.home-hero{background-image:linear-gradient(90deg,rgba(5,42,39,.86),rgba(5,42,39,.18)),url('home-hero.webp')!important}
+.planner-hero.clean-photo-hero{background-image:linear-gradient(90deg,rgba(3,38,34,.88) 0%,rgba(3,38,34,.60) 48%,rgba(3,38,34,.20) 100%),url('planner-hero.webp')!important}
 @media(max-width:760px){
   .app-shell{padding-left:8px!important;padding-right:8px!important}
   .planner-premium-view{overflow:hidden}
@@ -346,13 +346,13 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .planner-search-bar button[type="submit"]{white-space:normal!important;max-width:100%!important}
 }
 
-/* v1.7.5 reliability + clean photography + interactive POI filters */
+/* v1.7.8 reliability + clean photography + interactive POI filters */
 .home-hero{
-  background-image:linear-gradient(90deg,rgba(3,42,37,.88) 0%,rgba(3,42,37,.50) 52%,rgba(3,42,37,.12) 100%),url('assets/home-hero-photo.webp')!important;
+  background-image:linear-gradient(90deg,rgba(3,42,37,.88) 0%,rgba(3,42,37,.50) 52%,rgba(3,42,37,.12) 100%),url('home-hero-photo.webp')!important;
   background-position:center!important;background-size:cover!important;
 }
 .planner-hero.clean-photo-hero{
-  background-image:linear-gradient(90deg,rgba(3,38,34,.90) 0%,rgba(3,38,34,.58) 50%,rgba(3,38,34,.16) 100%),url('assets/planner-hero-photo.webp')!important;
+  background-image:linear-gradient(90deg,rgba(3,38,34,.90) 0%,rgba(3,38,34,.58) 50%,rgba(3,38,34,.16) 100%),url('planner-hero-photo.webp')!important;
   background-position:center!important;background-size:cover!important;
 }
 .home-hero .hero-copy{max-width:620px}
@@ -371,3 +371,41 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   .home-hero{min-height:430px!important;background-position:58% center!important}
   .planner-hero.clean-photo-hero{background-position:54% center!important}
 }
+
+/* v1.7.8 hero image visibility acceptance fix */
+.home-hero{
+  background-image:
+    linear-gradient(90deg,rgba(3,42,37,.62) 0%,rgba(3,42,37,.28) 44%,rgba(3,42,37,.04) 78%),
+    url('home-hero-photo-v2.webp')!important;
+  background-size:cover!important;
+  background-position:center 48%!important;
+  background-repeat:no-repeat!important;
+}
+.planner-hero.clean-photo-hero{
+  background-image:
+    linear-gradient(90deg,rgba(3,38,34,.64) 0%,rgba(3,38,34,.30) 46%,rgba(3,38,34,.06) 80%),
+    url('planner-hero-photo-v2.webp')!important;
+  background-size:cover!important;
+  background-position:center 48%!important;
+  background-repeat:no-repeat!important;
+}
+.home-hero::before,.planner-hero.clean-photo-hero::before{
+  background:none!important;
+  backdrop-filter:none!important;
+  filter:none!important;
+}
+@media(max-width:720px){
+  .home-hero{
+    background-position:center 44%!important;
+  }
+  .planner-hero.clean-photo-hero{
+    background-position:56% center!important;
+  }
+}
+
+/* v1.7.8 route-wide operational POIs */
+.reisslim-poi-pin.planned-poi{opacity:.78;filter:saturate(.82)}
+.reisslim-poi-pin.planned-poi:after{content:"";position:absolute;inset:-5px;border:2px dashed rgba(255,255,255,.92);border-radius:50% 50% 50% 8px}
+.planned-poi-row{background:linear-gradient(145deg,#fbfcfc,#f2f6f4)!important}
+.planned-poi-row .map-poi-number{opacity:.78}
+.map-legend-card:after{content:"Gestreepte POI = gepland routepunt; gevuld = specifieke live plaats";display:block;margin-top:8px;font-size:.66rem;color:#6b7d78}

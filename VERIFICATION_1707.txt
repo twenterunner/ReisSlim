@@ -1,0 +1,24 @@
+syntax place-provider.js: PASS
+syntax destination-provider.js: PASS
+syntax config.js: PASS
+syntax recommendation-engine.js: PASS
+syntax itinerary-engine.js: PASS
+syntax ui-feature-flags.js: PASS
+syntax assistant-engine.js: PASS
+syntax app.js: PASS
+syntax route-topology.js: PASS
+syntax service-worker.js: PASS
+syntax destination-engine.js: PASS
+syntax trip-optimizer.js: PASS
+syntax map-view.js: PASS
+syntax routing-provider.js: PASS
+route coverage functional: PASS {"total":22,"day1":6,"day2":6,"day4":7,"visible":18}
+resolver resolves all route ops: PASS
+rebuild after live routing: PASS
+planned targets retained: PASS
+POI toggles preserved: PASS
+revision config: PASS
+revision header: PASS
+revision footer: PASS
+revision cache: PASS
+Live named-place density still depends on external OSM responses; planned route coverage is deterministic.

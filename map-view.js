@@ -24,7 +24,7 @@ function poiIcon(item,index,focused=false){
   const color=poiColors[item.type]||'#697d78',day=dayColor(item.day);
   return L.divIcon({
     className:'reisslim-poi-icon-wrap',
-    html:`<div class="reisslim-poi-pin ${focused?'focused':''}" style="--poi:${color};--day:${day}"><span>${poiIcons[item.type]||'•'}</span><b>${index+1}</b></div>`,
+    html:`<div class="reisslim-poi-pin ${focused?'focused':''} ${item.live?'live-poi':'planned-poi'}" style="--poi:${color};--day:${day}"><span>${poiIcons[item.type]||'•'}</span><b>${index+1}</b></div>`,
     iconSize:[38,42],iconAnchor:[19,40],popupAnchor:[0,-38]
   });
 }
@@ -82,7 +82,7 @@ function renderLegend(plan,segments,proposals){
   const list=proposals.length
     ? proposals.map((item,index)=>{
         const link=safeUrl(item.mapUrl||item.url||item.websiteUrl);
-        return `<article class="map-poi-row" data-poi-type-row="${item.type}" data-map-poi-index="${index}" tabindex="0" role="button" aria-label="Toon ${escapeHtml(item.name)} op kaart"><span class="map-poi-number" style="--poi-color:${poiColors[item.type]||'#697d78'}">${index+1}</span><span class="map-poi-day" style="--day-color:${dayColor(item.day)}">D${item.day||'–'}</span><div><strong>${escapeHtml(item.name)}</strong><small>${poiIcons[item.type]||'•'} ${escapeHtml(poiLabels[item.type]||item.type||'POI')}</small></div>${link?`<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" aria-label="Open externe kaart">↗</a>`:'<span></span>'}</article>`;
+        return `<article class="map-poi-row ${item.live?'live-poi-row':'planned-poi-row'}" data-poi-type-row="${item.type}" data-map-poi-index="${index}" tabindex="0" role="button" aria-label="Toon ${escapeHtml(item.name)} op kaart"><span class="map-poi-number" style="--poi-color:${poiColors[item.type]||'#697d78'}">${index+1}</span><span class="map-poi-day" style="--day-color:${dayColor(item.day)}">D${item.day||'–'}</span><div><strong>${escapeHtml(item.name)}</strong><small>${poiIcons[item.type]||'•'} ${escapeHtml(poiLabels[item.type]||item.type||'POI')} · ${item.live?'specifiek':'gepland routepunt'}</small></div>${link?`<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" aria-label="Open externe kaart">↗</a>`:'<span></span>'}</article>`;
       }).join('')
     : '<div class="map-poi-empty">Nog geen specifieke POI’s geladen.</div>';
 
