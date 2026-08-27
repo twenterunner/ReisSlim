@@ -1,0 +1,14 @@
+ReisSlim 1.7.24 compare/map photo hotfix
+
+PASS - preferred proposal can be selected from portfolio table.
+PASS - preferred proposal can be selected from portfolio map popup.
+PASS - preferred proposal can be selected from comparison table.
+PASS - preferred proposal can be selected from comparison map popup.
+PASS - portfolio now has Cards / Table / Map views.
+PASS - comparison now has Table / Map views.
+PASS - comparison headers use trip/destination photos.
+PASS - proposal score pictogram strip is removed.
+PASS - missing visible proposal photos are fetched from the existing route-specific Wikimedia image provider.
+PASS - photo map pins show proposal match score.
+PASS - old floating compare dock is forcibly removed.
+PASS - both JavaScript files pass node --check.
