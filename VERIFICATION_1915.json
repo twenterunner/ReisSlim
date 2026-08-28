@@ -1,0 +1,27 @@
+{
+  "release": "1.10.5 / 1915",
+  "root_cause": "Build 1914's submit-block replacement left an extra closing brace at the end of the tripForm submit registration. The file remained syntactically parseable, but the initialize block structure was altered. When the app submit handler was not active, the form performed its native GET submission, reloading index.html; dashboardView is the default active view, exactly matching the reported 'Zoek mijn roadtrip takes me back to dashboard' symptom.",
+  "correction": {
+    "app": "Restored the submit listener closure to one handler-closing brace: scheduleReviewPrefetch(); });",
+    "safety": "Added planner-submit-guard.js as a classic capture-phase form guard. Native tripForm navigation is now prevented independently of app module startup; the real app handler still receives the same event.",
+    "routing_and_ranking": "1914 routing provider and initial discovery-before-ranking changes are retained."
+  },
+  "verification": {
+    "node_syntax": {
+      "app.js": true,
+      "routing-provider-1914.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "submit_listener_closure_verified": true,
+    "native_form_navigation_guard_loaded_before_module": true,
+    "app_ready_marker_at_end_of_initialize": true,
+    "android_device_not_executed_here": true
+  }
+}
