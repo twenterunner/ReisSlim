@@ -1,0 +1,30 @@
+{
+  "release": "1.13.2 / 1925",
+  "baseline": "GitHub main commit cfcca16b202bb7e818b193b7924f840398982385",
+  "root_cause": "Build 1924's planner-submit-guard.js installs a MutationObserver on document.documentElement for all childList changes. On every observed mutation it calls syncBuildBadge(), which assigns headerRevision.textContent. Setting textContent changes the badge's child nodes, producing another childList mutation. Once any normal UI mutation occurs after the observer is active, the callback can therefore trigger itself repeatedly and starve the event loop.",
+  "revision_mismatch_proof": {
+    "config_js": "1.13.1 / 1924",
+    "ui_feature_flags_js": "1.13.0 / 1923",
+    "index_html_footer_default": "1.12.0 / 1922",
+    "effect": "The deployed source contains three revision values. Normal app initialization is supposed to overwrite the footer from config, but the startup starvation makes the stale values visible and inconsistent."
+  },
+  "changes": {
+    "startup": "Removed the DOM-wide MutationObserver completely. The guard now performs one-shot setup only.",
+    "revision": "Header and footer are synchronized to v1.13.2 build 1925 with equality checks before changing text.",
+    "dashboard": "The visible current-trip tile changes from 'Jouw concept / Ga verder waar je was' to 'Jouw roadtrip / Reis verder. ReisSlim.'",
+    "pending_images": "The existing 4-second visible image pacing is retained without any observer.",
+    "cache": "Service-worker cache epoch bumped to 1.13.2 / 1925."
+  },
+  "verification": {
+    "node_syntax": {
+      "planner-submit-guard.js": true,
+      "config.js": true,
+      "service-worker.js": true
+    },
+    "mocked_dom_regression": {
+      "broken_1924": "After one external DOM mutation, the simulated observer recursively generated 26 callbacks/mutations before the test deliberately stopped it.",
+      "fixed_1925": "No MutationObserver is constructed; header and footer both resolve to 1.13.2 / 1925; dashboard copy resolves to 'Reis verder. ReisSlim.'."
+    },
+    "android_device_not_executed_here": true
+  }
+}
