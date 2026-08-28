@@ -1,0 +1,37 @@
+{
+  "syntax": {
+    "app.js": true,
+    "config.js": true,
+    "service-worker.js": true,
+    "ui-feature-flags.js": true,
+    "image-provider.js": true
+  },
+  "legacy_conflict_checks": {
+    "retry_no_catalog_reset": true,
+    "overpass_is_batched": true,
+    "old_monolithic_query_removed": true,
+    "reviewed_removed_before_legacy_preselector": true,
+    "roadtrip_pool_capacity_140": true,
+    "soft_boundary_late_observer": true
+  },
+  "cape_town_5_day_acceptance": {
+    "pass": true,
+    "route": [
+      "Cape Town",
+      "Montagu",
+      "Langebaan",
+      "Swellendam",
+      "Tulbagh",
+      "Cape Town"
+    ],
+    "legsKm": [
+      157,
+      209,
+      246,
+      146,
+      97
+    ],
+    "uniqueOvernights": 4
+  },
+  "limitations": "Network provider availability itself is mocked/deterministic here; production failure isolation is verified structurally by 8 independent batches with provider fallback."
+}

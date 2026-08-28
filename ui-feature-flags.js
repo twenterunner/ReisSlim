@@ -1,4 +1,4 @@
-const REISSLIM_RELEASE=Object.freeze({version:'1.7.44',build:'1744'});
+const REISSLIM_RELEASE=Object.freeze({version:'1.7.46',build:'1746'});
 function addRevisionToHeader(){const brand=document.querySelector('.brand');if(!brand||document.getElementById('headerRevision'))return;const badge=document.createElement('span');badge.id='headerRevision';badge.className='header-revision';badge.textContent=`v${REISSLIM_RELEASE.version} · ${REISSLIM_RELEASE.build}`;badge.style.cssText='font-size:11px;font-weight:750;opacity:.82;white-space:nowrap;margin-left:8px;';brand.appendChild(badge)}
 function loadCompactUi(){if(document.getElementById('reisslimCompactUi'))return;const link=document.createElement('link');link.id='reisslimCompactUi';link.rel='stylesheet';link.href=`./compact-ui.css?v=${REISSLIM_RELEASE.build}`;document.head.appendChild(link)}
 function hideTravelReadiness(){const anchor=document.getElementById('readinessScore')||document.getElementById('readinessList')||document.getElementById('readinessDisclaimer');const panel=anchor?.closest('section,article,.panel');if(panel)panel.hidden=true}
@@ -86,7 +86,17 @@ function enhanceProposalWeather(){
 
 const criteriaLabels={budget:'Budget',driving:'Reisbelasting',season:'Seizoen / weer',transport:'Voertuigmatch',family:'Kindvriendelijk',natuur:'Natuur',bergen:'Bergen',kust:'Kust / water',walking:'Wandelen',swimming:'Zwemmen',food:'Eten',culture:'Cultuur',crowds:'Rust / drukte'};
 
+
+function removeLegacySoftBoundaryControls(){
+  document.querySelectorAll('button,a,label,summary').forEach(el=>{
+    if(/zachte\s+grenzen|soft\s+(?:limits|boundaries)/i.test((el.textContent||'').trim()))el.remove();
+  });
+  document.getElementById('allowStretch')?.closest('label')?.remove();
+  document.querySelectorAll('[data-allow-stretch],.soft-limits,.soft-boundaries').forEach(el=>el.remove());
+}
+
 function removeDeprecatedSections(){
+  removeLegacySoftBoundaryControls();
   document.querySelectorAll('.inspiration-grid').forEach(grid=>grid.closest('section.panel')?.remove());
   document.getElementById('allowStretch')?.closest('label')?.remove();document.querySelectorAll('[data-allow-stretch],.soft-limits,.soft-boundaries').forEach(el=>el.remove());
   applyRequestedCleanup();
@@ -220,3 +230,5 @@ document.addEventListener('change',event=>{
     requestAnimationFrame(syncTransportVisuals);
   }
 });
+
+const softBoundaryObserver=new MutationObserver(()=>removeLegacySoftBoundaryControls());softBoundaryObserver.observe(document.body,{childList:true,subtree:true});removeLegacySoftBoundaryControls();

@@ -136,9 +136,7 @@ function handleDiscoveryProgress(event){
 
 function hasProposalImage(item){return /^https:\/\//i.test(String(item?.image?.url||''))&&item?.image?.validatedPhoto===true&&item?.image?.relevance==='destination-specific'}
 function imageReadyState(){
-  const filter=list=>(list||[]).filter(hasProposalImage);
-  const ranking=state.ranking?{...state.ranking,exact:filter(state.ranking.exact),stretched:filter(state.ranking.stretched),visible:filter(state.ranking.visible)}:null;
-  return{...state,ranked:filter(state.ranked),ranking};
+  return{...state,ranked:[...(state.ranked||[])],ranking:state.ranking?{...state.ranking,exact:[...(state.ranking.exact||[])],stretched:[...(state.ranking.stretched||[])],visible:[...(state.ranking.visible||[])]}:null};
 }
 async function hydrateProposalImages(){
   if(state.imageHydrationBusy||!state.ranked.length)return;
@@ -147,7 +145,7 @@ async function hydrateProposalImages(){
     const missing=state.ranked.filter(item=>!hasProposalImage(item)&&!state.imageRejectedIds.includes(item.id));
     if(missing.length)await enrichDestinationImages(missing,{});
     const unresolved=missing.filter(item=>!hasProposalImage(item));
-    if(unresolved.length)state.imageRejectedIds=[...new Set([...state.imageRejectedIds,...unresolved.map(item=>item.id)])];
+    if(unresolved.length)state.imageRejectedIds=state.imageRejectedIds.filter(id=>!unresolved.some(item=>item.id===id));
     renderDestinations(imageReadyState());renderPortfolioNavigator();renderComparison(imageReadyState());renderEnhancedComparison();
     const ready=state.ranked.filter(hasProposalImage).length;
     if(ready<8&&state.trip?.liveData&&!state.discoveryBusy&&state.dismissedIds.length<100){
@@ -487,7 +485,8 @@ function schedulePortfolioImages(){
 }
 function refreshPortfolio(){
   if(state.trip)state.trip.allowStretch=true;
-  state.ranking=buildProposalPortfolio(state.trip,state.catalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:[...state.dismissedIds,...state.imageRejectedIds]}));
+  const activeCatalog=state.catalog.filter(item=>!state.dismissedIds.includes(item.id));
+  state.ranking=buildProposalPortfolio(state.trip,activeCatalog,portfolioOptions({limit:12,focus:$('proposalFocus').value,excludedIds:[]}));
   state.ranked=state.ranking.visible;
   renderDestinations(imageReadyState());updateReviewProgress();renderPortfolioNavigator();renderComparison(state);renderEnhancedComparison();schedulePortfolioWeather();schedulePortfolioImages();updateManualLiveDiscoveryButton();
 }
@@ -522,7 +521,8 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
   updateManualLiveDiscoveryButton();
   if(retry){
     state.discoveryCursor=Math.max(1,state.discoveryCursor+1);
-    state.catalog=[...destinations];
+    // Preserve already discovered global roadtrip regions. The old reset to the
+    // static catalogue silently deleted South-African candidates on every retry.
     refreshPortfolio();
   }
   if(!quiet){startLiveDiscoveryProgress();setStatus('Live reisopties zoeken via OpenStreetMap…')}
@@ -644,8 +644,8 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
 }
 
 const REVIEW_VISIBLE_TARGET=8;
-const REVIEW_RESERVE_TARGET=24;
-const REVIEW_SEARCH_ROUNDS=12;
+const REVIEW_RESERVE_TARGET=100;
+const REVIEW_SEARCH_ROUNDS=24;
 let reviewPrefetchBusy=false;
 let reviewSearchEmptyRounds=0;
 
@@ -667,9 +667,10 @@ async function ensureReviewQueue({target=REVIEW_VISIBLE_TARGET,maxRounds=REVIEW_
   if(!state.trip?.liveData||state.ranked.length>=target)return state.ranked.length;
   showReviewQueueStatus(`Nieuwe reisopties zoeken… ${state.dismissedIds.length}/100 beoordeeld`);
   let rounds=0,empty=0;
-  while(state.ranked.length<target&&rounds<maxRounds&&empty<4){
+  while(state.ranked.length<target&&rounds<maxRounds&&empty<6){
     rounds++;
     const before=state.catalog.length;
+    if(rounds===1||rounds%4===0)await discoverRoadtripOvernightPool(state.trip);
     const added=await discoverLiveOptions({append:true,quiet:true});
     const gained=Math.max(Number(added||0),state.catalog.length-before);
     if(gained>0){empty=0;reviewSearchEmptyRounds=0}else{empty++;reviewSearchEmptyRounds++}
@@ -700,9 +701,10 @@ async function prefetchReviewReserve(){
   try{
     let rounds=0,empty=0;
     const unseenCount=()=>Math.max(0,(state.ranking?.candidates||[]).filter(item=>!state.dismissedIds.includes(item.id)).length);
-    while(unseenCount()<REVIEW_RESERVE_TARGET&&rounds<6&&empty<3){
+    while(unseenCount()<REVIEW_RESERVE_TARGET&&rounds<18&&empty<6){
       rounds++;
       const before=state.catalog.length;
+      if(rounds===1||rounds%3===0)await discoverRoadtripOvernightPool(state.trip);
       const added=await discoverLiveOptions({append:true,quiet:true});
       const gained=Math.max(Number(added||0),state.catalog.length-before);
       if(gained>0){empty=0;reviewSearchEmptyRounds=0}else{empty++;reviewSearchEmptyRounds++}
@@ -988,49 +990,60 @@ function roadtripSearchSeed(origin,distanceKm,bearingDeg){
  const lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(a)*Math.cos(lat1),Math.cos(a)-Math.sin(lat1)*Math.sin(lat2));
  return{lat:lat2*180/Math.PI,lon:((lon2*180/Math.PI+540)%360)-180};
 }
-function buildRoadtripPlaceQuery(trip,origin){
+function buildRoadtripPlaceQueries(trip,origin){
  const maxLeg=tourLegLimitKm(trip),days=Math.max(3,Number(trip.days||3));
  const outer=Math.min(620,Math.max(180,maxLeg*Math.min(1.55,.92+days*.10)));
  const rings=[.28,.48,.70,.90].map(f=>Math.max(60,outer*f));
- const bearings=[0,45,90,135,180,225,270,315];
- const clauses=[];
- for(let r=0;r<rings.length;r++){
-   for(let i=0;i<bearings.length;i++){
-     const p=roadtripSearchSeed(origin,rings[r],bearings[i]+(r%2?22.5:0));
-     clauses.push(`nwr(around:28000,${p.lat.toFixed(4)},${p.lon.toFixed(4)})["place"~"city|town|village"]["name"];`);
-   }
+ const bearings=[0,45,90,135,180,225,270,315],seeds=[];
+ for(let r=0;r<rings.length;r++)for(let i=0;i<bearings.length;i++){
+   const p=roadtripSearchSeed(origin,rings[r],bearings[i]+(r%2?22.5:0));
+   seeds.push({p,radius:26000});
  }
- return`[out:json][timeout:16][maxsize:33554432];(${clauses.join('')});out center 420;`;
+ const batches=[];
+ for(let i=0;i<seeds.length;i+=4){
+   const clauses=seeds.slice(i,i+4).map(({p,radius})=>`nwr(around:${radius},${p.lat.toFixed(4)},${p.lon.toFixed(4)})["place"~"city|town|village"]["name"];`);
+   batches.push(`[out:json][timeout:10][maxsize:12582912];(${clauses.join('')});out center 90;`);
+ }
+ return batches;
 }
-async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=15000}={}){
+async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=11000}={}){
  const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;
  if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return 0;
- const query=buildRoadtripPlaceQuery(trip,origin);
+ const queries=buildRoadtripPlaceQueries(trip,origin);
  const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
- let payload=null;
- for(const endpoint of endpoints){
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
-   try{
-     const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});
-     if(!response.ok)continue;
-     const candidate=await response.json();
-     if(candidate?.elements?.length){payload=candidate;break}
-   }catch(error){console.warn('Roadtrip place discovery provider failed',endpoint,error)}
-   finally{clearTimeout(timer)}
+ const elements=[],seenOsm=new Set();
+ // Each small geographic batch can fail independently. A provider timeout no
+ // longer destroys the entire country/region discovery run.
+ for(let q=0;q<queries.length;q++){
+   let batch=null;
+   for(let e=0;e<endpoints.length;e++){
+     const endpoint=endpoints[(q+e)%endpoints.length];
+     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+     try{
+       const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:queries[q]}),signal:controller.signal});
+       if(!response.ok)continue;
+       const candidate=await response.json();
+       if(Array.isArray(candidate?.elements)){batch=candidate.elements;break}
+     }catch(error){console.warn('Roadtrip place discovery batch failed',q+1,endpoint,error)}
+     finally{clearTimeout(timer)}
+   }
+   for(const el of batch||[]){
+     const key=`${el.type||'x'}:${el.id||`${el.lat}:${el.lon}`}`;
+     if(seenOsm.has(key))continue;seenOsm.add(key);elements.push(el);
+   }
  }
- if(!payload?.elements?.length)return 0;
-
+ if(!elements.length)return 0;
  const knownIds=new Set(state.catalog.map(x=>x.id));
  const existingPoints=state.catalog.flatMap(x=>x.bases||[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));
- const candidates=payload.elements.map(el=>roadtripDiscoveredProfile(trip,el,origin)).filter(Boolean)
+ const candidates=elements.map(el=>roadtripDiscoveredProfile(trip,el,origin)).filter(Boolean)
    .filter(item=>!knownIds.has(item.id))
    .filter(item=>!existingPoints.some(p=>geoDistanceKm(p,item.bases[0])<12))
    .sort((a,b)=>a.distanceKm-b.distanceKm);
  const selected=[];
  for(const item of candidates){
-   if(selected.some(x=>geoDistanceKm(x.bases[0],item.bases[0])<35))continue;
+   if(selected.some(x=>geoDistanceKm(x.bases[0],item.bases[0])<22))continue;
    selected.push(item);
-   if(selected.length>=90)break;
+   if(selected.length>=140)break;
  }
  if(selected.length){state.catalog.push(...selected);refreshPortfolio()}
  return selected.length;
@@ -1117,7 +1130,7 @@ function initialize(){
   $('startPlanningBtn').addEventListener('click',()=>showView('plannerView'));$('continueTripBtn').addEventListener('click',()=>showView('plannerView'));
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
-  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData){await discoverLiveOptions();refreshPortfolio();scheduleReviewPrefetch()}});
+  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);if(state.trip.liveData){const roadtripAdded=await discoverRoadtripOvernightPool(state.trip);if(roadtripAdded>0)showError()}refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});if(state.trip.liveData){await discoverLiveOptions();refreshPortfolio();scheduleReviewPrefetch()}});
   let saveTimer;const autosave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{state.trip=readTripForm(state.trip);persistDraft()},300)};$('tripForm').addEventListener('input',autosave);$('tripForm').addEventListener('change',autosave);
   $('tripForm').addEventListener('reisslim:preferences-changed',()=>{
     const scrollY=window.scrollY;
