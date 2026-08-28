@@ -1,0 +1,41 @@
+{
+  "status": "PASS",
+  "root_cause": "The Start button still depended on app.js being successfully imported and initialized. If any ES-module import/startup error occurs, no handler inside app.js can exist.",
+  "fix": [
+    "Added critical-ui.js as a classic script loaded before app.js.",
+    "It owns the Start button in capture phase and therefore works independently of the app module lifecycle.",
+    "When app.js is healthy it calls the full startNewTrip reset through window.reisslimStartNewTrip exactly once.",
+    "If app.js is unavailable it still opens plannerView instead of leaving a dead button.",
+    "The delegated listener survives replacement of the button DOM node."
+  ],
+  "browser_acceptance": {
+    "pass": true,
+    "results": {
+      "fallback_actual_dom": {
+        "dashboard_active": false,
+        "planner_active": true
+      },
+      "full_handler": {
+        "calls": 1,
+        "planner_active": true
+      },
+      "replaced_node": {
+        "calls": 1,
+        "planner_active": true
+      }
+    }
+  },
+  "roadtrip_regression": {
+    "passed": 49,
+    "total": 49
+  },
+  "checks": {
+    "browser_actual_dom_fallback": true,
+    "browser_full_handler_once": true,
+    "browser_replaced_node": true,
+    "critical_script_loaded_before_app": true,
+    "app_exposes_full_reset": true,
+    "planning_regression_49": true
+  },
+  "browser_test_note": "Headless Chromium exercised the actual ReisSlim dashboard/planner DOM. External localhost navigation is blocked in this environment, so the actual index HTML was injected with page.set_content."
+}

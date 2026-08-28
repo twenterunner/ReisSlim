@@ -1187,8 +1187,6 @@ function setupPremiumPlannerControls(){
 }
 
 function initialize(){
-  const startPlanningButton=$('startPlanningBtn');
-  if(startPlanningButton)startPlanningButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();event.__reisslimStartHandled=true;startNewTrip()});
   const brandButton=$('brandBtn');
   if(brandButton){
     brandButton.setAttribute('role','button');brandButton.setAttribute('tabindex','0');
@@ -1343,11 +1341,6 @@ refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('r
   $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderRoadtripMap(state.plan)});
   document.querySelectorAll('[data-inspire]').forEach(button=>button.addEventListener('click',()=>{$('destinationQuery').value=button.dataset.inspire;showView('plannerView')}));
 }
-document.addEventListener('click',event=>{
-  const start=event.target.closest?.('#startPlanningBtn');
-  if(!start)return;
-  event.preventDefault();
-  if(!event.__reisslimStartHandled){event.__reisslimStartHandled=true;startNewTrip()}
-});
+window.reisslimStartNewTrip=startNewTrip;
 document.addEventListener('DOMContentLoaded',initialize);
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register(`./service-worker.js?build=${BUILD}`,{updateViaCache:'none'}).then(reg=>reg.update()).catch(console.warn));
