@@ -1,0 +1,37 @@
+{
+  "release": "1.10.8 / 1918",
+  "root_causes": {
+    "slow_search_button": "The initial best-option discovery is awaited before ranking, but 1916/1917 showed no pending overlay during that wait.",
+    "hang_at_88_percent": "After POI progress reached 22/22, the app entered overnight-accommodation enrichment. It queried each overnight sequentially and could try two Overpass endpoints at 5.5 seconds each per night, so a five-day trip could sit visibly at 88% for tens of seconds."
+  },
+  "changes": {
+    "pending_screens": "The same full-screen pending UI used for plan calculation now appears while 'Zoek mijn roadtrip' discovers and ranks options.",
+    "image_flip": "The 24 progress images rotate every 1000 ms in every operation using the pending overlay.",
+    "accommodation_progress": "Progress now advances from 88% to an explicit 89% accommodation stage and 94% final assembly.",
+    "hang_prevention": "Overnight lookups run in parallel, both mirrors are raced, per-request timeout is 4.2 s, and the entire stage has a 7 s watchdog. Timeout keeps the completed route/POI plan rather than blocking."
+  },
+  "verification": {
+    "syntax": {
+      "app.js": true,
+      "overnight-accommodation.js": true,
+      "routing-provider-1914.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "parallel_accommodation_test": {
+      "elapsed": 81,
+      "max": 8,
+      "calls": 8,
+      "found": 2
+    },
+    "image_interval_ms": 1000,
+    "accommodation_watchdog_ms": 7000,
+    "android_device_not_executed_here": true
+  }
+}
