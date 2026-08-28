@@ -1,0 +1,44 @@
+{
+  "release": "1.14.1 / 1928",
+  "root_cause": {
+    "hard_distinct_rule": "The deployed 1927 policy calculates 8 required distinct overnight regions for a 10-day trip (9 nights).",
+    "max_changes_conflict": "The same default trip allows only 5 accommodation changes, which can produce at most 6 distinct overnight bases. The policy therefore asked discovery for a route that contradicted the trip's own hard setting.",
+    "repeat_rule_conflict": "The deployed validator allowed only one repeated night, so it could not represent the multi-night stays required by maxChanges=5. The beam solver also did not track accommodation changes."
+  },
+  "correction": {
+    "distinct_requirement": "The moving-roadtrip distinct-base target remains high, but is capped by maxChanges + 1.",
+    "change_aware_solver": "The overnight beam now tracks accommodation changes and never exceeds maxChanges.",
+    "deliberate_repeat_slots": "Necessary multi-night stays are placed at deterministic, evenly spaced rest slots so they cannot be pruned away by the route scorer.",
+    "repeat_validation": "The repeat allowance is derived from trip length and required distinct bases, rather than a fixed one-night maximum."
+  },
+  "verification": {
+    "default_10_day_case": {
+      "required": 6,
+      "nights": 9,
+      "distinct": 6,
+      "changes": 5,
+      "sequence": [
+        "B",
+        "I",
+        "I",
+        "H",
+        "C",
+        "C",
+        "K",
+        "K",
+        "D"
+      ]
+    },
+    "matrix_cases": 35,
+    "all_returned_paths_respect_max_changes": true,
+    "all_returned_paths_respect_distinct_minimum": true,
+    "all_returned_paths_respect_change_compatible_distinct_maximum": true,
+    "live_android_not_executed_here": true,
+    "representative_geography_default_10_day": {
+      "cases": 30,
+      "valid_paths": 24,
+      "coverage": "6 bearings at 140, 220, 320, 450 and 600 km from origin",
+      "note": "All 24 representative cases through 450 km produced 9-night paths with 6 distinct bases and 5 accommodation changes. The six 600 km synthetic cases did not, which remains a legitimate reachability/search-supply boundary rather than being masked."
+    }
+  }
+}
