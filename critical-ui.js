@@ -1,67 +1,91 @@
 (function(){
-  function showPlannerFallback(){
-    document.querySelectorAll('.app-view').forEach(function(view){
-      view.classList.toggle('active', view.id === 'plannerView');
-    });
-    document.querySelectorAll('.nav-item').forEach(function(button){
-      button.classList.toggle('active', button.dataset.view === 'plannerView');
-    });
-    try{ window.scrollTo({top:0,left:0,behavior:'auto'}); }catch(_){}
-  }
+  var BUILD='1905';
+  var loadPromise=null;
+  var bootError=null;
 
-  function showSubmitUnavailable(){
+  function formError(text){
     var error=document.getElementById('formError');
     if(error){
-      error.textContent='De planner is nog niet volledig geladen. Vernieuw de pagina en probeer opnieuw.';
-      error.classList.remove('hidden');
-      error.scrollIntoView({block:'center'});
+      error.textContent=text||'';
+      error.classList.toggle('hidden',!text);
+      if(text)error.scrollIntoView({block:'center'});
     }
   }
 
-  function activateStart(event){
-    var button = event.target && event.target.closest ? event.target.closest('#startPlanningBtn') : null;
-    if(!button) return;
-    event.preventDefault();
-    if(event.__reisslimCriticalStartHandled) return;
-    event.__reisslimCriticalStartHandled = true;
-
-    if(typeof window.reisslimStartNewTrip === 'function'){
-      try{ window.reisslimStartNewTrip(); return; }
-      catch(error){ console.error('ReisSlim new-trip handler failed; using bootstrap fallback.', error); }
+  function setBusy(busy,text){
+    var submit=document.querySelector('#tripForm button[type="submit"]');
+    if(submit){
+      if(!submit.dataset.originalText)submit.dataset.originalText=submit.textContent;
+      submit.setAttribute('aria-busy',busy?'true':'false');
+      submit.textContent=busy?(text||'Planner laden…'):submit.dataset.originalText;
     }
-    showPlannerFallback();
+    var start=document.getElementById('startPlanningBtn');
+    if(start){
+      if(!start.dataset.originalText)start.dataset.originalText=start.textContent;
+      start.setAttribute('aria-busy',busy?'true':'false');
+      start.textContent=busy?(text||'Planner laden…'):start.dataset.originalText;
+    }
   }
 
-  async function invokeSubmit(form,event){
-    // Give the ES module a short opportunity to register even on a cold mobile load.
-    for(var i=0;i<40;i++){
-      if(typeof window.reisslimSubmitTrip === 'function'){
-        try{
-          await window.reisslimSubmitTrip(event);
-          return;
-        }catch(error){
-          console.error('ReisSlim trip submit failed.',error);
-          showSubmitUnavailable();
-          return;
+  function defaultLoader(){
+    return import('./app.js?v='+BUILD);
+  }
+
+  async function loadApp(){
+    if(typeof window.reisslimSubmitTrip==='function'&&typeof window.reisslimStartNewTrip==='function')return true;
+    if(loadPromise)return loadPromise;
+    bootError=null;
+    setBusy(true,'Planner laden…');
+    var loader=typeof window.__reisslimAppLoader==='function'?window.__reisslimAppLoader:defaultLoader;
+    loadPromise=(async function(){
+      try{
+        await loader();
+        if(typeof window.reisslimSubmitTrip!=='function'||typeof window.reisslimStartNewTrip!=='function'){
+          throw new Error('app.js geladen maar plannerfuncties ontbreken');
         }
+        document.documentElement.dataset.reisslimApp='ready';
+        formError('');
+        return true;
+      }catch(error){
+        bootError=error;
+        document.documentElement.dataset.reisslimApp='failed';
+        console.error('ReisSlim app-module kon niet worden geladen',error);
+        formError('De planner kon niet worden geladen: '+(error&&error.message?error.message:'onbekende modulefout')+'.');
+        return false;
+      }finally{
+        setBusy(false);
       }
-      await new Promise(function(resolve){setTimeout(resolve,50)});
-    }
-    showSubmitUnavailable();
+    })();
+    return loadPromise;
   }
 
-  function interceptSubmit(event){
-    var form=event.target;
-    if(!form || form.id!=='tripForm') return;
-    // Never allow native HTML form navigation/reload. That was the cause of
-    // "Zoek mijn roadtrip" returning to the dashboard when app.js was not ready.
+  async function activateStart(event){
+    var button=event.target&&event.target.closest?event.target.closest('#startPlanningBtn'):null;
+    if(!button)return;
     event.preventDefault();
-    if(event.__reisslimCriticalSubmitHandled) return;
-    event.__reisslimCriticalSubmitHandled=true;
-    void invokeSubmit(form,event);
+    event.stopPropagation();
+    if(event.__reisslimCriticalStartHandled)return;
+    event.__reisslimCriticalStartHandled=true;
+    if(await loadApp())window.reisslimStartNewTrip();
   }
 
-  document.addEventListener('click', activateStart, true);
-  document.addEventListener('submit', interceptSubmit, true);
-  window.reisslimShowPlannerFallback = showPlannerFallback;
+  async function interceptSubmit(event){
+    var form=event.target;
+    if(!form||form.id!=='tripForm')return;
+    event.preventDefault();
+    event.stopPropagation();
+    if(event.__reisslimCriticalSubmitHandled)return;
+    event.__reisslimCriticalSubmitHandled=true;
+    if(await loadApp())await window.reisslimSubmitTrip(event);
+  }
+
+  // One owner for both critical actions.
+  document.addEventListener('click',function(event){void activateStart(event)},true);
+  document.addEventListener('submit',function(event){void interceptSubmit(event)},true);
+
+  // Start loading immediately; interaction waits on the same promise.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){void loadApp()},{once:true});
+  else void loadApp();
+
+  window.reisslimLoadApp=loadApp;
 })();

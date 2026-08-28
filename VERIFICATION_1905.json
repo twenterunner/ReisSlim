@@ -1,0 +1,45 @@
+{
+  "status": "PASS",
+  "release": "1.9.5 / 1905",
+  "root_cause": "The current 1904 repository shows that critical-ui.js is running while app.js never reaches its handler registration. app.js itself is syntactically valid and registers before initialize(), so the failure is in ES-module loading/linking before app.js executes. The old architecture allowed a half-loaded planner and then guessed failure after two seconds.",
+  "strategy_change": [
+    "Single atomic boot path: critical-ui.js owns app loading; index.html no longer separately starts app.js.",
+    "Start and Search both await the same module-load promise; there is no arbitrary timeout.",
+    "All 25 direct app.js imports use ?v=1905 to prevent direct dependency version mixing.",
+    "The service worker never substitutes stale cached code for current JS/CSS/JSON requests.",
+    "If module linking genuinely fails, the exact browser error is shown instead of the vague 'planner not fully loaded' message."
+  ],
+  "browser_acceptance": {
+    "pass": true,
+    "results": {
+      "slow_start": {
+        "calls": 1,
+        "planner": true,
+        "ready": "ready"
+      },
+      "slow_submit": {
+        "calls": 1,
+        "sameUrl": true,
+        "ready": "ready"
+      },
+      "load_failure": {
+        "state": "failed",
+        "error": "De planner kon niet worden geladen: mock import link failure."
+      }
+    }
+  },
+  "roadtrip_regression": {
+    "passed": 49,
+    "total": 49
+  },
+  "checks": {
+    "25_direct_imports_versioned": true,
+    "single_boot_path": true,
+    "critical_boot_present": true,
+    "no_two_second_timeout": true,
+    "boot_waits_same_promise": true,
+    "code_cache_no_stale_fallback": true,
+    "engine_version_unchanged": true,
+    "roadtrip_regression_49": true
+  }
+}
