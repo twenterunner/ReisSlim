@@ -1,0 +1,33 @@
+{
+  "release": "1.10.4 / 1914",
+  "root_causes": {
+    "routing": "1913 repaired drawing fallback but did not replace the routing execution. The deployed provider parallelized route days although loop return depends on completed outward geometry. The user screenshot showed dashed straight fallback segments, proving road geometry was not being rendered.",
+    "initial_options": "Initial submit ranked the static catalogue before live/global discovery. Retry therefore had a larger candidate pool and could reveal a better-scoring trip."
+  },
+  "changes": {
+    "routing": "Added routing-provider-1914.js. It routes road legs sequentially via OSRM, uses destination-aware daytrip routing, and evaluates loop-return alternatives after outward road geometry exists.",
+    "initial_options": "Initial form submit now performs a bounded discovery phase (max 12 s) before the first portfolio ranking."
+  },
+  "verification": {
+    "node_syntax": {
+      "app.js": true,
+      "routing-provider-1914.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "structural_dependency_race_removed": true,
+    "initial_discovery_precedes_ranking": true,
+    "android_live_network_not_available_in_test_environment": true,
+    "mocked_live_routing_test": {
+      "executed": true,
+      "max_concurrent_route_requests": 1,
+      "all_segments_received_osrm_geometry": true,
+      "plan_marked_live": true
+    }
+  }
+}

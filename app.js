@@ -1,28 +1,28 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1913';
-import { destinations } from './destinations.js?v=1913';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1913';
-import { discoverDestinationBatch } from './destination-provider.js?v=1913';
-import { buildItinerary } from './itinerary-engine.js?v=1913';
-import { buildItineraryVariants } from './itinerary-variants.js?v=1913';
-import { buildBudget } from './budget-engine.js?v=1913';
-import { calculateTripQuality } from './trip-quality-engine.js?v=1913';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1913';
-import { validatePlan } from './itinerary-validator.js?v=1913';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1913';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1913';
-import { downloadGpx, downloadJson } from './gpx-generator.js?v=1913';
-import { invalidateMap, renderMap } from './map-view.js?v=1913';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1913';
-import { evaluatePlanConstraints } from './constraint-engine.js?v=1913';
-import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1913';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1913';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1913';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1913';
-import { enrichDestinationImages } from './image-provider.js?v=1913';
-import { weatherWindowScore } from './weather-engine.js?v=1913';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1913';
-import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1913';
-import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1913';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1914';
+import { destinations } from './destinations.js?v=1914';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1914';
+import { discoverDestinationBatch } from './destination-provider.js?v=1914';
+import { buildItinerary } from './itinerary-engine.js?v=1914';
+import { buildItineraryVariants } from './itinerary-variants.js?v=1914';
+import { buildBudget } from './budget-engine.js?v=1914';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1914';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1914';
+import { validatePlan } from './itinerary-validator.js?v=1914';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1914';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1914';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1914';
+import { invalidateMap, renderMap } from './map-view.js?v=1914';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider-1914.js?v=1914';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1914';
+import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1914';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1914';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1914';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1914';
+import { enrichDestinationImages } from './image-provider.js?v=1914';
+import { weatherWindowScore } from './weather-engine.js?v=1914';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1914';
+import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1914';
+import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1914';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripStructure:'moving',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
@@ -1214,23 +1214,22 @@ function initialize(){
   $('continueTripBtn').addEventListener('click',event=>{event.preventDefault();showView('plannerView')});
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
-  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);// Render the planner result immediately. Global roadtrip enrichment runs after
-// the first usable portfolio is visible; it must never block the submit button.
-refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);
+  // Search first, rank second: initial cards must come from the enriched pool.
+  setStatus('Beste reisopties zoeken en rangschikken…');
   if(state.trip.liveData){
-    // Do not await external discovery from the form submit path. Build 1746
-    // could wait for up to 8 batches × 2 providers × 11 s before anything
-    // appeared, making the button look dead on mobile.
-    void (async()=>{
-      try{
-        const added=await discoverRoadtripOvernightPool(state.trip);
-        refreshPortfolio();
-        // Only invoke the legacy discovery provider when the dedicated global
-        // roadtrip pipeline did not produce a useful pool. Never run both together.
-        if(added<6){await discoverLiveOptions({append:true,quiet:true});refreshPortfolio()}
-      }catch(error){console.warn('Background roadtrip enrichment failed',error)}
-      finally{scheduleReviewPrefetch()}
-    })();
+    try{
+      await Promise.race([
+        (async()=>{
+          const added=await discoverRoadtripOvernightPool(state.trip);
+          if(added<10)await discoverLiveOptions({append:true,quiet:true});
+        })(),
+        new Promise(resolve=>setTimeout(resolve,12000))
+      ]);
+    }catch(error){console.warn('Initiële live zoekronde onvolledig; beschikbare opties worden gerangschikt',error)}
+  }
+  refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+  scheduleReviewPrefetch();
   }});
 
 
