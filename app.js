@@ -1,28 +1,28 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1912';
-import { destinations } from './destinations.js?v=1912';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1912';
-import { discoverDestinationBatch } from './destination-provider.js?v=1912';
-import { buildItinerary } from './itinerary-engine.js?v=1912';
-import { buildItineraryVariants } from './itinerary-variants.js?v=1912';
-import { buildBudget } from './budget-engine.js?v=1912';
-import { calculateTripQuality } from './trip-quality-engine.js?v=1912';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1912';
-import { validatePlan } from './itinerary-validator.js?v=1912';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1912';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1912';
-import { downloadGpx, downloadJson } from './gpx-generator.js?v=1912';
-import { invalidateMap, renderMap } from './map-view.js?v=1912';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1912';
-import { evaluatePlanConstraints } from './constraint-engine.js?v=1912';
-import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1912';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1912';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1912';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1912';
-import { enrichDestinationImages } from './image-provider.js?v=1912';
-import { weatherWindowScore } from './weather-engine.js?v=1912';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1912';
-import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1912';
-import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1912';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1913';
+import { destinations } from './destinations.js?v=1913';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1913';
+import { discoverDestinationBatch } from './destination-provider.js?v=1913';
+import { buildItinerary } from './itinerary-engine.js?v=1913';
+import { buildItineraryVariants } from './itinerary-variants.js?v=1913';
+import { buildBudget } from './budget-engine.js?v=1913';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1913';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1913';
+import { validatePlan } from './itinerary-validator.js?v=1913';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1913';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1913';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1913';
+import { invalidateMap, renderMap } from './map-view.js?v=1913';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1913';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1913';
+import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1913';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1913';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1913';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1913';
+import { enrichDestinationImages } from './image-provider.js?v=1913';
+import { weatherWindowScore } from './weather-engine.js?v=1913';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1913';
+import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1913';
+import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1913';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripStructure:'moving',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
@@ -295,42 +295,28 @@ function prepareItineraryCarousel(){
 
 
 function reconcileDayEndpointsToRoad(plan){
-  if(!plan?.routing?.live)return plan;
-  const days=plan.days||[];
-  for(let i=0;i<days.length;i++){
-    const day=days[i],geometry=(day.geometry||[]).filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon));
-    if(geometry.length<2||!day.toPoint)continue;
-    const roadEnd=geometry.at(-1);
-    const mismatch=geoDistanceKm(day.toPoint,roadEnd);
-    // A live road route is authoritative for where the leg actually ends.
-    // Stale synthetic/day points several kilometres away can otherwise survive
-    // enrichment and appear as isolated markers in the sea.
-    if(mismatch>2.5){
-      day.toPoint={...day.toPoint,lat:roadEnd.lat,lon:roadEnd.lon,roadEndpointReconciled:true};
-      const next=days[i+1];
-      if(next?.fromPoint){
-        next.fromPoint={...next.fromPoint,lat:roadEnd.lat,lon:roadEnd.lon,roadEndpointReconciled:true};
-        if(Array.isArray(next.geometry)&&next.geometry.length){
-          next.geometry[0]={...next.geometry[0],lat:roadEnd.lat,lon:roadEnd.lon};
-        }
-      }
-    }
-  }
+  // The itinerary's real overnight/day endpoints are authoritative.
+  // Live route geometry may describe the road between them, but must never move
+  // those endpoints: doing so can collapse the following day to a zero-length leg.
   return plan;
 }
 
 function ensureRenderableDayGeometries(plan){
  if(!plan?.days)return plan;
+ const ok=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
  for(const day of plan.days){
    const from=day.fromPoint,to=day.toPoint,target=day.destinationPoint;
-   if(day.kind==='daytrip'&&from&&target&&to&&Number.isFinite(from.lat)&&Number.isFinite(target.lat)&&Number.isFinite(to.lat)){
-     const valid=(day.geometry||[]).filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon));
-     if(valid.length<3)day.geometry=[{...from},{...target},{...to}];
+   const geometry=(day.geometry||[]).filter(ok).map(p=>({...p,lat:Number(p.lat),lon:Number(p.lon)}));
+   if(day.kind==='daytrip'&&ok(from)&&ok(target)&&ok(to)){
+     const reachesTarget=geometry.some(p=>geoDistanceKm(p,target)<2);
+     day.geometry=(geometry.length>=3&&reachesTarget)?geometry:[{...from},{...target},{...to}];
      continue;
    }
-   if(['outward','transfer','return'].includes(day.kind)&&from&&to&&Number.isFinite(from.lat)&&Number.isFinite(from.lon)&&Number.isFinite(to.lat)&&Number.isFinite(to.lon)){
-     const valid=(day.geometry||[]).filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon));
-     if(valid.length<2)day.geometry=[{...from},{...to}];
+   if(['outward','transfer','return'].includes(day.kind)&&ok(from)&&ok(to)){
+     const starts=geometry.length>=2&&geoDistanceKm(geometry[0],from)<3;
+     const ends=geometry.length>=2&&geoDistanceKm(geometry.at(-1),to)<3;
+     // Live routing is enhancement, never a prerequisite for drawing the trip.
+     day.geometry=(starts&&ends)?geometry:[{...from},{...to}];
    }
  }
  return plan;

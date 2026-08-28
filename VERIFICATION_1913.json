@@ -1,0 +1,15 @@
+{
+  "release": "1.10.3 / 1913",
+  "why_1912_failed": "The hidden-map hypothesis was not the complete cause. The renderer accepted any geometry with >=2 points, even when partial live enrichment no longer matched the day's canonical from/to endpoints. reconcileDayEndpointsToRoad could also move itinerary endpoints based on live geometry, which can collapse the next leg.",
+  "change": "Canonical endpoints are now immutable during reconciliation. Every outward/transfer/return geometry must begin/end at its actual day endpoints or is replaced by guaranteed from-to geometry. Daytrips must include the target or are replaced by base-target-base. Thus a valid Eifel/Sauerland plan always has drawable route segments even if live routing is partial.",
+  "verification": {
+    "node_syntax": true,
+    "geometry_cases": {
+      "missing_geometry": true,
+      "one_point": true,
+      "wrong_end": true,
+      "valid": true
+    },
+    "external_live_provider_not_executed": true
+  }
+}
