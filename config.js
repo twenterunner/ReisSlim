@@ -1,6 +1,6 @@
-export const VERSION = '1.7.41';
-export const BUILD = '1741';
-export const ENGINE_VERSION = 34;
+export const VERSION = '1.7.42';
+export const BUILD = '1742';
+export const ENGINE_VERSION = 35;
 export const STORAGE_SCHEMA_VERSION = 7;
 
 export const preferenceDefinitions = [

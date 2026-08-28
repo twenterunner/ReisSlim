@@ -241,8 +241,11 @@ function roadtripIntentReport(trip,plan){
  const days=Number(trip?.days||0);if(days<3||trip.routeTopology==='open-ended')return{valid:true,reason:'not-closed-multiday'};
  const routeDays=plan?.days||[];if(routeDays.length!==days)return{valid:false,reason:`${routeDays.length}/${days} reisdagen`};
  let moved=0,illegalShortMove=0,intentionalStays=0;
- for(let i=0;i<routeDays.length;i++){const d=routeDays[i],from=d.fromPoint,to=d.toPoint,same=d.kind==='stay'||(from&&to&&geoDistanceKm(from,to)<12);
-   if(same){intentionalStays++;continue}const direct=geoDistanceKm(from,to);if(i<days-1&&direct<50)illegalShortMove++;if(direct>=50)moved++}
+ for(let i=0;i<routeDays.length;i++){const d=routeDays[i],from=d.fromPoint,to=d.toPoint,hasPoints=Boolean(from&&to&&Number.isFinite(from.lat)&&Number.isFinite(from.lon)&&Number.isFinite(to.lat)&&Number.isFinite(to.lon));
+   const same=d.kind==='stay'&&hasPoints&&geoDistanceKm(from,to)<12;
+   if(same){intentionalStays++;continue}
+   if(!hasPoints){illegalShortMove++;continue}
+   const direct=geoDistanceKm(from,to);if(i<days-1&&direct<50)illegalShortMove++;if(direct>=50)moved++}
  const overnightNames=routeDays.slice(0,-1).map(d=>String(d.overnight||'').trim()).filter(Boolean);
  const origin=plan?.routeMetrics?.origin||plan?.origin;
  const leavesOrigin=routeDays.some(d=>d.toPoint&&origin&&geoDistanceKm(origin,d.toPoint)>=50);
@@ -972,19 +975,29 @@ function showProposalDetails(id){
   setTimeout(()=>target?.classList.remove('proposal-focus-flash'),1400);
 }
 
+function roadtripDiscoveryRadiusKm(trip){const leg=tourLegLimitKm(trip),days=Math.max(3,Number(trip.days||3));return Math.round(Math.min(650,Math.max(160,leg*Math.min(1.65,.85+days*.12))))}
+function roadtripDiscoveredProfile(trip,element,origin){
+ const tags=element?.tags||{},point=Number.isFinite(element?.lat)&&Number.isFinite(element?.lon)?{lat:element.lat,lon:element.lon}:element?.center,name=tags['name:nl']||tags.name;
+ if(!name||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lon))return null;const originKm=geoDistanceKm(origin,point);if(originKm<50)return null;
+ const importance=tags.place==='city'?95:tags.place==='town'?82:tags.place==='village'?62:55,id=`roadtrip-osm-${element.type||'place'}-${element.id||Math.round(point.lat*1e5)+'-'+Math.round(point.lon*1e5)}`,base={name,lat:Number(point.lat),lon:Number(point.lon)};
+ return{id,name:`${name} & omgeving`,country:tags['addr:country']||tags['is_in:country']||'Live regio',distanceKm:Math.round(originKm*1.18),driveHours:Number((originKm*1.18/72).toFixed(1)),nightMid:125,activityDaily:45,toll:0,tags:['natuur','cultuur','eten'],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:7,camper:7,weather:7,crowds:7,summary:`Live gevonden overnachtingsregio rond ${name}.`,pros:['Echte benoemde plaats','Geschikt als roadtrip-overnachtingsregio'],cons:['Verblijf en POI’s worden na selectie live ingevuld'],routeStops:[],bases:[base],activities:Array.from({length:Math.max(2,Math.round(importance/28))},(_,i)=>({type:i%2?'cultuur':'natuur',title:`Verken ${name} en omgeving.`,tags:i%2?['cultuur']:['natuur']})),dynamic:true,roadtripCandidate:true,discoverySource:'OpenStreetMap roadtrip pool',osm:{type:element.type,id:element.id}};
+}
+async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=12000}={}){
+ const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return 0;
+ const radius=Math.round(roadtripDiscoveryRadiusKm(trip)*1000),lat=Number(origin.lat).toFixed(5),lon=Number(origin.lon).toFixed(5),query=`[out:json][timeout:18][maxsize:33554432];(nwr(around:${radius},${lat},${lon})[\"place\"~\"city|town|village\"][\"name\"];);out center 260;`;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{const response=await fetchImpl('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)return 0;
+   const payload=await response.json(),knownIds=new Set(state.catalog.map(x=>x.id)),existingPoints=state.catalog.flatMap(x=>x.bases||[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));
+   const candidates=(payload?.elements||[]).map(el=>roadtripDiscoveredProfile(trip,el,origin)).filter(Boolean).filter(item=>!knownIds.has(item.id)).filter(item=>!existingPoints.some(p=>geoDistanceKm(p,item.bases[0])<12)).sort((a,b)=>a.distanceKm-b.distanceKm),selected=[];
+   for(const item of candidates){if(selected.some(x=>geoDistanceKm(x.bases[0],item.bases[0])<35))continue;selected.push(item);if(selected.length>=80)break}if(selected.length){state.catalog.push(...selected);refreshPortfolio()}return selected.length;
+ }catch(error){console.warn('Roadtrip overnight discovery failed',error);return 0}finally{clearTimeout(timer)}
+}
 async function ensureTourPlanSupply(destination,basePlan){
   let plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   if(Number(state.trip?.days||0)<3||state.trip?.routeTopology==='open-ended')return plan;
-  if(roadtripIntentReport(state.trip,plan).valid)return plan;
-  if(!state.trip?.liveData)return plan;
-  for(let round=0;round<8;round++){
-    const deadline=Date.now()+9000;
-    while(state.discoveryBusy&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,120));
-    if(state.discoveryBusy)break;
-    await discoverLiveOptions({append:true,quiet:true});
-    plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
-    if(roadtripIntentReport(state.trip,plan).valid)return plan;
-  }
+  if(roadtripIntentReport(state.trip,plan).valid)return plan;if(!state.trip?.liveData)return plan;
+  await discoverRoadtripOvernightPool(state.trip);plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);if(roadtripIntentReport(state.trip,plan).valid)return plan;
+  for(let round=0;round<4;round++){const deadline=Date.now()+9000;while(state.discoveryBusy&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,120));if(state.discoveryBusy)break;await discoverLiveOptions({append:true,quiet:true});plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);if(roadtripIntentReport(state.trip,plan).valid)return plan}
   return plan;
 }
 async function applyVariant(id){
