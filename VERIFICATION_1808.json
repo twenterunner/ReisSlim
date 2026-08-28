@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "root_cause": [
+    "The only remaining 'Start een nieuwe reis' button was bound late inside initialize(). Any exception earlier in initialization could leave the visible button with no click handler.",
+    "startNewTrip() navigated only after clearDraft() and resetState(). If reset/persistence/rendering threw first, the click appeared to do nothing.",
+    "resetState() used several unguarded DOM/persistence side effects, so an unrelated UI problem could abort the new-trip action."
+  ],
+  "fix": [
+    "The critical Start button is now bound first in initialize(), before other setup.",
+    "A delegated document-level fallback also handles the button if the DOM node is replaced or initialization is partial.",
+    "The event is explicitly marked so the direct and delegated handlers cannot fire twice.",
+    "Planner navigation happens before reset side effects.",
+    "Nonessential reset UI/persistence operations are guarded so they cannot block navigation."
+  ],
+  "tests": {
+    "roadtrip_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "start_button": {
+      "pass": true,
+      "calls": 2,
+      "view": "plannerView",
+      "state": {
+        "trip": {
+          "origin": "Saasveld",
+          "days": 10,
+          "transport": "motorcycle"
+        },
+        "destination": null,
+        "plan": null
+      },
+      "events": [
+        "prevent",
+        "stop",
+        "view:plannerView",
+        "clear",
+        "reset",
+        "status",
+        "view:plannerView",
+        "clear",
+        "reset",
+        "status"
+      ]
+    },
+    "checks": {
+      "critical_binding_before_brand": true,
+      "direct_handler_marks_event": true,
+      "delegated_fallback_present": true,
+      "navigation_before_reset": true,
+      "reset_optional_dom_guards": true,
+      "no_top_new_trip_button": true,
+      "roadtrip_regression_49": true,
+      "start_button_acceptance": true
+    }
+  }
+}

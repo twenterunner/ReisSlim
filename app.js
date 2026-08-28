@@ -1101,20 +1101,33 @@ async function applyVariant(id){
   renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();
   if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)
 }
-function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
+function resetState(trip=defaults()){
+  Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null,globalDiscoveryBusy:false,anchorDiscoveryPriority:false});
+  writeTripForm(trip);
+  renderVehicleControls();
+  $('resultsSection')?.classList.add('hidden');
+  $('planSection')?.classList.add('hidden');
+  $('variantSection')?.classList.add('hidden');
+  $('noPlanItinerary')?.classList.remove('hidden');
+  $('mapHint')?.classList.remove('hidden');
+  try{persistDraft('Nieuw concept opgeslagen')}catch(error){console.warn('Nieuw concept kon niet direct worden opgeslagen',error)}
+  try{renderDashboard(state,loadTrips())}catch(error){console.warn('Dashboard kon niet direct worden ververst',error)}
+}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
 
 function startNewTrip(){
+  // Navigation is immediate. Reset follows synchronously, so a storage/dashboard
+  // side-effect can never make the button appear dead.
+  try{showView('plannerView')}catch(error){console.warn('Plannerweergave kon niet direct worden geopend',error)}
+  try{window.scrollTo({top:0,left:0,behavior:'auto'})}catch{}
   try{
     clearDraft();
     resetState(defaults());
-    showView('plannerView');
-    window.scrollTo({top:0,left:0,behavior:'auto'});
     setStatus('Nieuw reisconcept gestart');
     return true;
   }catch(error){
     console.error('Nieuwe reis starten mislukt',error);
-    showError('Nieuwe reis kon niet worden gestart. Vernieuw de pagina en probeer opnieuw.');
+    showError('Nieuwe reis kon niet volledig worden gereset. De planner is geopend; controleer de velden.');
     return false;
   }
 }
@@ -1131,6 +1144,8 @@ function setupPremiumPlannerControls(){
 }
 
 function initialize(){
+  const startPlanningButton=$('startPlanningBtn');
+  if(startPlanningButton)startPlanningButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();event.__reisslimStartHandled=true;startNewTrip()});
   const brandButton=$('brandBtn');
   if(brandButton){
     brandButton.setAttribute('role','button');brandButton.setAttribute('tabindex','0');
@@ -1152,7 +1167,6 @@ function initialize(){
   const restored=loadDraft();if(restored?.trip)rebuildFromRecord(restored);else resetState();renderDashboard(state,loadTrips());
   document.querySelectorAll('.nav-item').forEach(button=>button.addEventListener('click',()=>{showView(button.dataset.view);if(button.dataset.view==='mapView')invalidateMap()}));
   document.querySelectorAll('[data-go-planner]').forEach(b=>b.addEventListener('click',()=>showView('plannerView')));
-  $('startPlanningBtn').addEventListener('click',event=>{event.preventDefault();startNewTrip()});
   $('continueTripBtn').addEventListener('click',event=>{event.preventDefault();showView('plannerView')});
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
@@ -1286,5 +1300,11 @@ refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('r
   $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderMap(state.plan)});
   document.querySelectorAll('[data-inspire]').forEach(button=>button.addEventListener('click',()=>{$('destinationQuery').value=button.dataset.inspire;showView('plannerView')}));
 }
+document.addEventListener('click',event=>{
+  const start=event.target.closest?.('#startPlanningBtn');
+  if(!start)return;
+  event.preventDefault();
+  if(!event.__reisslimStartHandled){event.__reisslimStartHandled=true;startNewTrip()}
+});
 document.addEventListener('DOMContentLoaded',initialize);
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register(`./service-worker.js?build=${BUILD}`,{updateViaCache:'none'}).then(reg=>reg.update()).catch(console.warn));
