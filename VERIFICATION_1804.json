@@ -1,0 +1,46 @@
+{
+  "status": "PASS",
+  "root_cause": [
+    "Selected-region discovery stopped at 24 raw places even if those places were too geographically clustered to satisfy the 50 km overnight rule.",
+    "The old query order exhausted the nearest distance ring before farther rings, making a dense Sauerland cluster hit that count before useful outer-ring towns were searched.",
+    "Earlier tests began with a good candidate pool, so they tested the solver but missed this discovery-to-solver supply defect."
+  ],
+  "fix": [
+    "Anchor discovery now stops only after the production solver can build all required overnight stops.",
+    "Each anchor batch spans 35, 70, 115 and 165 km search rings.",
+    "The 24-place stop is retained only for background portfolio discovery, not selected-trip discovery.",
+    "The selected plan performs one feasibility-driven anchor discovery and then rebuilds."
+  ],
+  "tests": {
+    "regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "discovery_supply": {
+      "pass": true,
+      "batches": 16,
+      "anchorBatches": 8,
+      "rawDenseCount": 24,
+      "denseFeasible": false,
+      "spreadFeasible": true,
+      "path": [
+        "Winterberg",
+        "Kassel",
+        "Schmallenberg",
+        "Korbach"
+      ]
+    },
+    "checks": {
+      "prior_49_regressions_pass": true,
+      "query_batches_span_geography": true,
+      "anchor_stop_uses_solver_feasibility": true,
+      "raw_24_stop_only_background": true,
+      "anchor_queries_before_origin": true,
+      "selected_plan_invokes_anchor_search": true,
+      "no_legacy_fallback_in_plan_supply": true,
+      "dense_24_reproduced_as_infeasible": true,
+      "spread_sauerland_pool_feasible": true
+    }
+  },
+  "limitations": "External Overpass cannot be live-called from this sandbox. The exact production query builder was executed, the production solver reproduced the dense-pool failure and passed after geographic spread was supplied, and all 49 prior regressions were rerun."
+}

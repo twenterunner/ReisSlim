@@ -941,19 +941,35 @@ function roadtripSearchSeed(origin,distanceKm,bearingDeg){
 function buildRoadtripPlaceQueries(trip,origin,anchor=null){
  const maxLeg=tourLegLimitKm(trip),days=Math.max(3,Number(trip.days||3));
  const outer=Math.min(620,Math.max(180,maxLeg*Math.min(1.55,.92+days*.10)));
- const rings=[.28,.48,.70,.90].map(f=>Math.max(60,outer*f));
- const bearings=[0,45,90,135,180,225,270,315],seeds=[],centres=[];
- if(anchor&&Number.isFinite(anchor.lat)&&Number.isFinite(anchor.lon))centres.push({point:anchor,rings:[35,70,115,165],radius:24000});
- centres.push({point:origin,rings,radius:26000});
- for(const group of centres)for(let r=0;r<group.rings.length;r++)for(let i=0;i<bearings.length;i++){
-   const p=roadtripSearchSeed(group.point,group.rings[r],bearings[i]+(r%2?22.5:0));seeds.push({p,radius:group.radius});
- }
+ const originRings=[.28,.48,.70,.90].map(f=>Math.max(60,outer*f));
+ const bearings=[0,45,90,135,180,225,270,315];
+ const groups=[];
+ if(anchor&&Number.isFinite(anchor.lat)&&Number.isFinite(anchor.lon))groups.push({point:anchor,rings:[35,70,115,165],radius:24000,kind:'anchor'});
+ groups.push({point:origin,rings:originRings,radius:26000,kind:'origin'});
  const batches=[];
- for(let i=0;i<seeds.length;i+=4){
-   const clauses=seeds.slice(i,i+4).map(({p,radius})=>`nwr(around:${radius},${p.lat.toFixed(4)},${p.lon.toFixed(4)})["place"~"city|town|village"]["name"];`);
-   batches.push(`[out:json][timeout:10][maxsize:12582912];(${clauses.join('')});out center 90;`);
+ // Geographic-spread first: each query contains one seed from every distance
+ // ring on the same bearing. This prevents a dense inner ring from satisfying
+ // a raw candidate-count threshold before the solver has usable roadtrip legs.
+ for(const group of groups){
+   for(let b=0;b<bearings.length;b++){
+     const clauses=group.rings.map((distance,r)=>{
+       const p=roadtripSearchSeed(group.point,distance,bearings[b]+(r%2?22.5:0));
+       return `nwr(around:${group.radius},${p.lat.toFixed(4)},${p.lon.toFixed(4)})["place"~"city|town|village"]["name"];`;
+     });
+     batches.push({kind:group.kind,query:`[out:json][timeout:10][maxsize:12582912];(${clauses.join('')});out center 90;`});
+   }
  }
  return batches;
+}
+function roadtripPoolSupportsTrip(trip,origin,anchor){
+ if(!anchor||!Number.isFinite(anchor.lat)||!Number.isFinite(anchor.lon))return false;
+ const path=selectRoadtripOvernights({
+   origin:{...origin,name:trip.origin},
+   trip,
+   destination:{id:'selected-roadtrip-anchor',bases:[anchor]},
+   candidates:roadtripLandCandidates(origin)
+ });
+ return path.length===Math.max(0,Number(trip.days||0)-1);
 }
 function ingestRoadtripElements(trip,elements,origin){
  const knownIds=new Set(state.catalog.map(x=>x.id));
@@ -973,21 +989,32 @@ function ingestRoadtripElements(trip,elements,origin){
 async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=8500,anchor=null}={}){
  const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;
  if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon)){
-   globalThis.__REISSLIM_DISCOVERY={status:'no-origin',added:0,batches:0,providers:[]};return 0;
+   globalThis.__REISSLIM_DISCOVERY={status:'no-origin',added:0,batches:0,providers:[],feasible:false};return 0;
  }
- if(state.globalDiscoveryBusy){const until=Date.now()+26000;while(state.globalDiscoveryBusy&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,120));if(state.globalDiscoveryBusy)return 0}
+ if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
+   globalThis.__REISSLIM_DISCOVERY={status:'already-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
+ }
+ if(state.globalDiscoveryBusy){
+   const until=Date.now()+26000;
+   while(state.globalDiscoveryBusy&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,120));
+   if(state.globalDiscoveryBusy)return 0;
+   if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
+     globalThis.__REISSLIM_DISCOVERY={status:'became-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
+   }
+ }
  state.globalDiscoveryBusy=true;updateManualLiveDiscoveryButton();
- const queries=buildRoadtripPlaceQueries(trip,origin,anchor);
+ const batches=buildRoadtripPlaceQueries(trip,origin,anchor);
  const endpoints=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
- const seenOsm=new Set(),discoveryDeadline=Date.now()+24000,diag={status:'running',added:0,batches:0,failedBatches:0,providers:[],origin:{lat:origin.lat,lon:origin.lon}};
+ const seenOsm=new Set(),discoveryDeadline=Date.now()+(anchor?36000:24000);
+ const diag={status:'running',added:0,batches:0,failedBatches:0,providers:[],origin:{lat:origin.lat,lon:origin.lon},anchor:anchor?{lat:anchor.lat,lon:anchor.lon}:null,feasible:false};
  globalThis.__REISSLIM_DISCOVERY=diag;
  try{
-   for(let q=0;q<queries.length&&Date.now()<discoveryDeadline;q++){
+   for(let q=0;q<batches.length&&Date.now()<discoveryDeadline;q++){
      let batch=null,usedProvider=null;
      for(let e=0;e<endpoints.length&&Date.now()<discoveryDeadline;e++){
        const endpoint=endpoints[(q+e)%endpoints.length],controller=new AbortController(),remaining=Math.max(1200,Math.min(timeoutMs,discoveryDeadline-Date.now())),timer=setTimeout(()=>controller.abort(),remaining);
        try{
-         const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','Accept':'application/json'},body:new URLSearchParams({data:queries[q]}),signal:controller.signal});
+         const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','Accept':'application/json'},body:new URLSearchParams({data:batches[q].query}),signal:controller.signal});
          if(!response.ok)continue;
          const candidate=await response.json();
          if(Array.isArray(candidate?.elements)){batch=candidate.elements;usedProvider=endpoint;break}
@@ -999,23 +1026,23 @@ async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=850
      diag.providers.push(usedProvider);
      const unique=[];
      for(const el of batch){const key=`${el.type||'x'}:${el.id||`${el.lat}:${el.lon}`}`;if(seenOsm.has(key))continue;seenOsm.add(key);unique.push(el)}
-     // Critical: publish every successful batch immediately. The old code waited
-     // for the entire multi-batch run, so one slow provider kept SA at 1-2 cards.
-     const added=ingestRoadtripElements(trip,unique,origin);diag.added+=added;
-     if(diag.added>=24)break;
+     diag.added+=ingestRoadtripElements(trip,unique,origin);
+     if(anchor){
+       diag.feasible=roadtripPoolSupportsTrip(trip,origin,anchor);
+       if(diag.feasible){diag.status='feasible';break}
+     }else if(diag.added>=24){diag.status='portfolio-ready';break}
    }
-   diag.status=diag.added?'ok':'empty';return diag.added;
+   if(diag.status==='running')diag.status=diag.feasible?'feasible':diag.added?'partial':'empty';
+   return diag.added;
  }finally{state.globalDiscoveryBusy=false;updateManualLiveDiscoveryButton()}
 }
-
 async function ensureTourPlanSupply(destination,basePlan){
   let plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   if(Number(state.trip?.days||0)<2||roadtripIntentReport(state.trip,plan).valid||!state.trip?.liveData)return plan;
   const anchor=destination?.bases?.[0]||null;
-  for(let round=0;round<2;round++){
+  if(anchor&&Number.isFinite(anchor.lat)&&Number.isFinite(anchor.lon)){
     await discoverRoadtripOvernightPool(state.trip,{anchor});
     plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
-    if(roadtripIntentReport(state.trip,plan).valid)return plan;
   }
   return plan;
 }
