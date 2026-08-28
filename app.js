@@ -9,7 +9,7 @@ import { calculateTripQuality } from './trip-quality-engine.js';
 import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js';
 import { validatePlan } from './itinerary-validator.js';
 import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model-1909.js';
 import { downloadGpx, downloadJson } from './gpx-generator.js';
 import { invalidateMap, renderMap } from './map-view.js';
 import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js';
@@ -20,7 +20,7 @@ import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } f
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
 import { enrichDestinationImages } from './image-provider.js';
 import { weatherWindowScore } from './weather-engine.js';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy-1909.js';
 import { enrichOvernightAccommodations } from './overnight-accommodation.js';
 import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js';
 

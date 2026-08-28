@@ -1,0 +1,46 @@
+{
+  "status": "PASS",
+  "release": "1.9.9 / 1909",
+  "root_cause_proven": {
+    "finding": "The button regression started in 1.9.0 when app.js added named imports selectRoadtripBase and selectBaseDayTrips from roadtrip-policy.js. The previously working 1.8.8 roadtrip-policy.js does not export those names. If the service worker/browser supplies that cached 1.8.8 module while loading a newer app.js, ES-module linking fails before app.js executes, so no button handlers can be registered.",
+    "reproduction": "A Node ESM test using the exact 1.8.8 roadtrip-policy.js and the new named imports fails with 'does not provide an export named'.",
+    "not_a_button_handler_bug": "This occurs before initialize() and before any click/submit listener can exist."
+  },
+  "fix": [
+    "app.js now imports roadtrip-policy-1909.js, a unique module filename that has never existed in an older cache.",
+    "app.js also imports trip-model-1909.js to keep the new tripStructure model in the same clean code generation.",
+    "A one-time release-reset script unregisters old ReisSlim service workers, deletes old ReisSlim caches, and reloads exactly once.",
+    "The new service worker never falls back to stale cached JS/CSS/JSON code; current code either loads as one generation or fails rather than mixing versions.",
+    "The native app.js Start and Search handlers from the restored architecture remain unchanged."
+  ],
+  "verification": {
+    "stale_1808_policy_link_test": "FAIL as expected",
+    "unique_1909_policy_link_test": "PASS",
+    "one_time_cache_reset": {
+      "pass": true,
+      "unregisters": 1,
+      "deletes": 1,
+      "replaces": 1,
+      "lastUrl": "https://example.test/ReisSlim/?release=1909"
+    },
+    "roadtrip_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "checks": {
+      "exact_old_cache_failure_reproduced": true,
+      "unique_policy_link_pass": true,
+      "unique_policy_import": true,
+      "unique_trip_model_import": true,
+      "one_time_cache_reset": true,
+      "reset_loaded_before_app": true,
+      "visible_release_1909": true,
+      "sw_cache_1909": true,
+      "sw_no_stale_code_fallback": true,
+      "obsolete_critical_not_precached": true,
+      "unique_modules_precached": true,
+      "engine_version_unchanged": true,
+      "roadtrip_regression_49": true
+    }
+  }
+}
