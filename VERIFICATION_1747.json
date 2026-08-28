@@ -1,0 +1,25 @@
+{
+  "root_cause": "Build 1746 awaited roadtrip discovery inside the trip form submit handler. With 8 batches, 2 providers and 11s per-request timeout, mobile provider latency could make the button appear to do nothing before results were rendered.",
+  "checks": {
+    "syntax_app.js": true,
+    "syntax_config.js": true,
+    "syntax_service-worker.js": true,
+    "syntax_ui-feature-flags.js": true,
+    "no_await_roadtrip_in_submit": true,
+    "results_visible_before_network": true,
+    "portfolio_render_before_network": true,
+    "background_failure_caught": true,
+    "global_discovery_deadline": true,
+    "submit_nonblocking_acceptance": true
+  },
+  "acceptance": {
+    "pass": true,
+    "events": [
+      "portfolio-rendered",
+      "results-visible",
+      "scrolled",
+      "submit-returned",
+      "network-finished"
+    ]
+  }
+}
