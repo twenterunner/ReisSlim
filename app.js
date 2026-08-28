@@ -1,29 +1,30 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1920';
-import { destinations } from './destinations.js?v=1920';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1920';
-import { discoverDestinationBatch } from './destination-provider.js?v=1920';
-import { buildItinerary } from './itinerary-engine.js?v=1920';
-import { buildItineraryVariants } from './itinerary-variants.js?v=1920';
-import { buildBudget } from './budget-engine.js?v=1920';
-import { calculateTripQuality } from './trip-quality-engine.js?v=1920';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1920';
-import { validatePlan } from './itinerary-validator.js?v=1920';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1920';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1920';
-import { downloadGpx, downloadJson } from './gpx-generator.js?v=1920';
-import { invalidateMap, renderMap } from './map-view.js?v=1920';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider-1914.js?v=1920';
-import { evaluatePlanConstraints } from './constraint-engine.js?v=1920';
-import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1920';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1920';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1920';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1920';
-import { enrichDestinationImages } from './image-provider.js?v=1920';
-import { weatherWindowScore } from './weather-engine.js?v=1920';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1920';
-import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1920';
-import { fillMissingDayPois } from './poi-gap-filler.js?v=1920';
-import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1920';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1922';
+import { destinations } from './destinations.js?v=1922';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1922';
+import { discoverDestinationBatch } from './destination-provider.js?v=1922';
+import { buildItinerary } from './itinerary-engine.js?v=1922';
+import { buildItineraryVariants } from './itinerary-variants.js?v=1922';
+import { buildBudget } from './budget-engine.js?v=1922';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1922';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1922';
+import { validatePlan } from './itinerary-validator.js?v=1922';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1922';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1922';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1922';
+import { invalidateMap, renderMap } from './map-view.js?v=1922';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider-1914.js?v=1922';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1922';
+import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1922';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1922';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1922';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1922';
+import { enrichDestinationImages } from './image-provider.js?v=1922';
+import { weatherWindowScore } from './weather-engine.js?v=1922';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1922';
+import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1922';
+import { fillMissingDayPois } from './poi-gap-filler.js?v=1922';
+import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1922';
+import { mapConcurrent, firstSuccessful, makeCache } from './roadtrip-runtime-engine.js?v=1922';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripStructure:'moving',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
@@ -272,7 +273,7 @@ function renderStrongOptimizationPreview(){const p=state.optimizationProposal,bo
 function syncPlanVisualHero(){if(!$('planVisualHero')||!state.trip)return;const title=state.destination?.name||'Jouw roadtrip';$('planVisualTitle').textContent=title;$('planVisualDays').textContent=`${state.trip.days} ${state.trip.days===1?'dag':'dagen'}`;$('planVisualRoute').textContent=state.plan?.topology==='day-loop'?'Daglus':state.plan?.topology==='daytrip'?'Dagtrip':state.trip.routeTopology==='loop'?'Lusroute':state.trip.routeTopology==='open-ended'?'Open einde':'Heen & terug';$('planVisualBudget').textContent=state.budget?.total?`± €${Math.round(state.budget.total).toLocaleString('nl-NL')}`:`Budget €${Number(state.trip.budget||0).toLocaleString('nl-NL')}`;const img=$('planVisualImage'),url=String(state.destination?.image?.url||'');if(img){if(/^https:\/\//i.test(url)){img.src=url;img.alt=`Beeld van ${title} langs de voorgestelde route`;img.hidden=false}else{img.removeAttribute('src');img.alt='';img.hidden=true}}}
 function resetOptimizerLocks(){document.querySelectorAll('[data-optimizer-lock]').forEach(x=>{x.checked=false;x.defaultChecked=false});if($('optimizationMode'))$('optimizationMode').value='maximum'}
 
-const PLAN_LOADING_IMAGES=['progress-01.webp','progress-02.webp','progress-03.webp','progress-04.webp','progress-05.webp','progress-06.webp','progress-07.webp','progress-08.webp','progress-09.webp','progress-10.webp','progress-11.webp','progress-12.webp','progress-13.webp','progress-14.webp','progress-15.webp','progress-16.webp','progress-17.webp','progress-18.webp','progress-19.webp','progress-20.webp','progress-21.webp','progress-22.webp','progress-23.webp','progress-24.webp'];
+const PLAN_LOADING_IMAGES=['home-hero-photo-v2.webp','planner-hero-photo-v2.webp','dolomieten.webp','harz.webp','slovenie.webp','home-hero.webp','planner-hero.webp'];
 let planLoadingImageTimer=null,planLoadingImageIndex=0,planLoadingProgress=0;
 function showPlanLoading(title='Reisplan voorbereiden…',text='We bouwen je route stap voor stap op.'){
   const overlay=$('planLoadingOverlay');if(!overlay)return;
@@ -283,7 +284,7 @@ function showPlanLoading(title='Reisplan voorbereiden…',text='We bouwen je rou
   planLoadingImageTimer=setInterval(()=>{
     planLoadingImageIndex=(planLoadingImageIndex+1)%PLAN_LOADING_IMAGES.length;
     if(image)image.src=PLAN_LOADING_IMAGES[planLoadingImageIndex];
-  },1000);
+  },5000);
 }
 function updatePlanLoading(percent,title,text,stage=''){
   const overlay=$('planLoadingOverlay');if(!overlay)return;
@@ -432,21 +433,35 @@ async function enhanceLiveData(destinationId,originalPlan){
     // accommodation choice so it cannot conflict with vehicle-aware selection.
     for(const day of plan.days||[]){day.recommendations=(day.recommendations||[]).filter(item=>item.type!=='accommodation');day.sleepProposal=null}
     plan.recommendations=(plan.days||[]).flatMap(day=>day.recommendations||[]);
-    updatePlanLoading(89,'Overnachtingen controleren…','We koppelen voertuiggeschikte verblijven aan de overnachtingsplaatsen.','Verblijf');
+    updatePlanLoading(89,'Overnachtingen zoeken…','We zoeken voor iedere nacht een concreet verblijf. De zoekradius wordt alleen vergroot als dat nodig is.','Verblijf');
     const accommodationBase=plan;
     try{
-      plan=await Promise.race([
-        enrichOvernightAccommodations(state.trip,plan,{timeoutMs:4200}),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('accommodation-stage-timeout')),7000))
-      ]);
+      plan=await enrichOvernightAccommodations(state.trip,plan,{
+        timeoutMs:14000,
+        onProgress:event=>{
+          if(run!==state.routingRun)return;
+          const completed=Number(event?.completed||0),total=Math.max(1,Number(event?.total||1));
+          const pct=89+Math.min(4,Math.round((completed/total)*4));
+          const place=event?.placeName?` rond ${event.placeName}`:'';
+          let text='Overnachtingen zoeken…';
+          if(event?.type==='accommodation-search-start')text=`Nacht ${Math.min(total,completed+1)}/${total}${place}: zoeken binnen ${event.radiusKm} km.`;
+          else if(event?.type==='accommodation-radius-empty')text=`Nog geen passend verblijf${place} binnen ${event.radiusKm} km; zoekgebied wordt vergroot.`;
+          else if(event?.type==='accommodation-fallback')text=`Overpass vond niets bruikbaars${place}; onafhankelijke OpenStreetMap-zoekbron proberen.`;
+          else if(event?.type==='accommodation-found')text=`${event.name} gevonden${place}.`;
+          else if(event?.type==='accommodation-day-complete')text=event.found?`Nacht ${completed}/${total} voorzien van verblijf.`:`Nacht ${completed}/${total}: geen concreet verblijf gevonden na alle bronnen.`;
+          updatePlanLoading(pct,'Overnachtingen zoeken…',text,'Verblijf');
+          planLiveBanner(`Stap 4/4 · ${text}`);
+          $('mapDataStatus').textContent=text;
+        }
+      });
     }catch(error){
-      console.warn('Overnachtingsverrijking overgeslagen na tijdslimiet',error);
+      console.warn('Overnachtingsverrijking kon niet volledig worden afgerond',error);
       plan=accommodationBase;
     }
     if(run!==state.routingRun||state.destination?.id!==destinationId)return;
     plan=reconcileDayEndpointsToRoad(plan);
 
-    updatePlanLoading(94,'Reisplan samenstellen…','We verwerken route, POI’s, weer, budget en dagplanning in één reisplan.','Samenstellen');
+    updatePlanLoading(94,'Reisplan samenstellen…','Route, plaatsen, weer en overnachtingen zijn verwerkt; we maken het plan af.','Samenstellen');
     const finalRoadtripCheck=roadtripIntentReport(state.trip,plan);
     if(!finalRoadtripCheck.valid){
       hidePlanLoading(false);
@@ -1066,7 +1081,7 @@ function ingestRoadtripElements(trip,elements,origin){
  if(selected.length){state.catalog.push(...selected);refreshPortfolio()}
  return selected.length;
 }
-async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=8500,anchor=null}={}){
+async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=8500,anchor=null,onProgress}={}){
  const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;
  if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon)){
    globalThis.__REISSLIM_DISCOVERY={status:'no-origin',added:0,batches:0,providers:[],feasible:false};return 0;
@@ -1074,63 +1089,88 @@ async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=850
  if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
    globalThis.__REISSLIM_DISCOVERY={status:'already-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
  }
- if(state.globalDiscoveryBusy){
-   // A user-selected itinerary has priority over background portfolio discovery.
-   // Build 1805 could make the selected Sauerland request wait behind a full
-   // origin-wide search for longer than the 26 s wait window, then return zero.
-   if(anchor)state.anchorDiscoveryPriority=true;
-   const until=Date.now()+(anchor?15000:26000);
-   while(state.globalDiscoveryBusy&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));
-   if(state.globalDiscoveryBusy){
-     if(anchor)globalThis.__REISSLIM_DISCOVERY={status:'anchor-wait-timeout',added:0,batches:0,providers:[],feasible:false};
-     return 0;
-   }
-   if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
-     state.anchorDiscoveryPriority=false;
-     globalThis.__REISSLIM_DISCOVERY={status:'became-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
-   }
- }
- if(anchor)state.anchorDiscoveryPriority=false;
- state.globalDiscoveryBusy=true;updateManualLiveDiscoveryButton();
- const batches=buildRoadtripPlaceQueries(trip,origin,anchor);
+
+ // Selected-trip discovery is never allowed to wait behind background portfolio work.
+ // The old global lock could hold Cape Town at 4% for 15–26 seconds before the real
+ // search even started.
+ if(anchor&&state.globalDiscoveryBusy)state.anchorDiscoveryPriority=true;
+ const ownsGlobalLock=!anchor;
+ if(ownsGlobalLock&&state.globalDiscoveryBusy)return 0;
+ if(ownsGlobalLock){state.globalDiscoveryBusy=true;updateManualLiveDiscoveryButton()}
+
+ const allBatches=buildRoadtripPlaceQueries(trip,origin,anchor);
+ const batches=anchor?allBatches.filter(x=>x.kind==='anchor'):allBatches;
  const endpoints=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
  const seenOsm=new Set();
+ const cache=makeCache(globalThis.localStorage,'reisslim.roadtrip-pool.v2');
+ const cacheBase=`${origin.lat.toFixed(2)},${origin.lon.toFixed(2)}:${anchor?`${anchor.lat.toFixed(2)},${anchor.lon.toFixed(2)}`:'origin'}:${trip.days}:${trip.maxDrive}`;
  const diag={status:'running',added:0,batches:0,failedBatches:0,providers:[],origin:{lat:origin.lat,lon:origin.lon},anchor:anchor?{lat:anchor.lat,lon:anchor.lon}:null,feasible:false};
  globalThis.__REISSLIM_DISCOVERY=diag;
+
+ async function loadBatch(entry,index){
+   const cached=cache.get(`${cacheBase}:${index}`);
+   if(Array.isArray(cached))return{elements:cached,provider:'cache',cached:true};
+   const tasks=endpoints.map(endpoint=>async()=>{
+     const controller=new AbortController();
+     const timer=setTimeout(()=>controller.abort(),Math.max(3500,Math.min(timeoutMs,anchor?7000:5500)));
+     try{
+       const response=await fetchImpl(endpoint,{
+         method:'POST',
+         headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','Accept':'application/json'},
+         body:new URLSearchParams({data:entry.query}),
+         signal:controller.signal
+       });
+       if(!response.ok)throw new Error(`Overpass ${response.status}`);
+       const payload=await response.json();
+       if(!Array.isArray(payload?.elements))throw new Error('invalid-overpass-payload');
+       return{elements:payload.elements,provider:endpoint,cached:false};
+     }finally{clearTimeout(timer)}
+   });
+   const result=await firstSuccessful(tasks);
+   cache.set(`${cacheBase}:${index}`,result.elements);
+   return result;
+ }
+
  try{
-   for(let q=0;q<batches.length;q++){
-     if(!anchor&&state.anchorDiscoveryPriority){diag.status='yielded-to-selected-trip';break}
-     let batch=null,usedProvider=null;
-     for(let e=0;e<endpoints.length;e++){
-       const endpoint=endpoints[(q+e)%endpoints.length],controller=new AbortController(),remaining=Math.max(1200,Math.min(timeoutMs,anchor?6500:5000)),timer=setTimeout(()=>controller.abort(),remaining);
-       try{
-         const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','Accept':'application/json'},body:new URLSearchParams({data:batches[q].query}),signal:controller.signal});
-         if(!response.ok)continue;
-         const candidate=await response.json();
-         if(Array.isArray(candidate?.elements)){batch=candidate.elements;usedProvider=endpoint;break}
-       }catch(error){console.warn('Roadtrip discovery batch/provider failed',q+1,endpoint,error)}
-       finally{clearTimeout(timer)}
+   let stop=false;
+   const results=await mapConcurrent(batches,async(entry,index)=>{
+     if(stop)return{skipped:true};
+     const result=await loadBatch(entry,index);
+     return{...result,index};
+   },{
+     concurrency:anchor?4:3,
+     onProgress:info=>{
+       const completed=info.completed,total=info.total;
+       onProgress?.({type:'overnight-pool-progress',completed,total,anchor:Boolean(anchor)});
+       if(anchor){
+         const pct=4+Math.round((completed/Math.max(1,total))*12);
+         updatePlanLoading(pct,'Overnachtingsregio’s zoeken…',`Zoekronde ${completed}/${total}: echte plaatsen rond de gekozen regio verzamelen.`,'Regio’s');
+       }
      }
+   });
+
+   for(const result of results){
      diag.batches++;
-     if(!batch){diag.failedBatches++;continue}
-     diag.providers.push(usedProvider);
+     if(!result||result.error||result.skipped){diag.failedBatches++;continue}
+     diag.providers.push(result.provider);
      const unique=[];
-     for(const el of batch){const key=`${el.type||'x'}:${el.id||`${el.lat}:${el.lon}`}`;if(seenOsm.has(key))continue;seenOsm.add(key);unique.push(el)}
+     for(const el of result.elements||[]){
+       const key=`${el.type||'x'}:${el.id||`${el.lat}:${el.lon}`}`;
+       if(seenOsm.has(key))continue;
+       seenOsm.add(key);unique.push(el);
+     }
      diag.added+=ingestRoadtripElements(trip,unique,origin);
-     if(!anchor&&state.anchorDiscoveryPriority){diag.status='yielded-to-selected-trip';break}
-     if(anchor){
-       diag.feasible=roadtripPoolSupportsTrip(trip,origin,anchor);
-       if(diag.feasible){diag.status='feasible';break}
-     }else{
-       // Before a destination is selected, raw place count is not evidence of
-       // usable roadtrip supply. Complete the geographic spread search.
-       diag.status='origin-spread-search';
+     if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
+       diag.feasible=true;stop=true;break;
      }
    }
    if(anchor)diag.status=diag.feasible?'feasible':diag.added?'partial':'empty';
-   else if(diag.status!=='yielded-to-selected-trip')diag.status=diag.added?'origin-complete':'empty';
+   else diag.status=diag.added?'origin-complete':'empty';
    return diag.added;
- }finally{state.globalDiscoveryBusy=false;updateManualLiveDiscoveryButton()}
+ }finally{
+   if(ownsGlobalLock){state.globalDiscoveryBusy=false;updateManualLiveDiscoveryButton()}
+   if(anchor)state.anchorDiscoveryPriority=false;
+ }
 }
 function mergeRegionalOvernightProfiles(profiles){
  const known=new Set(state.catalog.map(x=>x.id)),points=state.catalog.flatMap(x=>x.bases||[]);
@@ -1148,16 +1188,34 @@ async function ensureTourPlanSupply(destination,basePlan){
   const anchor=destination?.bases?.[0]||null;
   if(!anchor||!Number.isFinite(anchor.lat)||!Number.isFinite(anchor.lon))return plan;
 
-  // Source A: detailed Overpass place discovery.
-  await discoverRoadtripOvernightPool(state.trip,{anchor});
+  updatePlanLoading(5,'Reisplan opbouwen…','Nog niet genoeg echte overnachtingsregio’s; live regio’s worden nu gezocht.','Regio’s');
+
+  // Primary source: concurrent Overpass spread around the selected destination.
+  await discoverRoadtripOvernightPool(state.trip,{
+    anchor,
+    timeoutMs:8000,
+    onProgress:event=>{
+      const completed=Number(event.completed||0),total=Math.max(1,Number(event.total||1));
+      updatePlanLoading(5+Math.round((completed/total)*11),'Overnachtingsregio’s zoeken…',`OpenStreetMap-regio’s controleren · ${completed}/${total} zoekgroepen afgerond.`,'Regio’s');
+    }
+  });
+
   plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   if(roadtripIntentReport(state.trip,plan).valid)return plan;
 
-  // Source B: independent Nominatim reverse-geocoded regional seeds. This path
-  // deliberately does not use globalDiscoveryBusy, so provider/lock failures in
-  // source A cannot leave the selected trip without an overnight candidate pool.
+  // Independent fallback: reverse-geocoded regional seeds. It now runs concurrently
+  // and reports progress instead of appearing frozen at 4%.
+  updatePlanLoading(17,'Extra regio’s controleren…','De eerste bron was nog niet voldoende; een onafhankelijke plaatsendienst vult de route aan.','Fallback');
   const origin=state.trip.originPoint||plan?.routeMetrics?.origin||plan?.origin;
-  const regional=await discoverRegionalOvernightCandidates(state.trip,origin,anchor,{timeoutMs:3200,maxRequests:20});
+  const regional=await discoverRegionalOvernightCandidates(state.trip,origin,anchor,{
+    timeoutMs:5500,
+    maxRequests:24,
+    concurrency:6,
+    onProgress:event=>{
+      const completed=Number(event.completed||0),total=Math.max(1,Number(event.total||1));
+      updatePlanLoading(17+Math.round((completed/total)*8),'Extra regio’s controleren…',`Regionale plaatsen valideren · ${completed}/${total}.`,'Fallback');
+    }
+  });
   mergeRegionalOvernightProfiles(regional);
   plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   return plan;

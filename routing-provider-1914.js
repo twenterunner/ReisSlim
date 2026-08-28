@@ -1,4 +1,4 @@
-import {readRoutingSettings,saveRoutingSettings,routingConfigured} from './routing-provider.js?v=1920';
+import {readRoutingSettings,saveRoutingSettings,routingConfigured} from './routing-provider.js?v=1922';
 export {readRoutingSettings,saveRoutingSettings,routingConfigured};
 
 const URLS=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];

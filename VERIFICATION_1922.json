@@ -1,0 +1,57 @@
+{
+  "release": "1.12.0 / 1922",
+  "architecture": "Refinement of the existing roadtrip engine around one shared runtime execution layer rather than another UI hotfix. Discovery, regional fallback and accommodation now use the same concurrency/cache/progress primitives.",
+  "root_causes": {
+    "cape_town_4_percent_hang": "Selected-trip supply was serialized: it could wait up to 15 s for background discovery, then run as many as 16 Overpass batches sequentially with two sequential mirrors, then up to 20 Nominatim reverse lookups sequentially. The overlay stayed at 4% because none of those internal waits reported progress.",
+    "missing_accommodation": "Accommodation depended only on Overpass within limited radii. A provider miss or sparse OSM tourism tagging left a night empty even when a real accommodation could be found via a different OSM search path.",
+    "blurry_images": "The active progress assets are only about 8\u201315 KB each in the repository, while the existing photo hero assets are roughly 145\u2013185 KB. The atlas-style frames were part of that low-resolution progress set."
+  },
+  "engine_changes": {
+    "runtime_engine": "Added roadtrip-runtime-engine.js for bounded concurrency, first-success provider racing and TTL caching.",
+    "selected_trip_supply": "Anchor discovery bypasses background locks, searches only relevant anchor batches, runs up to four batch workers concurrently, races both Overpass mirrors and reports live progress.",
+    "regional_fallback": "Nominatim seeds run six at a time, cache results and report progress.",
+    "accommodation": "Each overnight runs through 12/25/45 km Overpass search and then Nominatim fallback if needed, with explicit user-visible progress and no short outer watchdog.",
+    "images": "Low-resolution progress/atlas image set removed from active rotation. Only existing higher-resolution scenic photo assets are used; each remains visible for 5 seconds."
+  },
+  "performance": {
+    "without_quality_tradeoff": [
+      "Concurrent independent geographic queries instead of serial queries",
+      "Race redundant provider mirrors instead of waiting for one to fail before trying the next",
+      "Cache identical region lookups for repeat plans/retries",
+      "Stop selected-trip region search as soon as the solver has enough real overnight supply",
+      "Keep weather/image enrichment off the critical path where it does not affect plan validity"
+    ]
+  },
+  "verification": {
+    "syntax": {
+      "app.js": true,
+      "roadtrip-runtime-engine.js": true,
+      "regional-overnight-provider.js": true,
+      "overnight-accommodation.js": true,
+      "routing-provider-1914.js": true,
+      "poi-gap-filler.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "regional_concurrency_mock": {
+      "max": 6,
+      "calls": 18,
+      "count": 14,
+      "progress": 18
+    },
+    "accommodation_fallback_mock": {
+      "name": "Eifel Hotel",
+      "source": "OpenStreetMap Nominatim",
+      "fallback": true
+    },
+    "active_pending_image_interval_ms": 5000,
+    "atlas_progress_assets_not_referenced": true,
+    "android_live_network_not_executed_here": true
+  }
+}
