@@ -20,11 +20,11 @@ import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } f
 import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js';
 import { enrichDestinationImages } from './image-provider.js';
 import { weatherWindowScore } from './weather-engine.js';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, validateRoadtrip } from './roadtrip-policy.js';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js';
 import { enrichOvernightAccommodations } from './overnight-accommodation.js';
 import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js';
 
-const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
+const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripStructure:'moving',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
@@ -193,23 +193,42 @@ function placeProgressText(event){
 
 
 function geoDistanceKm(a,b){if(!a||!b||!Number.isFinite(a.lat)||!Number.isFinite(a.lon)||!Number.isFinite(b.lat)||!Number.isFinite(b.lon))return 0;const r=v=>v*Math.PI/180,R=6371,d1=r(b.lat-a.lat),d2=r(b.lon-a.lon),a1=r(a.lat),a2=r(b.lat),h=Math.sin(d1/2)**2+Math.cos(a1)*Math.cos(a2)*Math.sin(d2/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
-function roadtripLandCandidates(origin){
+function roadtripLandCandidates(origin,trip=state.trip){
  const rows=[];
  for(const item of(state.catalog||[]))for(const b of(item?.bases||[])){
    if(!Number.isFinite(b?.lat)||!Number.isFinite(b?.lon))continue;
-   const originKm=geoDistanceKm(origin,b);if(originKm<45)continue;
+   const originKm=geoDistanceKm(origin,b);if(originKm<12)continue;
    const activityCount=Number(item.activities?.length||0),tagCount=Number(item.tags?.length||0);
    const poiRichness=Number.isFinite(Number(item.poiRichness))?Number(item.poiRichness):Math.min(100,activityCount*18+tagCount*5+(item.dynamic?12:0));
-   rows.push({...b,name:b.name||item.name||'Overnachtingsregio',role:'destination',landValidated:true,generatedExploration:false,
-     catalogId:item.id||null,originKm,poiRichness,activityCount,tagCount,destinationName:item.name||b.name});
+   const preferenceScore=(item.tags||[]).reduce((sum,tag)=>sum+((trip?.preferences||[]).includes(tag)?Number(trip?.preferenceWeights?.[tag]||2)*12:0),0);
+   const vehicleScore=trip?.transport==='motorcycle'?Number(item.motorcycle||0):['motorhome','caravan'].includes(trip?.transport)?Number(item.camper||0):Number(item.family||0);
+   rows.push({...b,name:b.name||item.name||'Overnachtingsregio',role:'destination',landValidated:true,generatedExploration:false,catalogId:item.id||null,originKm,poiRichness,activityCount,tagCount,preferenceScore,vehicleScore,tags:[...(item.tags||[])],destinationName:item.name||b.name});
  }
  const seen=[];return rows.filter(p=>{if(seen.some(q=>geoDistanceKm(q,p)<12))return false;seen.push(p);return true});
 }
 function tourLegLimitKm(trip){return maximumRoadLegKm(trip)}
-function chooseTourStops(origin,trip,destination,nightCount){return selectRoadtripOvernights({origin:{...origin,name:trip.origin},trip,destination,candidates:roadtripLandCandidates(origin)})}
-function roadtripIntentReport(trip,plan){if(plan?.roadtripPolicy?.violations?.includes('insufficient-real-overnight-regions'))return{valid:false,moved:0,intentionalStays:0,illegalShortMove:0,reason:'onvoldoende echte overnachtingsregio’s rond de gekozen reisregio'};const r=validateRoadtrip(trip,plan);return{valid:r.valid,moved:r.moves?.filter(x=>x>=50).length||0,intentionalStays:(plan?.days||[]).filter(x=>x.intentionalStay).length,illegalShortMove:r.violations?.filter(x=>x.startsWith('short-move')).length||0,reason:r.valid?'roadtrip-ok':r.violations.join(', ')}}
+function chooseTourStops(origin,trip,destination,nightCount){return selectRoadtripOvernights({origin:{...origin,name:trip.origin},trip,destination,candidates:roadtripLandCandidates(origin,trip)})}
+function roadtripIntentReport(trip,plan){if(plan?.roadtripPolicy?.violations?.includes('no-suitable-base'))return{valid:false,moved:0,intentionalStays:0,illegalShortMove:0,reason:'geen geschikte centrale uitvalsbasis gevonden'};if(plan?.roadtripPolicy?.violations?.includes('insufficient-base-daytrips'))return{valid:false,moved:0,intentionalStays:0,illegalShortMove:0,reason:'te weinig gevarieerde dagritten rond de beste uitvalsbasis'};if(plan?.roadtripPolicy?.violations?.includes('insufficient-real-overnight-regions'))return{valid:false,moved:0,intentionalStays:0,illegalShortMove:0,reason:'onvoldoende echte overnachtingsregio’s rond de gekozen reisregio'};const r=validateRoadtrip(trip,plan);return{valid:r.valid,moved:r.moves?.filter(x=>x>=50).length||0,intentionalStays:(plan?.days||[]).filter(x=>x.intentionalStay).length,illegalShortMove:r.violations?.filter(x=>x.startsWith('short-move')).length||0,reason:r.valid?'roadtrip-ok':r.violations.join(', ')}}
 function tourDay(kind,from,to,day,trip){const distanceKm=Math.max(10,Math.round(estimatedRoadKm(from,to))),speed=planningSpeedKmh(trip),roadHours=Number((distanceKm/speed).toFixed(1)),d=new Date(`${trip.startDate}T12:00:00`);d.setDate(d.getDate()+day-1);return{kind,typeLabel:kind==='return'?'Terugreis':kind==='transfer'?'Tour-etappe':'Heenreis',from:from.name,to:to.name,location:to.name,fromPoint:{...from},toPoint:{...to},overnight:kind==='return'?trip.origin:to.name,distanceKm,roadHours,driveHours:roadHours,elapsedHours:roadHours,breakHours:0,restStops:0,fuelStops:0,stopCount:0,waypoints:[],geometry:[{...from},{...to}],routeSource:'canonical-roadtrip-policy',primaryPlan:`Roadtrip-etappe naar ${to.name}.`,rainAlternative:'Kies bij slecht weer de veiligste directe route.',exceedsDailyLimit:roadHours>Number(trip.maxDrive||5)+.05,day,date:d.toISOString().slice(0,10)}}
-function ensureMultiDayRoadtripProgression(trip,destination,plan){const days=Number(trip?.days||0);if(days<=1||!plan?.days?.length)return plan;const origin=plan.routeMetrics?.origin||plan.origin||plan.days[0]?.fromPoint;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return{...plan,roadtripPolicy:{valid:false,violations:['missing-origin']}};const nights=days-1,stops=chooseTourStops({...origin,name:trip.origin},trip,destination,nights);if(stops.length!==nights)return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:['insufficient-real-overnight-regions']},warnings:[...(plan.warnings||[]),'Onvoldoende echte overnachtingsregio’s voor de harde roadtripregels.']};const rebuilt=[],home={...origin,name:trip.origin,role:'origin',landValidated:true};let from=home,last=null,changes=0;for(let i=0;i<nights;i++){const to=stops[i],same=i>0&&last===to.catalogId;if(same){if(!repeatStayAllowed(to,trip,i,nights))return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:[`unjustified-repeat:${i+1}`]}};rebuilt.push({kind:'stay',fromPoint:{...to},toPoint:{...to},from:to.name,to:to.name,location:to.name,overnight:to.name,distanceKm:0,roadHours:0,driveHours:0,elapsedHours:0,intentionalStay:true,stayJustification:Number(to.poiRichness||0)>=85?'exceptionele POI-dichtheid':'geplande rustdag',generatedExploration:false,day:i+1,date:trip.startDate})}else{if(i>0)changes++;rebuilt.push(tourDay(i===0?'outward':'transfer',from,to,i+1,trip))}from=to;last=to.catalogId}if(trip.routeTopology==='open-ended'){
+function baseDayTripDay(base,target,day,trip){
+ const oneWay=Math.round(estimatedRoadKm(base,target)),distanceKm=oneWay*2,speed=planningSpeedKmh(trip),elapsedHours=Number((distanceKm/speed).toFixed(1)),d=new Date(`${trip.startDate}T12:00:00`);d.setDate(d.getDate()+day-1);
+ return{kind:'daytrip',typeLabel:'Dagrit vanuit uitvalsbasis',from:base.name,to:base.name,location:target.name,fromPoint:{...base},toPoint:{...base},destinationPoint:{...target},overnight:base.name,distanceKm,roadHours:elapsedHours,driveHours:elapsedHours,elapsedHours,breakHours:0,restStops:0,fuelStops:0,stopCount:0,waypoints:[{...target,role:'activity'}],geometry:[{...base},{...target},{...base}],routeSource:'canonical-base-daytrip',primaryPlan:`Dagrit vanuit ${base.name} naar ${target.name} en terug.`,rainAlternative:'Kies een kortere daglus vanuit dezelfde uitvalsbasis.',exceedsDailyLimit:elapsedHours>Number(trip.maxDrive||5)+.05,day,date:d.toISOString().slice(0,10)}
+}
+function ensureBaseTripProgression(trip,destination,plan){
+ const days=Number(trip?.days||0);if(days<=1)return plan;
+ const origin=plan?.routeMetrics?.origin||plan?.origin||plan?.days?.[0]?.fromPoint;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:['missing-origin']}};
+ const candidates=roadtripLandCandidates(origin,trip),base=selectRoadtripBase({origin:{...origin,name:trip.origin},trip,destination,candidates});
+ if(!base)return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:['no-suitable-base']},warnings:[...(plan.warnings||[]),'Geen voldoende sterke uitvalsbasis gevonden binnen de gekozen reisregio.']};
+ const dayTripCount=Math.max(0,days-2),targets=selectBaseDayTrips({base,trip,candidates,count:dayTripCount});
+ if(targets.length!==dayTripCount)return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:['insufficient-base-daytrips']},warnings:[...(plan.warnings||[]),'Te weinig gevarieerde dagritten gevonden rond de beste uitvalsbasis.']};
+ const home={...origin,name:trip.origin,role:'origin',landValidated:true},rebuilt=[tourDay('outward',home,base,1,trip)];
+ for(let i=0;i<targets.length;i++)rebuilt.push(baseDayTripDay(base,targets[i],i+2,trip));
+ rebuilt.push(tourDay('return',base,home,days,trip));
+ const candidate={...plan,days:rebuilt,accommodationChanges:0,baseSelection:{point:{...base},score:base.baseScore,why:base.baseWhy,label:`${base.name} als slimme uitvalsbasis`},routeMetrics:{...(plan.routeMetrics||{}),origin:{...origin},exploration:{overlap:0,explorationScore:100,method:'intelligent-base-daytrips'}},routing:{...(plan.routing||{}),source:'canonical-base-plan',live:false},topology:'base-daytrips'};
+ candidate.roadtripPolicy=validateRoadtrip(trip,candidate);candidate.feasible=candidate.roadtripPolicy.valid;
+ return candidate;
+}
+function ensureMultiDayRoadtripProgression(trip,destination,plan){const days=Number(trip?.days||0);if(days<=1||!plan?.days?.length)return plan;if(trip?.tripStructure==='base')return ensureBaseTripProgression(trip,destination,plan);const origin=plan.routeMetrics?.origin||plan.origin||plan.days[0]?.fromPoint;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return{...plan,roadtripPolicy:{valid:false,violations:['missing-origin']}};const nights=days-1,stops=chooseTourStops({...origin,name:trip.origin},trip,destination,nights);if(stops.length!==nights)return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:['insufficient-real-overnight-regions']},warnings:[...(plan.warnings||[]),'Onvoldoende echte overnachtingsregio’s voor de harde roadtripregels.']};const rebuilt=[],home={...origin,name:trip.origin,role:'origin',landValidated:true};let from=home,last=null,changes=0;for(let i=0;i<nights;i++){const to=stops[i],same=i>0&&last===to.catalogId;if(same){if(!repeatStayAllowed(to,trip,i,nights))return{...plan,feasible:false,roadtripPolicy:{valid:false,violations:[`unjustified-repeat:${i+1}`]}};rebuilt.push({kind:'stay',fromPoint:{...to},toPoint:{...to},from:to.name,to:to.name,location:to.name,overnight:to.name,distanceKm:0,roadHours:0,driveHours:0,elapsedHours:0,intentionalStay:true,stayJustification:Number(to.poiRichness||0)>=85?'exceptionele POI-dichtheid':'geplande rustdag',generatedExploration:false,day:i+1,date:trip.startDate})}else{if(i>0)changes++;rebuilt.push(tourDay(i===0?'outward':'transfer',from,to,i+1,trip))}from=to;last=to.catalogId}if(trip.routeTopology==='open-ended'){
    // For open-ended trips the final day must still make geographic progress.
    const finalCandidates=roadtripLandCandidates(origin).filter(p=>p.catalogId!==last&&estimatedRoadKm(from,p)>=ROADTRIP_POLICY.minRoadMoveKm&&estimatedRoadKm(from,p)<=maximumRoadLegKm(trip));
    const finalStop=finalCandidates.sort((a,b)=>estimatedRoadKm(from,a)-estimatedRoadKm(from,b))[0];
@@ -300,6 +319,30 @@ function reconcileDayEndpointsToRoad(plan){
   return plan;
 }
 
+function ensureRenderableDayGeometries(plan){
+ if(!plan?.days)return plan;
+ for(const day of plan.days){
+   const from=day.fromPoint,to=day.toPoint,target=day.destinationPoint;
+   if(day.kind==='daytrip'&&from&&target&&to&&Number.isFinite(from.lat)&&Number.isFinite(target.lat)&&Number.isFinite(to.lat)){
+     const valid=(day.geometry||[]).filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon));
+     if(valid.length<3)day.geometry=[{...from},{...target},{...to}];
+     continue;
+   }
+   if(['outward','transfer','return'].includes(day.kind)&&from&&to&&Number.isFinite(from.lat)&&Number.isFinite(from.lon)&&Number.isFinite(to.lat)&&Number.isFinite(to.lon)){
+     const valid=(day.geometry||[]).filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon));
+     if(valid.length<2)day.geometry=[{...from},{...to}];
+   }
+ }
+ return plan;
+}
+function renderRoadtripMap(plan){
+ ensureRenderableDayGeometries(plan);
+ const result=renderMap(plan);
+ const expected=(plan?.days||[]).filter(day=>Array.isArray(day.geometry)&&day.geometry.filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon)).length>1).length;
+ if(result?.rendered&&Number(result.segments||0)<expected)console.warn('Kaart mist dagsegmenten',{expected,rendered:result.segments});
+ if(plan)plan.mapDiagnostics={expectedSegments:expected,renderedSegments:Number(result?.segments||0),complete:Boolean(result?.rendered&&Number(result.segments||0)>=expected)};
+ return result;
+}
 async function enhanceLiveData(destinationId,originalPlan){
   const run=++state.routingRun;
   showPlanLoading('Routepunten controleren…','We controleren eerst of alle open-einde routepunten op land en bij echte plaatsen liggen.');
@@ -334,7 +377,7 @@ async function enhanceLiveData(destinationId,originalPlan){
       if(run!==state.routingRun||state.destination?.id!==destinationId)return;
       plan=reconcileDayEndpointsToRoad(plan);
       Object.assign(state,derivePlanState(state.destination,plan));
-      renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderMap(state.plan);
+      renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderRoadtripMap(state.plan);
       const routed=Boolean(plan.routing?.live);
       const loopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
       updatePlanLoading(48,routed?'Wegroute gevonden':'Routebasis gereed',routed?'De echte wegroute staat. Nu zoeken we specifieke stops, eten, brandstof en verblijf.':'We gaan verder met specifieke plaatsen langs de route.','Route');
@@ -375,7 +418,7 @@ async function enhanceLiveData(destinationId,originalPlan){
       setStatus('Bestaande geldige roadtrip behouden');return;
     }
     Object.assign(state,derivePlanState(state.destination,plan));
-    renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);
+    renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderRoadtripMap(state.plan);
     const routed=Boolean(plan.routing?.live),places=plan.recommendations?.length||0,weather=Boolean(plan.weather?.live);
     const finalLoopOverlap=Number.isFinite(plan.routing?.loopOverlap)?Math.round(plan.routing.loopOverlap*100):null;
     const parts=[routed?(finalLoopOverlap!==null?`lusroute ${finalLoopOverlap}% overlap`:'wegroute'):null,places?`${places} plaatsen`:null,weather?'weer':null].filter(Boolean);
@@ -393,7 +436,7 @@ async function enhanceLiveData(destinationId,originalPlan){
     }
   }
 }
-function applyDestination(destination,optimize=false){if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
+function applyDestination(destination,optimize=false){if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');Object.assign(state,{destination,...calculatePlan(destination,optimize),optimized:optimize,selectedVariantId:'balanced',optimizationProposal:null});renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderRoadtripMap(state.plan);$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft();renderDashboard(state,loadTrips());if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
 function chooseProposal(destination){learn('select',destination);state.destination=destination;if(state.trip?.liveData&&!destination.image)void enrichDestinationImages([destination],{maximum:1}).then(()=>{if(state.destination?.id===destination.id){syncPlanVisualHero();persistDraft('Routebeeld geladen')}});state.variants=buildItineraryVariants(state.trip,destination);state.selectedVariantId='balanced';state.plan=null;$('variantSection').classList.add('hidden');$('planSection').classList.add('hidden');$('noPlanItinerary').classList.add('hidden');persistDraft('Reisconcept gekozen · gebalanceerde opbouw');showView('itineraryView');applyVariant('balanced')}
 let portfolioWeatherTimer=null;
 function schedulePortfolioWeather(){clearTimeout(portfolioWeatherTimer);portfolioWeatherTimer=setTimeout(()=>void enrichPortfolioWeather(),180)}
@@ -964,12 +1007,12 @@ function buildRoadtripPlaceQueries(trip,origin,anchor=null){
 }
 function roadtripPoolSupportsTrip(trip,origin,anchor){
  if(!anchor||!Number.isFinite(anchor.lat)||!Number.isFinite(anchor.lon))return false;
- const path=selectRoadtripOvernights({
-   origin:{...origin,name:trip.origin},
-   trip,
-   destination:{id:'selected-roadtrip-anchor',bases:[anchor]},
-   candidates:roadtripLandCandidates(origin)
- });
+ const candidates=roadtripLandCandidates(origin,trip),destination={id:'selected-roadtrip-anchor',bases:[anchor]};
+ if(trip?.tripStructure==='base'){
+   const base=selectRoadtripBase({origin:{...origin,name:trip.origin},trip,destination,candidates});
+   return Boolean(base)&&selectBaseDayTrips({base,trip,candidates,count:Math.max(0,Number(trip.days||0)-2)}).length===Math.max(0,Number(trip.days||0)-2);
+ }
+ const path=selectRoadtripOvernights({origin:{...origin,name:trip.origin},trip,destination,candidates});
  return path.length===Math.max(0,Number(trip.days||0)-1);
 }
 function ingestRoadtripElements(trip,elements,origin){
@@ -1092,13 +1135,13 @@ async function applyVariant(id){
   if(!roadtripCheck.valid){
     hidePlanLoading(false);
     showError(`Nog geen geldige ${state.trip.days}-daagse roadtrip gevonden (${roadtripCheck.reason}). ReisSlim toont geen kunstmatige stadsroute; zoek opnieuw voor extra echte overnachtingsregio’s.`);
-    setStatus('Meer echte overnachtingsregio’s nodig');showView('planner');return;
+    setStatus('Meer echte overnachtingsregio’s nodig');showView('plannerView');return;
   }
   const derived=derivePlanState(destination,plan);
   plan=derived.plan;
   Object.assign(state,{destination,selectedVariantId:variant.id,plan,budget:derived.budget,quality:derived.quality,constraintStatus:derived.constraintStatus,validation:derived.validation,optimized:false});
   $('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');
-  renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();
+  renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderRoadtripMap(state.plan);persistDraft();
   if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)
 }
 function resetState(trip=defaults()){
@@ -1295,9 +1338,9 @@ refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('r
     $('assistantApplyBtn').classList.add('hidden');$('assistantCancelBtn').classList.add('hidden');
   });
   $('improveTripBtn').addEventListener('click',()=>{if(!state.plan)return;const boxes=[...document.querySelectorAll('[data-optimizer-lock]')],locks=Object.fromEntries(boxes.map(x=>[x.dataset.optimizerLock,x.checked]));state.optimizationProposal=proposeOptimizations(state.trip,state.destination,state.plan,{mode:$('optimizationMode').value||'maximum',locks});renderOptimizationPreview(state);renderStrongOptimizationPreview();const gain=Math.round((state.optimizationProposal.after?.quality?.overall||0)-(state.optimizationProposal.before?.quality?.overall||0));setStatus(state.optimizationProposal.meaningful?`Sterke optimalisatie: ${gain>=0?'+':''}${gain} punten`:boxes.length&&boxes.every(x=>x.checked)?'Alles is beschermd; optimizer kan niets wijzigen':'Geen voldoende sterke verbetering gevonden');$('optimizationPreview')?.scrollIntoView({behavior:'smooth',block:'nearest'});});
-  $('applyOptimizationBtn').addEventListener('click',()=>{if(!state.plan||!state.optimizationProposal)return;const ids=[...document.querySelectorAll('[data-optimization-action]:checked')].map(x=>x.dataset.optimizationAction);if(!ids.length)return;const before=Math.round(state.quality?.overall||state.optimizationProposal.before?.quality?.overall||0),selected=(state.optimizationProposal.actions||[]).filter(x=>ids.includes(x.id));state.undoSnapshot=clone({plan:state.plan,budget:state.budget,quality:state.quality,validation:state.validation,constraintStatus:state.constraintStatus});Object.assign(state,applyOptimizationProposal(state.trip,state.destination,state.plan,ids));const after=Math.round(state.quality?.overall||0);state.optimizationSummary={before,after,changes:selected.map(x=>`${x.title}: ${x.description}`)};state.optimizationProposal=null;renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);setStatus(`Optimalisatie toegepast: ${before}/100 → ${after}/100 (${after-before>=0?'+':''}${after-before})`);persistDraft(`Optimalisatie toegepast: ${before} → ${after}`);});
+  $('applyOptimizationBtn').addEventListener('click',()=>{if(!state.plan||!state.optimizationProposal)return;const ids=[...document.querySelectorAll('[data-optimization-action]:checked')].map(x=>x.dataset.optimizationAction);if(!ids.length)return;const before=Math.round(state.quality?.overall||state.optimizationProposal.before?.quality?.overall||0),selected=(state.optimizationProposal.actions||[]).filter(x=>ids.includes(x.id));state.undoSnapshot=clone({plan:state.plan,budget:state.budget,quality:state.quality,validation:state.validation,constraintStatus:state.constraintStatus});Object.assign(state,applyOptimizationProposal(state.trip,state.destination,state.plan,ids));const after=Math.round(state.quality?.overall||0);state.optimizationSummary={before,after,changes:selected.map(x=>`${x.title}: ${x.description}`)};state.optimizationProposal=null;renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderRoadtripMap(state.plan);setStatus(`Optimalisatie toegepast: ${before}/100 → ${after}/100 (${after-before>=0?'+':''}${after-before})`);persistDraft(`Optimalisatie toegepast: ${before} → ${after}`);});
   $('rejectOptimizationBtn').addEventListener('click',()=>{state.optimizationProposal=null;renderOptimizationPreview(state)});
-  $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderMap(state.plan)});
+  $('undoOptimizeBtn').addEventListener('click',()=>{if(!state.undoSnapshot)return;Object.assign(state,state.undoSnapshot);state.undoSnapshot=null;renderPlan(state);renderRoadtripMap(state.plan)});
   document.querySelectorAll('[data-inspire]').forEach(button=>button.addEventListener('click',()=>{$('destinationQuery').value=button.dataset.inspire;showView('plannerView')}));
 }
 document.addEventListener('click',event=>{

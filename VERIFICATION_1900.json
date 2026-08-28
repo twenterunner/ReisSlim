@@ -1,0 +1,81 @@
+{
+  "status": "PASS",
+  "root_causes_addressed": [
+    "A valid five-day plan could lose the final return-day geometry during live enrichment; the map then rendered only four day segments.",
+    "The rejected-variant path called showView('planner'), but the real view id is plannerView.",
+    "The planner had only one trip structure: the roadtrip hard rules rejected deliberate single-base holidays as invalid repeated nights.",
+    "There was no explicit base-selection optimisation; legacy stay logic could use a destination base without proving it was the best hub for the user's criteria and reachable day trips."
+  ],
+  "new_behavior": {
+    "moving": "Roadtrip \u2014 every overnight progresses to a different place; existing >=50 km and distinct-night rules remain.",
+    "base": "One intelligent base. Day 1 travels to the base, middle days are distinct round trips from that base, final day returns home.",
+    "base_scoring": "Scores preference match, POI richness, vehicle suitability, centrality/reachable day-trip count, destination-anchor proximity and outbound comfort.",
+    "map": "Every outward/transfer/return day is guaranteed drawable geometry; base day trips are base -> target -> base."
+  },
+  "tests": {
+    "existing_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "new_exact_cases": {
+      "pass": true,
+      "passed": 5,
+      "total": 5,
+      "failed": [],
+      "results": [
+        {
+          "name": "Sauerland moving 5-day",
+          "pass": true
+        },
+        {
+          "name": "Cape moving 5-day",
+          "pass": true
+        },
+        {
+          "name": "Sauerland intelligent base 5-day",
+          "pass": true
+        },
+        {
+          "name": "Cape intelligent base 5-day",
+          "pass": true
+        },
+        {
+          "name": "Base choice is criteria-driven not nearest only",
+          "pass": true
+        }
+      ]
+    },
+    "map_geometry": {
+      "pass": true,
+      "movingSegments": 5,
+      "baseGeometryCounts": [
+        2,
+        3,
+        3,
+        3,
+        2
+      ]
+    },
+    "checks": {
+      "49_existing_regressions_pass": true,
+      "new_structure_acceptance_5_of_5": true,
+      "moving_map_has_day5_return": true,
+      "base_map_geometry_complete": true,
+      "trip_structure_persisted": true,
+      "trip_structure_ui": true,
+      "invalid_planner_view_id_removed": true,
+      "checked_map_wrapper_used": true,
+      "base_selector_is_scored": true,
+      "syntax_app.js": true,
+      "syntax_trip-model.js": true,
+      "syntax_roadtrip-policy.js": true,
+      "syntax_overnight-accommodation.js": true,
+      "syntax_regional-overnight-provider.js": true,
+      "syntax_config.js": true,
+      "syntax_service-worker.js": true,
+      "syntax_ui-feature-flags.js": true,
+      "syntax_image-provider.js": true
+    }
+  },
+  "limitations": "Public live routing/discovery providers are not executable from this sandbox. Production policy, base selection, day-trip selection, validation and the exact route-geometry repair function were executed locally."
+}
