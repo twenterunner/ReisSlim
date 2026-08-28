@@ -1,0 +1,125 @@
+{
+  "status": "PASS",
+  "total_cases": 25,
+  "passed": 25,
+  "failed": [],
+  "checks": {
+    "syntax_app.js": true,
+    "syntax_roadtrip-policy.js": true,
+    "syntax_config.js": true,
+    "syntax_service-worker.js": true,
+    "syntax_ui-feature-flags.js": true,
+    "syntax_image-provider.js": true,
+    "no_legacy_repeatStayScore": true,
+    "no_legacy_plannedRestDay": true,
+    "canonical_policy_imported": true,
+    "hard_policy_feasibility_gate": true,
+    "open_ended_zero_move_removed": true,
+    "five_day_no_repeat_rule": true,
+    "max_one_repeat_long_trip": true,
+    "synthetic_rejected": true,
+    "return_home_required": true
+  },
+  "cases": [
+    {
+      "name": "motorcycle speed 55",
+      "pass": true
+    },
+    {
+      "name": "car speed 65",
+      "pass": true
+    },
+    {
+      "name": "motorhome speed 55",
+      "pass": true
+    },
+    {
+      "name": "caravan speed 50",
+      "pass": true
+    },
+    {
+      "name": "5-day requires four distinct nights",
+      "pass": true
+    },
+    {
+      "name": "6-day allows at most one repeat",
+      "pass": true
+    },
+    {
+      "name": "repeat forbidden on five-day trip",
+      "pass": true
+    },
+    {
+      "name": "repeat allowed on relaxed seven-day midpoint",
+      "pass": true
+    },
+    {
+      "name": "motorcycle 7h planning range is 385 km",
+      "pass": true
+    },
+    {
+      "name": "valid 5-day Saasveld loop motorcycle",
+      "pass": true
+    },
+    {
+      "name": "valid 5-day Saasveld loop car",
+      "pass": true
+    },
+    {
+      "name": "valid 5-day Saasveld loop motorhome",
+      "pass": true
+    },
+    {
+      "name": "valid 5-day Saasveld loop caravan",
+      "pass": true
+    },
+    {
+      "name": "Cape Town 5-day loop valid",
+      "pass": true
+    },
+    {
+      "name": "single-base five-day rejected",
+      "pass": true
+    },
+    {
+      "name": "49 km overnight movement rejected",
+      "pass": true
+    },
+    {
+      "name": "50 km overnight movement accepted boundary",
+      "pass": true
+    },
+    {
+      "name": "drive limit violation rejected",
+      "pass": true
+    },
+    {
+      "name": "synthetic overnight rejected",
+      "pass": true
+    },
+    {
+      "name": "landValidated false rejected",
+      "pass": true
+    },
+    {
+      "name": "loop that does not return home rejected",
+      "pass": true
+    },
+    {
+      "name": "open-ended trip with progression valid",
+      "pass": true
+    },
+    {
+      "name": "open-ended no progression rejected",
+      "pass": true
+    },
+    {
+      "name": "7-day one justified repeat accepted",
+      "pass": true
+    },
+    {
+      "name": "7-day two repeat nights rejected",
+      "pass": true
+    }
+  ]
+}
