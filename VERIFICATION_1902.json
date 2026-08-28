@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "root_cause": "When app.js was not fully initialized, the trip form had no submit listener. The browser therefore performed a normal HTML form submission, reloading index.html and returning to the default dashboard. The critical Start-button fallback made this failure reachable because it could open the planner even while the main app module was not ready.",
+  "fix": [
+    "critical-ui.js now owns the trip form submit event in capture phase and always prevents native form navigation.",
+    "The real search workflow was extracted to a top-level submitTripForm() and exposed as window.reisslimSubmitTrip before initialize() runs.",
+    "On a cold load the critical submit bridge waits up to two seconds for the app module to register, then invokes the full search exactly once.",
+    "If the main module never becomes available, the app stays on the planner and shows an explicit loading error instead of returning to the dashboard."
+  ],
+  "browser_acceptance": {
+    "pass": true,
+    "results": {
+      "module_missing": {
+        "url_same": true,
+        "planner_active": true,
+        "error_visible": true,
+        "error_text": "De planner is nog niet volledig geladen. Vernieuw de pagina en probeer opnieuw."
+      },
+      "immediate_handler": {
+        "calls": 1
+      },
+      "delayed_handler": {
+        "calls": 1
+      }
+    }
+  },
+  "roadtrip_regression": {
+    "passed": 49,
+    "total": 49
+  },
+  "checks": {
+    "submit_never_native_reload": true,
+    "submit_handler_exposed_top_level": true,
+    "initialize_no_longer_owns_submit": true,
+    "cold_load_waits_for_module": true,
+    "actual_dom_no_reload_test": true,
+    "actual_dom_explicit_error_test": true,
+    "delayed_handler_test": true,
+    "immediate_handler_once": true,
+    "planning_regression_49": true
+  }
+}
