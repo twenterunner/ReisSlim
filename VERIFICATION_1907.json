@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "release": "1.9.7 / 1907",
+  "restoration": "Removed the critical-ui dynamic bootloader architecture and restored the pre-loader pattern: index.html directly loads app.js as a module; app.js directly owns Start and Search listeners during initialize().",
+  "reference": "This matches the architecture visible in the earlier working 1.8.8 GitHub revision: direct <script type=module src=app.js> and app-owned button handling.",
+  "tests": {
+    "native_browser": {
+      "pass": true,
+      "result": {
+        "startCalls": 1,
+        "submitCalls": 1,
+        "planner": true,
+        "sameUrl": true
+      }
+    },
+    "roadtrip_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "checks": {
+      "critical_ui_not_loaded": true,
+      "direct_app_module": true,
+      "native_start_listener": true,
+      "native_submit_listener": true,
+      "no_global_loader_bridges": true,
+      "normal_internal_imports": true,
+      "engine_version_63": true,
+      "browser_native_actions": true,
+      "roadtrip_regression_49": true
+    }
+  },
+  "limitation": "The sandbox browser blocks navigation to a localhost HTTP server, so full-page module loading could not be exercised end-to-end here. The native event architecture itself was executed in Chromium, all release JS passes syntax checks, and the roadtrip regression is 49/49."
+}
