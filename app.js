@@ -196,98 +196,84 @@ function roadtripLandCandidates(origin){
  const rows=[];
  for(const item of(state.catalog||[]))for(const b of(item?.bases||[])){
    if(!Number.isFinite(b?.lat)||!Number.isFinite(b?.lon))continue;
-   const d=geoDistanceKm(origin,b);if(d<35)continue;
-   rows.push({...b,name:b.name||item.name||'Overnachtingsregio',role:'destination',landValidated:true,generatedExploration:false,catalogId:item.id||null,originKm:d});
+   const originKm=geoDistanceKm(origin,b);if(originKm<45)continue;
+   const activityCount=Number(item.activities?.length||0),tagCount=Number(item.tags?.length||0);
+   const poiRichness=Math.min(100,activityCount*18+tagCount*5+(item.dynamic?12:0));
+   rows.push({...b,name:b.name||item.name||'Overnachtingsregio',role:'destination',landValidated:true,generatedExploration:false,
+     catalogId:item.id||null,originKm,poiRichness,activityCount,tagCount,destinationName:item.name||b.name});
  }
- const seen=new Set();
- return rows.filter(p=>{
-   const spatial=`${Math.round(p.lat*20)/20}:${Math.round(p.lon*20)/20}`;
-   if(seen.has(spatial))return false;seen.add(spatial);return true;
- });
+ const seen=[];return rows.filter(p=>{if(seen.some(q=>geoDistanceKm(q,p)<12))return false;seen.push(p);return true});
 }
-function tourLegLimitKm(trip){
- const h=Math.max(2,Number(trip.maxDrive||5));
- const speed=trip.transport==='motorcycle'?68:trip.transport==='caravan'?58:trip.transport==='motorhome'?62:72;
- return Math.max(120,h*speed*.92);
+function tourLegLimitKm(trip){const h=Math.max(2,Number(trip.maxDrive||5)),speed=trip.transport==='motorcycle'?68:trip.transport==='caravan'?58:trip.transport==='motorhome'?62:72;return Math.max(120,h*speed*.92)}
+function plannedRestDay(trip,nightIndex,nightCount){return nightCount>=2&&((trip.tripPace==='relaxed'||Number(trip.days||0)>=7)&&nightIndex===Math.floor(nightCount/2))}
+function repeatStayScore(point,trip,nightIndex,nightCount){
+ const rest=plannedRestDay(trip,nightIndex,nightCount);
+ const tags=state.catalog.find(x=>x.id===point.catalogId)?.tags||[];
+ const preferenceFit=tags.reduce((sum,tag)=>sum+(trip.preferences?.includes(tag)?Number(trip.preferenceWeights?.[tag]||2):0),0);
+ return Number(point.poiRichness||0)+preferenceFit*5+(rest?45:0);
 }
-function tourStateScore(path,start,maxLegKm,count){
- const last=path.at(-1)||start;
- const legs=[];let prev=start;
- for(const p of path){legs.push(geoDistanceKm(prev,p));prev=p}
- const home=geoDistanceKm(last,start);
- const progress=path.length/Math.max(1,count);
- const mean=legs.length?legs.reduce((a,b)=>a+b,0)/legs.length:0;
- const movement=legs.reduce((s,d)=>s+Math.min(d,maxLegKm),0);
- const tooShort=legs.filter(d=>d<35).length;
- const balance=legs.reduce((s,d)=>s+Math.abs(d-mean),0);
- return movement*.8+Math.min(home,maxLegKm)*.15+progress*150-tooShort*500-balance*.12;
-}
-function chooseTourStops(origin,trip,destination,count){
+function chooseTourStops(origin,trip,destination,nightCount){
  const maxLegKm=tourLegLimitKm(trip),start={...origin,name:trip.origin};
- const candidates=roadtripLandCandidates(origin)
-   .filter(p=>p.originKm<=maxLegKm*Math.max(2,Math.ceil(count/2)+1)*1.12);
- if(candidates.length<count)return[];
-
- // Beam search avoids the greedy dead-end that previously caused Cape Town
- // tours to fall back to a one-base stay even when many live regions existed.
- let beam=[{path:[],used:new Set(),score:0}];
- const beamWidth=140;
- for(let step=0;step<count;step++){
-   const remaining=count-step-1,next=[];
-   for(const stateRow of beam){
-     const current=stateRow.path.at(-1)||start;
-     for(let idx=0;idx<candidates.length;idx++){
-       if(stateRow.used.has(idx))continue;
-       const p=candidates[idx],leg=geoDistanceKm(current,p),home=geoDistanceKm(p,start);
-       if(leg<35||leg>maxLegKm*1.18)continue;
-       // There must remain enough daily legs to get home.
-       if(home>maxLegKm*Math.max(1,remaining+1)*1.18)continue;
-       // Do not choose two "different" places that are effectively the same stop.
-       if(stateRow.path.some(q=>geoDistanceKm(q,p)<28))continue;
-       const path=[...stateRow.path,p],used=new Set(stateRow.used);used.add(idx);
-       let score=tourStateScore(path,start,maxLegKm,count);
-       if(p.catalogId===destination?.id)score+=12;
-       // From the halfway point onward reward genuine homeward progression,
-       // while still keeping substantial travel between overnight regions.
-       if(step>=Math.floor(count/2)){
-         const previousHome=geoDistanceKm(current,start);
-         if(home<previousHome)score+=Math.min(70,(previousHome-home)*.22);
-       }
-       next.push({path,used,score});
+ const candidates=roadtripLandCandidates(origin).filter(p=>p.originKm<=maxLegKm*Math.max(2,Math.ceil(nightCount/2)+1)*1.18);
+ if(!candidates.length)return[];
+ let beam=[{path:[],score:0,consecutive:0}],beamWidth=180;
+ for(let night=0;night<nightCount;night++){
+   const remaining=nightCount-night-1,next=[];
+   for(const row of beam){const current=row.path.at(-1)||start;
+     for(const p of candidates){
+       const same=row.path.length>0&&current.catalogId===p.catalogId,leg=same?0:geoDistanceKm(current,p);
+       if(!same&&(leg<50||leg>maxLegKm*1.18))continue;
+       const home=geoDistanceKm(p,start);if(home>maxLegKm*Math.max(1,remaining+1)*1.18)continue;
+       let consecutive=same?row.consecutive+1:1;
+       if(same){const stayScore=repeatStayScore(p,trip,night,nightCount),maxConsecutive=stayScore>=105?3:stayScore>=70?2:1;if(consecutive>maxConsecutive)continue}
+       const path=[...row.path,p],unique=new Set(path.map(x=>x.catalogId)).size;
+       const movement=path.reduce((sum,q,i)=>sum+(i?(path[i-1].catalogId===q.catalogId?0:geoDistanceKm(path[i-1],q)):geoDistanceKm(start,q)),0);
+       const stayBonus=same?repeatStayScore(p,trip,night,nightCount)*1.15:0,destinationBonus=p.catalogId===destination?.id?18:0;
+       const returnFitness=remaining===0?Math.max(0,80-Math.abs(home-Math.min(maxLegKm*.62,180))*.25):0;
+       next.push({path,score:movement*.62+unique*85+stayBonus+destinationBonus+returnFitness,consecutive});
      }
    }
-   next.sort((a,b)=>b.score-a.score);
-   beam=next.slice(0,beamWidth);
-   if(!beam.length)return[];
+   next.sort((a,b)=>b.score-a.score);beam=next.slice(0,beamWidth);if(!beam.length)return[];
  }
- const complete=beam.filter(row=>{
-   const last=row.path.at(-1),home=geoDistanceKm(last,start);
-   return home>=20&&home<=maxLegKm*1.18;
- }).sort((a,b)=>b.score-a.score);
- return complete[0]?.path||[];
+ return beam.filter(row=>{const home=geoDistanceKm(row.path.at(-1),start);return home>=20&&home<=maxLegKm*1.18}).sort((a,b)=>b.score-a.score)[0]?.path||[];
 }
 function roadtripIntentReport(trip,plan){
- const days=Number(trip?.days||0);
- if(days<3||trip.routeTopology==='open-ended')return{valid:true,reason:'not-closed-multiday'};
- const away=(plan?.days||[]).filter(d=>d.overnight&&d.overnight!==trip.origin);
- const unique=[...new Set(away.map(d=>String(d.overnight).trim().toLowerCase()))];
- const travel=(plan?.days||[]).filter(d=>['outward','transfer','return','daytrip'].includes(d.kind));
- const meaningful=travel.filter(d=>Number(d.distanceKm||0)>=35).length;
- const expected=Math.min(days-1,Math.max(2,Number(trip.maxChanges||0)+1));
- const totalKm=travel.reduce((s,d)=>s+Number(d.distanceKm||0),0);
- const start=plan?.routeMetrics?.origin||plan?.origin;
- let spreadKm=0;
- if(start&&Number.isFinite(start.lat)&&Number.isFinite(start.lon)){
-   spreadKm=Math.max(0,...(plan?.days||[]).map(d=>geoDistanceKm(start,d.toPoint)));
- }
- const valid=unique.length>=expected&&meaningful>=days-1&&totalKm>=Math.max(140,(days-1)*45)&&spreadKm>=45;
- return{valid,uniqueOvernights:unique.length,expected,meaningful,totalKm:Math.round(totalKm),spreadKm:Math.round(spreadKm),
-   reason:valid?'roadtrip-ok':`roadtrip-collapsed:${unique.length}/${expected} overnachtingsregio's, ${meaningful}/${days-1} betekenisvolle etappes, spreiding ${Math.round(spreadKm)} km`};
+ const days=Number(trip?.days||0);if(days<3||trip.routeTopology==='open-ended')return{valid:true,reason:'not-closed-multiday'};
+ const routeDays=plan?.days||[];if(routeDays.length!==days)return{valid:false,reason:`${routeDays.length}/${days} reisdagen`};
+ let moved=0,illegalShortMove=0,intentionalStays=0;
+ for(let i=0;i<routeDays.length;i++){const d=routeDays[i],from=d.fromPoint,to=d.toPoint,same=d.kind==='stay'||(from&&to&&geoDistanceKm(from,to)<12);
+   if(same){intentionalStays++;continue}const direct=geoDistanceKm(from,to);if(i<days-1&&direct<50)illegalShortMove++;if(direct>=50)moved++}
+ const overnightNames=routeDays.slice(0,-1).map(d=>String(d.overnight||'').trim()).filter(Boolean);
+ const origin=plan?.routeMetrics?.origin||plan?.origin;
+ const leavesOrigin=routeDays.some(d=>d.toPoint&&origin&&geoDistanceKm(origin,d.toPoint)>=50);
+ const returnsHome=String(routeDays.at(-1)?.overnight||'')===String(trip.origin||'');
+ const valid=overnightNames.length===days-1&&leavesOrigin&&returnsHome&&illegalShortMove===0&&(moved+intentionalStays)>=days-1;
+ return{valid,moved,intentionalStays,illegalShortMove,reason:valid?'roadtrip-ok':`overnachtingen ${overnightNames.length}/${days-1}, verplaatsingen ${moved}, bewuste verblijfsdagen ${intentionalStays}, te korte wissels ${illegalShortMove}`};
 }
 function tourDay(kind,from,to,day,trip){const direct=Math.max(1,geoDistanceKm(from,to)),distanceKm=Math.max(10,Math.round(direct*1.18)),speed=trip.transport==='motorcycle'?68:trip.transport==='caravan'?58:trip.transport==='motorhome'?62:72,roadHours=Number((distanceKm/speed).toFixed(1)),d=new Date(`${trip.startDate}T12:00:00`);d.setDate(d.getDate()+day-1);return{kind,typeLabel:kind==='return'?'Terugreis':kind==='transfer'?'Tour-etappe':'Heenreis',from:from.name,to:to.name,location:to.name,fromPoint:{...from},toPoint:{...to},overnight:kind==='return'?trip.origin:to.name,distanceKm,roadHours,driveHours:roadHours,elapsedHours:roadHours,breakHours:0,restStops:0,fuelStops:0,stopCount:0,waypoints:[],geometry:[{...from},{...to}],routeSource:'multi-destination-tour',primaryPlan:kind==='return'?`Laatste touretappe terug naar ${trip.origin}.`:`Tour-etappe naar ${to.name}.`,rainAlternative:'Kies bij slecht weer de veiligste directe route naar de volgende overnachtingsplaats.',exceedsDailyLimit:roadHours>Number(trip.maxDrive||5)+.05,day,date:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}}
-function ensureMultiDayRoadtripProgression(trip,destination,plan){const days=Number(trip?.days||0);if(days<3||trip.routeTopology==='open-ended'||!plan?.days?.length)return plan;const origin=plan.routeMetrics?.origin||plan.origin;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return plan;const maxChanges=Math.max(0,Number(trip.maxChanges||0));if(maxChanges===0)return plan;const overnightCount=Math.min(days-1,maxChanges+1),current=plan.days.filter(d=>d.overnight&&d.overnight!==trip.origin),unique=[...new Set(current.map(d=>d.overnight))],meaningful=plan.days.filter(d=>Number(d.distanceKm||0)>=35).length;if(unique.length>=overnightCount&&meaningful>=days-1)return plan;const stops=chooseTourStops({...origin,name:trip.origin},trip,destination,overnightCount);if(stops.length!==overnightCount)return{...plan,warnings:[...(plan.warnings||[]),'Geen geldige multi-stop tour gevonden binnen de ingestelde dagelijkse reistijd; ReisSlim behoudt het bestaande plan en maakt geen fictieve routepunten.']};const seq=[{...origin,name:trip.origin,role:'origin'},...stops,{...origin,name:trip.origin,role:'return'}],rebuilt=[];for(let i=0;i<days;i++)rebuilt.push(tourDay(i===days-1?'return':i===0?'outward':'transfer',seq[i],seq[i+1],i+1,trip));let changes=0,last=null;for(const d of rebuilt){if(d.overnight===trip.origin)continue;if(last&&last!==d.overnight)changes++;last=d.overnight}if(changes>maxChanges)return plan;return{...plan,days:rebuilt,accommodationChanges:changes,usedLegs:days-1,routeMetrics:{...(plan.routeMetrics||{}),origin:{...origin},exploration:{overlap:0,explorationScore:100,method:'multi-destination-tour'}},warnings:[...(plan.warnings||[]),`Multi-stop tour: ${overnightCount} echte overnachtingsregio’s, inclusief de terugweg.`],routing:{...(plan.routing||{}),source:'multi-destination-tour',live:false},progressionRepair:true}}
+function ensureMultiDayRoadtripProgression(trip,destination,plan){
+ const days=Number(trip?.days||0);if(days<3||trip.routeTopology==='open-ended'||!plan?.days?.length)return plan;
+ const origin=plan.routeMetrics?.origin||plan.origin;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return plan;
+ const maxChanges=Math.max(0,Number(trip.maxChanges||0));if(maxChanges===0)return plan;if(roadtripIntentReport(trip,plan).valid)return plan;
+ const nightCount=days-1,stops=chooseTourStops({...origin,name:trip.origin},trip,destination,nightCount);
+ if(stops.length!==nightCount)return{...plan,warnings:[...(plan.warnings||[]),'Nog onvoldoende echte overnachtingsregio’s gevonden om een geldige roadtrip te bouwen.']};
+ const rebuilt=[],home={...origin,name:trip.origin,role:'origin'};let from=home,changes=0,lastCatalog=null;
+ for(let i=0;i<nightCount;i++){const to=stops[i],same=i>0&&lastCatalog===to.catalogId;
+   if(same){const d=new Date(`${trip.startDate}T12:00:00`);d.setDate(d.getDate()+i);const rest=plannedRestDay(trip,i,nightCount);
+     rebuilt.push({kind:'stay',typeLabel:rest?'Rust-/verblijfsdag':'Verblijfsdag',from:to.name,to:to.name,location:to.name,fromPoint:{...to},toPoint:{...to},overnight:to.name,
+       distanceKm:0,roadHours:0,driveHours:0,elapsedHours:0,breakHours:0,restStops:0,fuelStops:0,stopCount:0,waypoints:[],geometry:[{...to}],routeSource:'multi-destination-tour',
+       activityType:rest?'rust':'verblijf',primaryPlan:rest?`Blijf een tweede nacht in ${to.name}: rustdag en lokale POI’s zonder accommodatiewissel.`:`Blijf een extra nacht in ${to.name}; de lokale POI- en activiteitenwaarde rechtvaardigt geen extra accommodatiewissel.`,
+       rainAlternative:'Gebruik de verblijfsdag voor geschikte lokale binnenactiviteiten.',exceedsDailyLimit:false,day:i+1,date:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`});
+   }else{if(i>0)changes++;rebuilt.push(tourDay(i===0?'outward':'transfer',from,to,i+1,trip))}
+   from=to;lastCatalog=to.catalogId;
+ }
+ rebuilt.push(tourDay('return',from,home,days,trip));if(changes>maxChanges)return plan;
+ const candidate={...plan,days:rebuilt,accommodationChanges:changes,usedLegs:days-1,routeMetrics:{...(plan.routeMetrics||{}),origin:{...origin},exploration:{overlap:0,explorationScore:100,method:'generic-multi-stop-roadtrip'}},
+   warnings:[...(plan.warnings||[]),'Roadtrip opgebouwd uit echte overnachtingsregio’s; locatiewissels zijn minimaal 50 km, tenzij bewust meerdere nachten op dezelfde plek worden gepland.'],
+   routing:{...(plan.routing||{}),source:'generic-multi-stop-roadtrip',live:false},progressionRepair:true};
+ return roadtripIntentReport(trip,candidate).valid?candidate:plan;
+}
 
-function calculatePlan(destination,optimize=false){let plan=ensureMultiDayRoadtripProgression(state.trip,destination,buildItinerary(state.trip,destination)),changes=[];if(optimize)({plan,changes}=optimisePlan(state.trip,destination,plan));const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus,changes}}
 function derivePlanState(destination,plan){plan=ensureMultiDayRoadtripProgression(state.trip,destination,plan);const budget=buildBudget(state.trip,destination,plan),constraintStatus=evaluatePlanConstraints(state.trip,plan,budget,{allowStretch:destination.category==='stretch'});plan.constraintStatus=constraintStatus;plan.feasible=constraintStatus.exact;plan.warnings=[...new Set([...(plan.warnings||[]),...constraintStatus.violations.map(item=>item.detail)])];return{plan,budget,quality:calculateTripQuality(state.trip,destination,plan,budget),validation:validatePlan(state.trip,destination,plan,budget),constraintStatus}}
 
 const optimizerDimensionLabels={driving:'Rijbelasting',budget:'Budget',relaxation:'Ontspanning',family:'Gezin',adventure:'Avontuur',weather:'Weerbestendig',variety:'Variatie',crowds:'Rust',realism:'Realisme',completeness:'Compleetheid',routeEfficiency:'Route-efficiëntie',routeExploration:'Routeverkenning',vehicleSuitability:'Voertuigmatch',safetyReadiness:'Veiligheid',poiQuality:'POI-kwaliteit',bookingReadiness:'Boekbaarheid',documentationReadiness:'Documenten'};
@@ -435,9 +421,8 @@ async function enhanceLiveData(destinationId,originalPlan){
     const finalRoadtripCheck=roadtripIntentReport(state.trip,plan);
     if(!finalRoadtripCheck.valid){
       hidePlanLoading(false);
-      showError(`Live controle heeft de route afgekeurd: ${finalRoadtripCheck.reason}. De kaart wordt niet vervangen door een ongeldige stadsroute.`);
-      setStatus('Roadtrip afgekeurd na live routecontrole');
-      return;
+      planLiveBanner(`Live verrijking is genegeerd omdat die de geldige roadtrip zou verslechteren (${finalRoadtripCheck.reason}).`,'error');
+      setStatus('Bestaande geldige roadtrip behouden');return;
     }
     Object.assign(state,derivePlanState(state.destination,plan));
     renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);
@@ -1010,9 +995,8 @@ async function applyVariant(id){
   const roadtripCheck=roadtripIntentReport(state.trip,plan);
   if(!roadtripCheck.valid){
     hidePlanLoading(false);
-    showError(`ReisSlim weigert dit plan: de ${state.trip.days}-daagse roadtrip heeft onvoldoende geografische voortgang (${roadtripCheck.reason}). Kies “Opnieuw zoeken”; een verblijf van meerdere dagen rond alleen ${state.trip.origin} wordt niet meer als roadtrip getoond.`);
-    setStatus('Roadtrip afgekeurd · onvoldoende geografische voortgang');
-    return;
+    showError(`Nog geen geldige ${state.trip.days}-daagse roadtrip gevonden (${roadtripCheck.reason}). ReisSlim toont geen kunstmatige stadsroute; zoek opnieuw voor extra echte overnachtingsregio’s.`);
+    setStatus('Meer echte overnachtingsregio’s nodig');showView('planner');return;
   }
   const derived=derivePlanState(destination,plan);
   plan=derived.plan;
