@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "release": "1.9.6 / 1906",
+  "root_cause": "Build 1905 started module loading automatically at DOM ready and stored the result forever in loadPromise. If that first mobile/4G module load failed or timed out, loadPromise resolved false and every later Start/Search press immediately reused that failed promise. The button therefore appeared permanently dead.",
+  "fix": [
+    "Removed background module preloading; the first actual Start/Search interaction owns the first load attempt.",
+    "A failed/timed-out load resets loadPromise, so the next tap really retries.",
+    "Each retry imports a fresh app.js URL with a unique boot counter, avoiding a sticky failed app module URL in the current browser document.",
+    "A 15-second bound prevents a hung module request from leaving the button waiting forever.",
+    "Search still prevents native form navigation, and the roadtrip engine is unchanged."
+  ],
+  "browser_acceptance": {
+    "pass": true,
+    "results": {
+      "start_retry": {
+        "first": {
+          "loaderCalls": 1,
+          "startCalls": 0,
+          "state": "failed",
+          "error": "De planner kon niet worden geladen: temporary mobile module failure. Tik nogmaals om opnieuw te proberen."
+        },
+        "second": {
+          "loaderCalls": 2,
+          "startCalls": 1,
+          "state": "ready",
+          "planner": true
+        }
+      },
+      "submit_retry": {
+        "first": {
+          "loaderCalls": 1,
+          "submitCalls": 0,
+          "sameUrl": true,
+          "state": "failed"
+        },
+        "second": {
+          "loaderCalls": 2,
+          "submitCalls": 1,
+          "sameUrl": true,
+          "state": "ready"
+        }
+      }
+    }
+  },
+  "roadtrip_regression": {
+    "passed": 49,
+    "total": 49
+  },
+  "checks": {
+    "no_background_preload": true,
+    "failed_boot_resets_promise": true,
+    "retry_uses_fresh_app_url": true,
+    "15s_hang_timeout": true,
+    "search_never_native_reload": true,
+    "direct_imports_1906": true,
+    "engine_version_unchanged": true,
+    "browser_start_retry_pass": true,
+    "browser_submit_retry_pass": true,
+    "roadtrip_regression_49": true
+  }
+}

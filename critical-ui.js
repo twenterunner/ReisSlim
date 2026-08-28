@@ -1,7 +1,7 @@
 (function(){
-  var BUILD='1905';
+  var BUILD='1906';
   var loadPromise=null;
-  var bootError=null;
+  var attempt=0;
 
   function formError(text){
     var error=document.getElementById('formError');
@@ -27,19 +27,30 @@
     }
   }
 
+  function timeout(ms){
+    return new Promise(function(_,reject){
+      setTimeout(function(){reject(new Error('laden duurde langer dan '+Math.round(ms/1000)+' seconden'))},ms);
+    });
+  }
+
   function defaultLoader(){
-    return import('./app.js?v='+BUILD);
+    attempt+=1;
+    // Unique app URL per retry prevents a failed app-module fetch from becoming
+    // permanently sticky in the browser module map for this document.
+    return import('./app.js?v='+BUILD+'&boot='+attempt);
   }
 
   async function loadApp(){
     if(typeof window.reisslimSubmitTrip==='function'&&typeof window.reisslimStartNewTrip==='function')return true;
     if(loadPromise)return loadPromise;
-    bootError=null;
+
     setBusy(true,'Planner laden…');
+    formError('');
     var loader=typeof window.__reisslimAppLoader==='function'?window.__reisslimAppLoader:defaultLoader;
-    loadPromise=(async function(){
+
+    var current=(async function(){
       try{
-        await loader();
+        await Promise.race([loader(),timeout(15000)]);
         if(typeof window.reisslimSubmitTrip!=='function'||typeof window.reisslimStartNewTrip!=='function'){
           throw new Error('app.js geladen maar plannerfuncties ontbreken');
         }
@@ -47,16 +58,20 @@
         formError('');
         return true;
       }catch(error){
-        bootError=error;
         document.documentElement.dataset.reisslimApp='failed';
         console.error('ReisSlim app-module kon niet worden geladen',error);
-        formError('De planner kon niet worden geladen: '+(error&&error.message?error.message:'onbekende modulefout')+'.');
+        formError('De planner kon niet worden geladen: '+(error&&error.message?error.message:'onbekende modulefout')+'. Tik nogmaals om opnieuw te proberen.');
         return false;
       }finally{
         setBusy(false);
+        // Critical fix: a failed or timed-out boot must never poison all future
+        // button presses. The next interaction gets a fresh loader attempt.
+        if(document.documentElement.dataset.reisslimApp!=='ready')loadPromise=null;
       }
     })();
-    return loadPromise;
+
+    loadPromise=current;
+    return current;
   }
 
   async function activateStart(event){
@@ -79,13 +94,11 @@
     if(await loadApp())await window.reisslimSubmitTrip(event);
   }
 
-  // One owner for both critical actions.
   document.addEventListener('click',function(event){void activateStart(event)},true);
   document.addEventListener('submit',function(event){void interceptSubmit(event)},true);
 
-  // Start loading immediately; interaction waits on the same promise.
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){void loadApp()},{once:true});
-  else void loadApp();
-
+  // Do NOT pre-load the module in the background. On mobile this could fail
+  // transiently during page/SW startup before the user ever interacted.
+  // First critical interaction owns the first boot attempt.
   window.reisslimLoadApp=loadApp;
 })();
