@@ -984,7 +984,7 @@ function roadtripDiscoveredProfile(trip,element,origin){
 }
 async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=12000}={}){
  const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return 0;
- const radius=Math.round(roadtripDiscoveryRadiusKm(trip)*1000),lat=Number(origin.lat).toFixed(5),lon=Number(origin.lon).toFixed(5),query=`[out:json][timeout:18][maxsize:33554432];(nwr(around:${radius},${lat},${lon})[\"place\"~\"city|town|village\"][\"name\"];);out center 260;`;
+ const radius=Math.round(roadtripDiscoveryRadiusKm(trip)*1000),lat=Number(origin.lat).toFixed(5),lon=Number(origin.lon).toFixed(5),query=`[out:json][timeout:18][maxsize:33554432];(nwr(around:${radius},${lat},${lon})["place"~"city|town|village"]["name"];);out center 260;`;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{const response=await fetchImpl('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)return 0;
    const payload=await response.json(),knownIds=new Set(state.catalog.map(x=>x.id)),existingPoints=state.catalog.flatMap(x=>x.bases||[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));
