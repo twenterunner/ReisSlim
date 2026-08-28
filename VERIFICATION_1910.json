@@ -1,0 +1,29 @@
+{
+  "release": "1.10.0 / 1910",
+  "root_cause": "The deployed 1909 build does not start because trip-model-1909.js has a real JavaScript syntax error. GitHub Actions failed on that exact file before the test suite could run. Since app.js imports the malformed module, the browser never executes app.js or initialize(), so the buttons cannot work.",
+  "github_actions_failure": {
+    "run_id": 33163622065,
+    "job_id": 98823723893,
+    "message": "trip-model-1909.js:7 SyntaxError: missing ) after argument list"
+  },
+  "verification": {
+    "deployed_1909_error_reproduced_locally": true,
+    "corrected_trip_model_body_parses": true,
+    "release_root_js_syntax_files_checked": 9,
+    "startup_checks": {
+      "direct_app_module": true,
+      "no_critical_ui": true,
+      "no_release_reset": true,
+      "native_start_listener": true,
+      "native_submit_listener": true,
+      "trip_model_import_1910": true,
+      "policy_import_1910": true,
+      "fixed_weight_expression": true,
+      "engine_unchanged": true
+    },
+    "roadtrip_regression": {
+      "passed": 49,
+      "total": 49
+    }
+  }
+}
