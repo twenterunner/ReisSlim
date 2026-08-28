@@ -1186,33 +1186,10 @@ function setupPremiumPlannerControls(){
   }
 }
 
-async function submitTripForm(event){
-  event?.preventDefault?.();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);// Render the planner result immediately. Global roadtrip enrichment runs after
-// the first usable portfolio is visible; it must never block the submit button.
-refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
-  if(state.trip.liveData){
-    // Do not await external discovery from the form submit path. Build 1746
-    // could wait for up to 8 batches × 2 providers × 11 s before anything
-    // appeared, making the button look dead on mobile.
-    void (async()=>{
-      try{
-        const added=await discoverRoadtripOvernightPool(state.trip);
-        refreshPortfolio();
-        // Only invoke the legacy discovery provider when the dedicated global
-        // roadtrip pipeline did not produce a useful pool. Never run both together.
-        if(added<6){await discoverLiveOptions({append:true,quiet:true});refreshPortfolio()}
-      }catch(error){console.warn('Background roadtrip enrichment failed',error)}
-      finally{scheduleReviewPrefetch()}
-    })();
-
-}
-}
 
 function initialize(){
   const startPlanningButton=$('startPlanningBtn');
   if(startPlanningButton)startPlanningButton.addEventListener('click',event=>{event.preventDefault();startNewTrip()});
-  const tripForm=$('tripForm');
-  if(tripForm)tripForm.addEventListener('submit',submitTripForm);
   const brandButton=$('brandBtn');
   if(brandButton){
     brandButton.setAttribute('role','button');brandButton.setAttribute('tabindex','0');
@@ -1237,6 +1214,24 @@ function initialize(){
   $('continueTripBtn').addEventListener('click',event=>{event.preventDefault();showView('plannerView')});
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());
   $('useLocationBtn').addEventListener('click',()=>{if(!navigator.geolocation)return showError('Locatiebepaling niet ondersteund.');navigator.geolocation.getCurrentPosition(pos=>{const point={lat:pos.coords.latitude,lon:pos.coords.longitude,name:'Huidige locatie',source:'Browser-geolocatie'};$('origin').value='Huidige locatie';state.trip=normalizeTrip({...readTripForm(state.trip),origin:'Huidige locatie',originPoint:point});persistDraft('Huidige locatie opgeslagen')},()=>showError('Locatie kon niet worden bepaald.'),{timeout:10000,maximumAge:600000})});
+  $('tripForm').addEventListener('submit',async event=>{event.preventDefault();state.trip=readTripForm(state.trip);const errors=validateTripInput(state.trip);if(errors.length)return showError(errors.join(' '));showError();if(!state.trip.originPoint&&state.trip.liveData){setStatus('Vertrekplaats controleren…');const point=await geocodeOrigin(state.trip.origin);if(point)state.trip=normalizeTrip({...state.trip,originPoint:point})}if(state.trip.destinationQuery&&!state.trip.destinationPoint&&state.trip.liveData){const point=await geocodeOrigin(state.trip.destinationQuery);if(point)state.trip=normalizeTrip({...state.trip,destinationPoint:point})}state.dismissedIds=[];state.imageRejectedIds=[];state.catalog=[...destinations];state.discoveryCursor=0;state.preferenceProfile.privateMode=state.trip.privateMode;savePreferenceProfile(state.preferenceProfile);// Render the planner result immediately. Global roadtrip enrichment runs after
+// the first usable portfolio is visible; it must never block the submit button.
+refreshPortfolio();state.destination=null;state.plan=null;state.variants=[];$('resultsSection').classList.remove('hidden');$('planSection').classList.add('hidden');persistDraft();$('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+  if(state.trip.liveData){
+    // Do not await external discovery from the form submit path. Build 1746
+    // could wait for up to 8 batches × 2 providers × 11 s before anything
+    // appeared, making the button look dead on mobile.
+    void (async()=>{
+      try{
+        const added=await discoverRoadtripOvernightPool(state.trip);
+        refreshPortfolio();
+        // Only invoke the legacy discovery provider when the dedicated global
+        // roadtrip pipeline did not produce a useful pool. Never run both together.
+        if(added<6){await discoverLiveOptions({append:true,quiet:true});refreshPortfolio()}
+      }catch(error){console.warn('Background roadtrip enrichment failed',error)}
+      finally{scheduleReviewPrefetch()}
+    })();
+  }});
 
 
   let saveTimer;const autosave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{state.trip=readTripForm(state.trip);persistDraft()},300)};$('tripForm').addEventListener('input',autosave);$('tripForm').addEventListener('change',autosave);

@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "release": "1.9.8 / 1908",
+  "root_cause": "The Start/Search workflow was repeatedly restructured after the known-working 1.9.0 implementation. The extracted submitTripForm/global bridge/dynamic-loader changes created handler-scope and boot dependencies. Build 1908 removes those changes and restores the exact native inline tripForm submit pattern used in the known-working GitHub revision while retaining the current planning engine.",
+  "verification": {
+    "syntax": true,
+    "native_browser": {
+      "startCalls": 1,
+      "refreshCalls": 1,
+      "planner": true,
+      "sameUrl": true,
+      "resultsVisible": true
+    },
+    "roadtrip_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "structural": {
+      "inline_submit_inside_initialize": true,
+      "single_inline_submit": true,
+      "direct_start_listener": true,
+      "no_submit_bridge": true,
+      "no_critical_loader": true,
+      "direct_app_module": true
+    }
+  },
+  "engine_version": 63,
+  "limitation": "The environment blocks browser navigation to local HTTP/file pages, so the full PWA could not be opened by URL. The exact Start listener and exact restored Submit listener source from the finished app.js were executed in Chromium with the required DOM/dependencies, and all module files pass syntax checks."
+}
