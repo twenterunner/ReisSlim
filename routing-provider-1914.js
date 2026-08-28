@@ -1,4 +1,4 @@
-import {readRoutingSettings,saveRoutingSettings,routingConfigured} from './routing-provider.js?v=1919';
+import {readRoutingSettings,saveRoutingSettings,routingConfigured} from './routing-provider.js?v=1920';
 export {readRoutingSettings,saveRoutingSettings,routingConfigured};
 
 const URLS=['https://router.project-osrm.org','https://routing.openstreetmap.de/routed-car'];
@@ -9,21 +9,30 @@ const clone=x=>typeof structuredClone==='function'?structuredClone(x):JSON.parse
 
 async function json(url,fetchImpl,timeoutMs){
  const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);
- try{const r=await fetchImpl(url,{signal:c.signal,headers:{accept:'application/json'}});if(!r.ok)throw new Error(`OSRM ${r.status}`);return await r.json()}finally{clearTimeout(t)}
+ try{const response=await fetchImpl(url,{signal:c.signal,headers:{accept:'application/json'}});if(!response.ok)throw new Error(`OSRM ${response.status}`);return await response.json()}finally{clearTimeout(t)}
+}
+function routeUrl(base,pts){
+ const coords=pts.map(p=>`${+p.lon},${+p.lat}`).join(';');
+ const u=new URL(`${base}/route/v1/driving/${coords}`);
+ u.search=new URLSearchParams({overview:'full',geometries:'geojson',steps:'false',alternatives:'false',generate_hints:'false'});
+ return u;
+}
+function normalizeRoad(payload){
+ const route=payload?.routes?.[0],g=route?.geometry?.coordinates||[];
+ if(!route||g.length<2)throw new Error('OSRM gaf geen volledige wegroute');
+ return{provider:'osrm',distanceKm:route.distance/1000,roadHours:route.duration/3600,geometry:g.map(([lon,lat])=>({lat:+lat,lon:+lon}))};
 }
 async function road(points,fetchImpl,timeoutMs){
  const pts=points.filter(valid);if(pts.length<2)throw new Error('Te weinig routepunten');
- let last;
- for(const base of URLS){try{
-   const coords=pts.map(p=>`${+p.lon},${+p.lat}`).join(';');
-   const u=new URL(`${base}/route/v1/driving/${coords}`);
-   u.search=new URLSearchParams({overview:'full',geometries:'geojson',steps:'false',alternatives:'false',generate_hints:'false'});
-   const p=await json(u,fetchImpl,Math.max(3000,Math.floor(timeoutMs/URLS.length)));
-   const r=p?.routes?.[0],g=r?.geometry?.coordinates||[];
-   if(!r||g.length<2)throw new Error('OSRM gaf geen volledige wegroute');
-   return{provider:'osrm',distanceKm:r.distance/1000,roadHours:r.duration/3600,geometry:g.map(([lon,lat])=>({lat:+lat,lon:+lon}))};
- }catch(e){last=e}}
- throw last||new Error('Geen routeprovider beschikbaar');
+ // Query both public mirrors concurrently. First valid road geometry wins.
+ const tasks=URLS.map(base=>json(routeUrl(base,pts),fetchImpl,Math.max(4500,timeoutMs||9000)).then(normalizeRoad));
+ try{return await Promise.any(tasks)}
+ catch(firstError){
+   // One controlled retry with a longer window prevents first/last-day gaps from
+   // transient OSRM mirror failures.
+   const retry=URLS.map(base=>json(routeUrl(base,pts),fetchImpl,Math.max(7500,(timeoutMs||9000)+2500)).then(normalizeRoad));
+   try{return await Promise.any(retry)}catch{throw firstError}
+ }
 }
 function controls(from,to,side=1,f=.32,count=3){
  const direct=km(from,to);if(!Number.isFinite(direct)||direct<25)return[];
@@ -61,18 +70,26 @@ export async function enrichPlanWithLiveRouting(trip,destination,plan,options={}
  const next=clone(plan),days=(next.days||[]).filter(d=>['outward','transfer','return','daytrip'].includes(d.kind)&&valid(d.fromPoint)&&valid(d.toPoint));
  let completed=0,applied=0;options.onProgress?.({type:'routing-start',completed,total:days.length});
  // Sequential by design: return-loop routing depends on completed outward geometry.
+ const routeOne=async(day,timeoutMs)=>{
+   let result;
+   if(day.kind==='return'&&trip.routeTopology==='loop'){
+     const outbound=(next.days||[]).filter(d=>d.kind==='outward'&&d.routeSource==='osrm'&&Array.isArray(d.geometry)).flatMap(d=>d.geometry).filter(valid);
+     result=await loopReturn(day,outbound,fetchImpl,timeoutMs);
+   }else if(day.kind==='daytrip')result=await dayTrip(day,fetchImpl,timeoutMs);
+   else result=await road([day.fromPoint,day.toPoint],fetchImpl,timeoutMs);
+   apply(day,result,trip);
+ };
  for(const day of days){
    options.onProgress?.({type:'routing-day-start',day:day.day,completed,total:days.length});
-   try{
-     let r;
-     if(day.kind==='return'&&trip.routeTopology==='loop'){
-       const outbound=(next.days||[]).filter(d=>d.kind==='outward'&&d.routeSource==='osrm'&&Array.isArray(d.geometry)).flatMap(d=>d.geometry).filter(valid);
-       r=await loopReturn(day,outbound,fetchImpl,options.timeoutMs||9000);
-     }else if(day.kind==='daytrip')r=await dayTrip(day,fetchImpl,options.timeoutMs||9000);
-     else r=await road([day.fromPoint,day.toPoint],fetchImpl,options.timeoutMs||9000);
-     apply(day,r,trip);applied++;
-   }catch(e){console.warn(`Live wegroute dag ${day.day} mislukt`,e)}
+   try{await routeOne(day,options.timeoutMs||9000);applied++}
+   catch(e){console.warn(`Live wegroute dag ${day.day} eerste poging mislukt`,e)}
    finally{completed++;options.onProgress?.({type:'routing-day-complete',day:day.day,completed,total:days.length,applied})}
+ }
+ // Explicitly retry every travel day still lacking real road geometry. This is
+ // especially important for day 1 and the final return leg.
+ for(const day of days.filter(d=>d.routeSource!=='osrm')){
+   try{await routeOne(day,12000);applied++}
+   catch(e){console.warn(`Live wegroute dag ${day.day} definitief niet beschikbaar`,e)}
  }
  const ret=(next.days||[]).filter(d=>d.kind==='return'&&Number.isFinite(d.routeOverlap));
  const loopOverlap=ret.length?+(ret.reduce((s,d)=>s+d.routeOverlap,0)/ret.length).toFixed(3):null;

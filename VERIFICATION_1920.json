@@ -1,0 +1,45 @@
+{
+  "release": "1.11.0 / 1920",
+  "root_causes": {
+    "pending_offscreen": "The global overlay was fixed-position, but its card had no mobile viewport max-height/overflow contract. On shorter Android viewports the centered card could extend beyond the usable screen.",
+    "image_flicker": "The image timer fired once per second, but each change also triggered an opacity/scale transition and a second 180 ms delayed state change. Visually that produces two flashes per image cycle rather than one clean image change.",
+    "partial_route": "The live router accepted a partially-routed plan after transient per-leg OSRM failures. 1917 correctly preserved live geometry, but that also preserved missing first/final live legs instead of retrying them.",
+    "missing_poi": "Generic place enrichment can finish with categories missing on individual days. Accommodation search used only a 12 km radius and could therefore leave legitimate overnight days without a result."
+  },
+  "changes": {
+    "pending": "Added a mobile-safe viewport contract: body-level overlay, 100dvh, safe-area padding, card max-height and scrolling, compact small-height layout.",
+    "images": "Removed opacity/scale switch animation and delayed 180 ms update. Exactly one image src change occurs every 1000 ms.",
+    "routing": "Both OSRM mirrors are raced for every leg; failed travel legs are explicitly retried with a longer window. Day 1 and final return are part of the same hard retry set.",
+    "poi": "Added a targeted per-day POI gap filler for restaurant, fuel and activity categories after generic place enrichment.",
+    "accommodation": "Accommodation lookup now expands from 12 km to 25 km when the first search is empty and accepts results within 28 km."
+  },
+  "verification": {
+    "syntax": {
+      "app.js": true,
+      "routing-provider-1914.js": true,
+      "overnight-accommodation.js": true,
+      "poi-gap-filler.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "route_mock": {
+      "sources": [
+        "osrm",
+        "osrm",
+        "osrm"
+      ],
+      "live": true,
+      "calls": 6
+    },
+    "image_interval_ms": 1000,
+    "image_transition_removed": true,
+    "mobile_overlay_contract": true,
+    "android_device_not_executed_here": true
+  }
+}

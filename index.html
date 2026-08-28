@@ -1,21 +1,22 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="1.10.9-1919-global-pending">
+  <meta name="reisslim-build" content="1.11.0-1920-route-poi-pending">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1919">
-  <link rel="icon" type="image/png" sizes="192x192" href="reisslim-icon-192.png?v=1919">
-  <link rel="apple-touch-icon" sizes="192x192" href="reisslim-icon-192.png?v=1919">
+  <link rel="manifest" href="manifest.webmanifest?v=1920">
+  <link rel="icon" type="image/png" sizes="192x192" href="reisslim-icon-192.png?v=1920">
+  <link rel="apple-touch-icon" sizes="192x192" href="reisslim-icon-192.png?v=1920">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://images.prismic.io">
   <link rel="preconnect" href="https://images.squarespace-cdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=1919">
-  <link rel="stylesheet" href="compact-ui.css?v=1919">
+  <link rel="stylesheet" href="styles.css?v=1920">
+  <link rel="stylesheet" href="compact-ui.css?v=1920">
+  <link rel="stylesheet" href="pending-overlay-fix.css?v=1920">
 </head>
 <body>
       <div id="planLoadingOverlay" class="plan-loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
@@ -36,7 +37,7 @@
 
   <header class="topbar">
     <div id="brandBtn" class="brand brand-static" aria-label="ReisSlim">
-      <img class="brand-app-icon" src="reisslim-icon-192.png?v=1919" alt="" aria-hidden="true">
+      <img class="brand-app-icon" src="reisslim-icon-192.png?v=1920" alt="" aria-hidden="true">
       <span class="brand-copy"><strong>ReisSlim</strong><small>Global travel assistant</small></span>
     </div>
   </header>
@@ -256,11 +257,11 @@
     <button class="nav-item" data-view="budgetView" type="button"><span>€</span><small>Budget</small></button>
   </nav>
 
-  <footer><p><span id="versionLabel">ReisSlim v1.10.9 · Build 1919</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v1.11.0 · Build 1920</span><br>Roadtripplanning vanaf het door de gebruiker gekozen vertrekpunt · © OpenStreetMap-bijdragers, ODbL.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="start-new-trip.js?v=1919"></script>
-  <script src="ui-feature-flags.js?v=1919"></script>
-  <script src="planner-submit-guard.js?v=1919"></script>
-  <script type="module" src="app.js?v=1919"></script>
+  <script src="start-new-trip.js?v=1920"></script>
+  <script src="ui-feature-flags.js?v=1920"></script>
+  <script src="planner-submit-guard.js?v=1920"></script>
+  <script type="module" src="app.js?v=1920"></script>
 </body>
 </html>
