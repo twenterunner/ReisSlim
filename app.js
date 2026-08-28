@@ -433,6 +433,21 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
     });
     state.discoveryCursor++;
 
+    // Provider contract fix: destination-provider returns the completed discovery
+    // set in result.destinations. Older app code only merged onBatch callbacks, but
+    // the current provider does not emit onBatch, so live regions were reported as
+    // found without ever entering state.catalog. That left tour generation with
+    // only the static catalogue (mostly Europe) plus the selected Cape Town item.
+    if(result.destinations?.length){
+      const known=new Set(state.catalog.map(item=>item.id));
+      const fresh=result.destinations.filter(item=>!known.has(item.id));
+      if(fresh.length){
+        state.catalog.push(...fresh);
+        addedTotal+=fresh.length;
+        if(!quiet)refreshPortfolio();
+      }
+    }
+
     // If an initial cached search produces zero usable destinations, don't stop
     // and show an error. Immediately do one genuinely fresh search using a new
     // seed group. This is the deployed 1605 failure shown as "0s · lokale cache".
@@ -450,6 +465,11 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
         onBatch:batchHandler
       });
       state.discoveryCursor++;
+      if(result.destinations?.length){
+        const known=new Set(state.catalog.map(item=>item.id));
+        const fresh=result.destinations.filter(item=>!known.has(item.id));
+        if(fresh.length){state.catalog.push(...fresh);addedTotal+=fresh.length;if(!quiet)refreshPortfolio()}
+      }
     }
 
     // A transient provider miss should not immediately surface as a failure. Try one
@@ -467,7 +487,12 @@ async function discoverLiveOptions({append=false,retry=false,quiet=false}={}){
         onBatch:batchHandler
       });
       state.discoveryCursor++;
-      if(second.destinations?.length)result=second;
+      if(second.destinations?.length){
+        const known=new Set(state.catalog.map(item=>item.id));
+        const fresh=second.destinations.filter(item=>!known.has(item.id));
+        if(fresh.length){state.catalog.push(...fresh);addedTotal+=fresh.length;if(!quiet)refreshPortfolio()}
+        result=second;
+      }
     }
 
     if(result.destinations?.length){
