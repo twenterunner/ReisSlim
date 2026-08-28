@@ -198,7 +198,7 @@ function roadtripLandCandidates(origin){
    if(!Number.isFinite(b?.lat)||!Number.isFinite(b?.lon))continue;
    const originKm=geoDistanceKm(origin,b);if(originKm<45)continue;
    const activityCount=Number(item.activities?.length||0),tagCount=Number(item.tags?.length||0);
-   const poiRichness=Math.min(100,activityCount*18+tagCount*5+(item.dynamic?12:0));
+   const poiRichness=Number.isFinite(Number(item.poiRichness))?Number(item.poiRichness):Math.min(100,activityCount*18+tagCount*5+(item.dynamic?12:0));
    rows.push({...b,name:b.name||item.name||'Overnachtingsregio',role:'destination',landValidated:true,generatedExploration:false,
      catalogId:item.id||null,originKm,poiRichness,activityCount,tagCount,destinationName:item.name||b.name});
  }
@@ -980,18 +980,62 @@ function roadtripDiscoveredProfile(trip,element,origin){
  const tags=element?.tags||{},point=Number.isFinite(element?.lat)&&Number.isFinite(element?.lon)?{lat:element.lat,lon:element.lon}:element?.center,name=tags['name:nl']||tags.name;
  if(!name||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lon))return null;const originKm=geoDistanceKm(origin,point);if(originKm<50)return null;
  const importance=tags.place==='city'?95:tags.place==='town'?82:tags.place==='village'?62:55,id=`roadtrip-osm-${element.type||'place'}-${element.id||Math.round(point.lat*1e5)+'-'+Math.round(point.lon*1e5)}`,base={name,lat:Number(point.lat),lon:Number(point.lon)};
- return{id,name:`${name} & omgeving`,country:tags['addr:country']||tags['is_in:country']||'Live regio',distanceKm:Math.round(originKm*1.18),driveHours:Number((originKm*1.18/72).toFixed(1)),nightMid:125,activityDaily:45,toll:0,tags:['natuur','cultuur','eten'],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:7,camper:7,weather:7,crowds:7,summary:`Live gevonden overnachtingsregio rond ${name}.`,pros:['Echte benoemde plaats','Geschikt als roadtrip-overnachtingsregio'],cons:['Verblijf en POI’s worden na selectie live ingevuld'],routeStops:[],bases:[base],activities:Array.from({length:Math.max(2,Math.round(importance/28))},(_,i)=>({type:i%2?'cultuur':'natuur',title:`Verken ${name} en omgeving.`,tags:i%2?['cultuur']:['natuur']})),dynamic:true,roadtripCandidate:true,discoverySource:'OpenStreetMap roadtrip pool',osm:{type:element.type,id:element.id}};
+ return{id,name:`${name} & omgeving`,country:tags['addr:country']||tags['is_in:country']||'Live regio',distanceKm:Math.round(originKm*1.18),driveHours:Number((originKm*1.18/72).toFixed(1)),nightMid:125,activityDaily:45,toll:0,tags:['natuur','cultuur','eten'],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:7,camper:7,weather:7,crowds:7,summary:`Live gevonden overnachtingsregio rond ${name}.`,pros:['Echte benoemde plaats','Geschikt als roadtrip-overnachtingsregio'],cons:['Verblijf en POI’s worden na selectie live ingevuld'],routeStops:[],bases:[base],activities:Array.from({length:Math.max(2,Math.round(importance/28))},(_,i)=>({type:i%2?'cultuur':'natuur',title:`Verken ${name} en omgeving.`,tags:i%2?['cultuur']:['natuur']})),poiRichness:Math.round(importance*.40),dynamic:true,roadtripCandidate:true,discoverySource:'OpenStreetMap roadtrip pool',osm:{type:element.type,id:element.id}};
 }
-async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=12000}={}){
- const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return 0;
- const radius=Math.round(roadtripDiscoveryRadiusKm(trip)*1000),lat=Number(origin.lat).toFixed(5),lon=Number(origin.lon).toFixed(5),query=`[out:json][timeout:18][maxsize:33554432];(nwr(around:${radius},${lat},${lon})["place"~"city|town|village"]["name"];);out center 260;`;
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
- try{const response=await fetchImpl('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});if(!response.ok)return 0;
-   const payload=await response.json(),knownIds=new Set(state.catalog.map(x=>x.id)),existingPoints=state.catalog.flatMap(x=>x.bases||[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));
-   const candidates=(payload?.elements||[]).map(el=>roadtripDiscoveredProfile(trip,el,origin)).filter(Boolean).filter(item=>!knownIds.has(item.id)).filter(item=>!existingPoints.some(p=>geoDistanceKm(p,item.bases[0])<12)).sort((a,b)=>a.distanceKm-b.distanceKm),selected=[];
-   for(const item of candidates){if(selected.some(x=>geoDistanceKm(x.bases[0],item.bases[0])<35))continue;selected.push(item);if(selected.length>=80)break}if(selected.length){state.catalog.push(...selected);refreshPortfolio()}return selected.length;
- }catch(error){console.warn('Roadtrip overnight discovery failed',error);return 0}finally{clearTimeout(timer)}
+function roadtripSearchSeed(origin,distanceKm,bearingDeg){
+ const R=6371,a=distanceKm/R,b=bearingDeg*Math.PI/180,lat1=origin.lat*Math.PI/180,lon1=origin.lon*Math.PI/180;
+ const lat2=Math.asin(Math.sin(lat1)*Math.cos(a)+Math.cos(lat1)*Math.sin(a)*Math.cos(b));
+ const lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(a)*Math.cos(lat1),Math.cos(a)-Math.sin(lat1)*Math.sin(lat2));
+ return{lat:lat2*180/Math.PI,lon:((lon2*180/Math.PI+540)%360)-180};
 }
+function buildRoadtripPlaceQuery(trip,origin){
+ const maxLeg=tourLegLimitKm(trip),days=Math.max(3,Number(trip.days||3));
+ const outer=Math.min(620,Math.max(180,maxLeg*Math.min(1.55,.92+days*.10)));
+ const rings=[.28,.48,.70,.90].map(f=>Math.max(60,outer*f));
+ const bearings=[0,45,90,135,180,225,270,315];
+ const clauses=[];
+ for(let r=0;r<rings.length;r++){
+   for(let i=0;i<bearings.length;i++){
+     const p=roadtripSearchSeed(origin,rings[r],bearings[i]+(r%2?22.5:0));
+     clauses.push(`nwr(around:28000,${p.lat.toFixed(4)},${p.lon.toFixed(4)})["place"~"city|town|village"]["name"];`);
+   }
+ }
+ return`[out:json][timeout:16][maxsize:33554432];(${clauses.join('')});out center 420;`;
+}
+async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=15000}={}){
+ const origin=trip.originPoint||state.plan?.routeMetrics?.origin||state.plan?.origin;
+ if(!origin||!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon))return 0;
+ const query=buildRoadtripPlaceQuery(trip,origin);
+ const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+ let payload=null;
+ for(const endpoint of endpoints){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+   try{
+     const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({data:query}),signal:controller.signal});
+     if(!response.ok)continue;
+     const candidate=await response.json();
+     if(candidate?.elements?.length){payload=candidate;break}
+   }catch(error){console.warn('Roadtrip place discovery provider failed',endpoint,error)}
+   finally{clearTimeout(timer)}
+ }
+ if(!payload?.elements?.length)return 0;
+
+ const knownIds=new Set(state.catalog.map(x=>x.id));
+ const existingPoints=state.catalog.flatMap(x=>x.bases||[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));
+ const candidates=payload.elements.map(el=>roadtripDiscoveredProfile(trip,el,origin)).filter(Boolean)
+   .filter(item=>!knownIds.has(item.id))
+   .filter(item=>!existingPoints.some(p=>geoDistanceKm(p,item.bases[0])<12))
+   .sort((a,b)=>a.distanceKm-b.distanceKm);
+ const selected=[];
+ for(const item of candidates){
+   if(selected.some(x=>geoDistanceKm(x.bases[0],item.bases[0])<35))continue;
+   selected.push(item);
+   if(selected.length>=90)break;
+ }
+ if(selected.length){state.catalog.push(...selected);refreshPortfolio()}
+ return selected.length;
+}
+
 async function ensureTourPlanSupply(destination,basePlan){
   let plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   if(Number(state.trip?.days||0)<3||state.trip?.routeTopology==='open-ended')return plan;
@@ -1048,6 +1092,13 @@ function setupPremiumPlannerControls(){
 }
 
 function initialize(){
+  const brandButton=$('brandBtn');
+  if(brandButton){
+    brandButton.setAttribute('role','button');brandButton.setAttribute('tabindex','0');
+    const goHome=()=>{showView('dashboardView');window.scrollTo({top:0,left:0,behavior:'auto'})};
+    brandButton.addEventListener('click',goHome);
+    brandButton.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome()}});
+  }
   const newTripButton=$('newTripBtn');
   if(newTripButton)newTripButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();startNewTrip()});
   const manualLiveButton=$('manualLiveDiscoveryBtn');
