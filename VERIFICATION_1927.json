@@ -1,0 +1,85 @@
+{
+  "release": {
+    "version": "1.14.0",
+    "build": "1927",
+    "engineVersion": 65
+  },
+  "baseline": "Current deployed repository inspected before implementation: config.js reports 1.13.3 / 1926, while several loaded modules still use older 1923 cache-buster labels.",
+  "root_causes": {
+    "overnight_regions": "The selected-trip solver ultimately gets candidate towns from state.catalog. The existing independent regional fallback used only Nominatim reverse-geocoding, with up to 24 seeds and concurrency 6. A transient/provider-throttling failure therefore starved both moving-roadtrip overnight selection and base-trip selection.",
+    "smart_base": "The base solver itself is deterministic, but it can only select a base and day trips from the same candidate pool. Sparse regional discovery therefore appears as 'geen geschikte centrale uitvalsbasis' even when real towns exist.",
+    "poi": "The final POI gap filler was Overpass-only. When public Overpass mirrors were slow/empty, missing restaurant/fuel/rest/activity items remained unresolved.",
+    "accommodation": "Accommodation already had multiple providers but successful results were not persistently reused across future plans, causing repeated external searches.",
+    "proposal_images": "Image metadata was cached by proposal id, but dynamically rediscovered proposals can receive different ids. Cross-origin image bytes were also outside the service worker cache.",
+    "dashboard_slogan": "The dashboard hero still used the generic question slogan instead of a distinct ReisSlim brand line."
+  },
+  "changes": {
+    "destination_discovery": "Photon reverse geocoding is now the fast primary source; two Overpass mirrors are a secondary batch source; Nominatim is a deliberately rate-limited tertiary fallback. Results are cached for 30 days and stale-cache fallback is allowed for 180 days.",
+    "regional_supply": "Regional overnight/base discovery now uses dense route-corridor + anchor rings, Photon primary, batched Overpass secondary, rate-limited Nominatim tertiary, fresh and stale caches, and returns up to 24 real named locality profiles. Base and moving modes use different seed geometry.",
+    "poi": "Missing POIs now use Overpass, then Photon, then a targeted external map-search link rather than silently disappearing. Successful POIs are cached for 14 days with 90-day stale fallback.",
+    "accommodation": "Specific accommodation selections are cached for 21 days with 120-day stale fallback. Overpass + Photon + a limited Nominatim fallback remain available; generic map links are not cached as if they were verified accommodation.",
+    "images": "Proposal image metadata is keyed by normalized destination name/country rather than transient proposal id. Actual Wikimedia/external image responses are cached in Cache Storage and by the service worker, while map tiles are deliberately excluded.",
+    "dashboard": "Hero becomes 'Ga ver. ReisSlim.' with eyebrow 'Minder zoeken. Meer roadtrip.'",
+    "pending_images": "The deployed 4-second guard pacing is returned to 1 second."
+  },
+  "verification": {
+    "node_syntax": {
+      "config.js": true,
+      "destination-provider.js": true,
+      "image-provider.js": true,
+      "overnight-accommodation.js": true,
+      "planner-submit-guard.js": true,
+      "poi-gap-filler.js": true,
+      "regional-overnight-provider.js": true,
+      "service-worker.js": true
+    },
+    "static_acceptance": {
+      "dashboard_slogan": true,
+      "pending_image_interval_1000ms": true,
+      "cross_origin_image_cache": true,
+      "build_1927": true,
+      "engine_65": true,
+      "destination_multi_source": true,
+      "regional_multi_source": true,
+      "poi_multi_source_cache": true,
+      "accommodation_cache": true,
+      "name_keyed_image_cache": true
+    },
+    "integration_test": {
+      "regionalCount": 23,
+      "baseFeasible": true,
+      "movingFeasible": true,
+      "regionalNetworkCalls": 24,
+      "destinationCount": 38,
+      "destinationNetworkCalls": 36,
+      "poiTypes": [
+        "activity",
+        "fuel",
+        "rest",
+        "restaurant"
+      ],
+      "poiFirstNetworkCalls": 12,
+      "accommodation": "Camping Route",
+      "accommodationFirstNetworkCalls": 6,
+      "imageCachedAcrossIds": true
+    },
+    "specific_acceptance": {
+      "five_day_base_candidate_supply": true,
+      "five_day_moving_loop_candidate_supply": true,
+      "regional_candidate_count": 23,
+      "destination_candidate_count": 38,
+      "poi_types_resolved": [
+        "activity",
+        "fuel",
+        "rest",
+        "restaurant"
+      ],
+      "image_cache_reused_across_different_proposal_ids": true
+    },
+    "not_verified": {
+      "android_device": true,
+      "live_public_provider_execution_from_this_environment": true,
+      "full_current_repository_test_suite": true
+    }
+  }
+}

@@ -1,260 +1,83 @@
-import './ui-feature-flags.js';
 import { resolveOrigin } from './trip-model.js';
 import { haversineKm } from './route-engine.js';
 
-const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
-const GOLDEN_ANGLE = 137.507764;
-const DEFAULT_BATCH_SEEDS = 16;
-const DEFAULT_RESULT_LIMIT = 72;
-const DISCOVERY_PASSES = 3;
-const countryNames = { AT: 'Oostenrijk', BE: 'België', CH: 'Zwitserland', CZ: 'Tsjechië', DE: 'Duitsland', DK: 'Denemarken', ES: 'Spanje', FR: 'Frankrijk', GB: 'Verenigd Koninkrijk', HR: 'Kroatië', IT: 'Italië', LU: 'Luxemburg', NL: 'Nederland', NO: 'Noorwegen', PL: 'Polen', PT: 'Portugal', SE: 'Zweden', SI: 'Slovenië', SK: 'Slowakije' };
-const countryCosts = { CH: 185, DK: 155, NO: 165, SE: 145, AT: 150, IT: 150, FR: 140, DE: 125, BE: 125, CZ: 105, PL: 100, SI: 125, HR: 120, ES: 125, PT: 115 };
-
-
-const REGIONAL_MOTOR_ANCHORS = [
-  { id:'region-sauerland', name:'Sauerland', country:'Duitsland', lat:51.192, lon:8.533, tags:['motor','natuur','bergen','wandelen'], summary:'Bochtige middelgebergtewegen, stuwmeren en compacte motorlussen rond Winterberg en Schmallenberg.' },
-  { id:'region-eifel', name:'Eifel', country:'Duitsland', lat:50.407, lon:6.939, tags:['motor','natuur','bergen','wandelen'], summary:'Bochtige Eifelwegen, vulkaanlandschap en compacte routes rond Monschau, Nürburg en de Vulkaaneifel.' }
+const PHOTON_REVERSE='https://photon.komoot.io/reverse';
+const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
+const OVERPASS_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
+const GOLDEN_ANGLE=137.507764,DEFAULT_BATCH_SEEDS=12,DEFAULT_RESULT_LIMIT=72,DISCOVERY_PASSES=3;
+const CACHE_PREFIX='reisslim.destination-resilient.v5';
+const FRESH_MS=30*24*60*60*1000,STALE_MS=180*24*60*60*1000;
+const countryCosts={CH:185,DK:155,NO:165,SE:145,AT:150,IT:150,FR:140,DE:125,BE:125,CZ:105,PL:100,SI:125,HR:120,ES:125,PT:115};
+const REGIONAL_MOTOR_ANCHORS=[
+{id:'region-sauerland',name:'Sauerland',country:'Duitsland',lat:51.192,lon:8.533,tags:['motor','natuur','bergen','wandelen']},
+{id:'region-eifel',name:'Eifel',country:'Duitsland',lat:50.407,lon:6.939,tags:['motor','natuur','bergen','wandelen']}
 ];
-
-function regionalMotorAnchors(trip, excludedIds=[]){
-  if(trip.transport!=='motorcycle' || Number(trip.days||0)<1 || Number(trip.days||0)>5) return [];
-  const origin=resolveOrigin(trip); if(!origin) return [];
-  const excluded=new Set(excludedIds);
-  return REGIONAL_MOTOR_ANCHORS.map(a=>{
-    if(excluded.has(a.id)) return null;
-    const point={lat:a.lat,lon:a.lon};
-    const direct=haversineKm(origin,point);
-    // Relevant to Saasveld / NL / western-DE short breaks; do not inject globally.
-    if(direct>650) return null;
-    const distanceKm=Math.round(direct*1.18);
-    const base={name:a.name,...point};
-    return {
-      id:a.id,name:`${a.name} & omgeving`,country:a.country,distanceKm,
-      driveHours:Number((distanceKm/88).toFixed(1)),nightMid:120,activityDaily:42,toll:0,
-      tags:a.tags,season:[3,4,5,6,7,8,9,10],family:7,motorcycle:10,camper:7,weather:7,crowds:7,
-      summary:a.summary,
-      pros:['Sterke motorregio op korte afstand','Veel bochtige daglussen mogelijk','Compact genoeg voor een 3-daagse trip'],
-      cons:['Weer kan snel wisselen in het middelgebergte'],
-      routeStops:corridorStops(origin,point,a.name,distanceKm),bases:[base],
-      activities:[
-        {type:'motor',title:`Rijd een landschappelijke motorlus door ${a.name}.`,rainAlternative:`Kies een kortere lus met droge binnenstop in ${a.name}.`,tags:['motor','natuur']},
-        {type:'natuur',title:`Plan een uitzicht- of natuurstop in ${a.name}.`,rainAlternative:`Kies een lokale binnenactiviteit.`,tags:['natuur']},
-        {type:'eten',title:`Plan een lokale eetstop langs de route.`,rainAlternative:`Kies een overdekte eetstop.`,tags:['eten']}
-      ],
-      dynamic:false,discoverySource:'ReisSlim regional anchor'
-    };
-  }).filter(Boolean);
+const finite=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
+const slug=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,55);
+const hash=v=>[...String(v)].reduce((s,c)=>((s*31)+c.charCodeAt(0))>>>0,2166136261);
+function destinationPoint(origin,distanceKm,bearingDegrees){const R=6371,b=bearingDegrees*Math.PI/180,lat1=origin.lat*Math.PI/180,lon1=origin.lon*Math.PI/180,lat2=Math.asin(Math.sin(lat1)*Math.cos(distanceKm/R)+Math.cos(lat1)*Math.sin(distanceKm/R)*Math.cos(b)),lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(distanceKm/R)*Math.cos(lat1),Math.cos(distanceKm/R)-Math.sin(lat1)*Math.sin(lat2));return{lat:lat2*180/Math.PI,lon:lon2*180/Math.PI}}
+function reachFor(trip){const global=trip.travelMode&&trip.travelMode!=='direct',legs=Math.max(1,Math.min(5,Math.floor((Number(trip.days||1)-1)/2)));return global?Math.min(15000,2600+Number(trip.days||1)*600):Math.max(250,Math.min(4200,Number(trip.maxDrive||5)*86*legs))}
+export function discoverySeeds(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){const origin=resolveOrigin(trip);if(!origin)return[];if(trip.destinationPoint){const rings=[10,25,45,70,100,140];return Array.from({length:count},(_,i)=>{const seq=cursor*count+i,distanceKm=rings[(seq+cursor)%rings.length]+Math.floor(cursor/2)*12;return{...destinationPoint(trip.destinationPoint,distanceKm,seq*GOLDEN_ANGLE),distanceKm,sequence:seq,targeted:true}})}
+ const reach=reachFor(trip),bands=(trip.travelMode&&trip.travelMode!=='direct')?[.16,.27,.40,.55,.70,.84,.96]:[.12,.20,.30,.42,.56,.70,.84,.96];
+ return Array.from({length:count},(_,i)=>{const seq=cursor*count+i,band=(seq+Math.floor(seq/bands.length))%bands.length,jitter=(((seq*17)%9)-4)*.012,f=Math.max(.08,Math.min(.98,bands[band]+jitter)),distanceKm=reach*f,bearing=seq*GOLDEN_ANGLE+(cursor%5)*11.25;return{...destinationPoint(origin,distanceKm,bearing),distanceKm,sequence:seq}})}
+function queryClauses(p){const around=p.targeted?30000:34000,lat=p.lat.toFixed(4),lon=p.lon.toFixed(4);return`nwr(around:${around},${lat},${lon})["place"~"city|town|village"]["name"];nwr(around:${around},${lat},${lon})["boundary"~"national_park|protected_area"]["name"];nwr(around:${around},${lat},${lon})["tourism"~"attraction|resort"]["name"];`}
+export function buildDiscoveryQuery(trip,cursor=0,count=DEFAULT_BATCH_SEEDS){const clauses=discoverySeeds(trip,cursor,count).map(queryClauses).join('\n');return`[out:json][timeout:7][maxsize:12582912];(${clauses});out center tags 300;`}
+function typeTags(tags={}){const d=[];if(tags.natural==='peak')d.push('bergen','wandelen','natuur');if(tags.boundary==='national_park'||tags.boundary==='protected_area')d.push('natuur','wandelen');if(tags.tourism==='attraction')d.push('cultuur');if(tags.tourism==='resort')d.push('eten');return[...new Set(d)]}
+function profileFromPoint(trip,p,tags={},source='multi-source'){const origin=resolveOrigin(trip),name=p.name;if(!origin||!finite(p)||!name)return null;const multimodal=trip.travelMode&&trip.travelMode!=='direct',direct=haversineKm(origin,p),distanceKm=Math.round(direct*(multimodal?1:1.18));if(distanceKm<70||distanceKm>(multimodal?15000:4200))return null;const code=String(p.countryCode||tags['addr:country']||tags['is_in:country_code']||'').toUpperCase(),country=p.country||tags['is_in:country']||tags['addr:country']||'Wereldregio',seed=hash(`${name}:${p.lat.toFixed(3)}:${p.lon.toFixed(3)}`),nightMid=countryCosts[code]||125+(seed%25),base={name,lat:Number(p.lat),lon:Number(p.lon)},extra=typeTags(tags);
+ return{id:`live-${slug(name)}-${Math.round(p.lat*100)}-${Math.round(p.lon*100)}`,name:`${name} & omgeving`,country,distanceKm,driveHours:Number((distanceKm/(multimodal?780:88)).toFixed(1)),nightMid,activityDaily:38+seed%25,toll:multimodal?0:Math.round(distanceKm*.025),tags:[...new Set(['natuur','cultuur','eten',...extra,...(trip.transport==='motorcycle'?['motor']:[])])],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:6+seed%4,motorcycle:7+(seed>>3)%3,camper:6+(seed>>5)%4,weather:5+(seed>>7)%4,crowds:6+(seed>>9)%4,summary:`Live ontdekt reisgebied rond ${name}; meerdere kaartbronnen en een lokale cache voorkomen afhankelijkheid van één server.`,pros:['Live ontdekt via meerdere kaartbronnen','Herbruikbaar uit lokale cache','Route, verblijf en POI’s worden na selectie apart gecontroleerd'],cons:['Prijzen en actuele openingstijden worden later gecontroleerd'],routeStops:[],bases:[base],activities:[{type:'natuur',title:`Verken natuur en uitzicht rond ${name}.`,rainAlternative:`Kies een compacte binnenactiviteit in ${name}.`,tags:['natuur']},{type:trip.transport==='motorcycle'?'motor':'cultuur',title:trip.transport==='motorcycle'?`Rijd een landschappelijke lus rond ${name}.`:`Verken ${name} en omgeving.`,rainAlternative:`Kies een kortere lokale route.`,tags:trip.transport==='motorcycle'?['motor','natuur']:['cultuur']}],poiRichness:45,dynamic:true,roadtripCandidate:true,discoverySource:`OpenStreetMap ${source}`,discoveredAt:new Date().toISOString()}}
+function pointOf(el){return finite(el)?{lat:Number(el.lat),lon:Number(el.lon)}:finite(el?.center)?{lat:Number(el.center.lat),lon:Number(el.center.lon)}:null}
+export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],limit=DEFAULT_RESULT_LIMIT}={}){const ex=new Set(excludedIds),seen=[];for(const el of payload?.elements||[]){const p=pointOf(el),tags=el.tags||{},name=tags['name:nl']||tags.name||tags['name:en'];if(!p||!name)continue;const item=profileFromPoint(trip,{...p,name,country:tags['is_in:country']||tags['addr:country'],countryCode:tags['is_in:country_code']||tags['addr:country']},tags,'Overpass');if(!item||ex.has(item.id)||seen.some(x=>haversineKm(x.bases[0],item.bases[0])<14))continue;seen.push(item);if(seen.length>=limit)break}return seen}
+function regionalMotorAnchors(trip,excludedIds=[]){if(trip.transport!=='motorcycle'||Number(trip.days||0)<1||Number(trip.days||0)>5)return[];const origin=resolveOrigin(trip);if(!origin)return[];const ex=new Set(excludedIds);return REGIONAL_MOTOR_ANCHORS.map(a=>{if(ex.has(a.id)||haversineKm(origin,a)>650)return null;const distanceKm=Math.round(haversineKm(origin,a)*1.18);return{id:a.id,name:`${a.name} & omgeving`,country:a.country,distanceKm,driveHours:Number((distanceKm/88).toFixed(1)),nightMid:120,activityDaily:42,toll:0,tags:a.tags,season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:10,camper:7,weather:7,crowds:7,summary:`Sterke motorregio rond ${a.name}.`,pros:['Sterke motorregio op korte afstand','Veel bochtige daglussen mogelijk'],cons:['Weer kan wisselen'],routeStops:[],bases:[{name:a.name,lat:a.lat,lon:a.lon}],activities:[],poiRichness:60,dynamic:false,discoverySource:'ReisSlim regional anchor'}}).filter(Boolean)}
+function cacheKey(trip,cursor){return`${CACHE_PREFIX}:${String(trip.origin).toLowerCase()}:${trip.destinationQuery||''}:${trip.travelMode||''}:${trip.days||0}:${trip.maxDrive||0}:${cursor}`}
+function cacheRead(storage,k,maxAge){try{const r=JSON.parse(storage?.getItem(k)||'null');if(!r?.savedAt||!Array.isArray(r.value)||Date.now()-r.savedAt>maxAge)return null;return r.value}catch{return null}}
+function cacheWrite(storage,k,value){try{storage?.setItem(k,JSON.stringify({savedAt:Date.now(),value}))}catch{}}
+async function fetchJson(url,options,fetchImpl,timeoutMs){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetchImpl(url,{...options,signal:c.signal});if(!r?.ok)return null;return await r.json()}catch{return null}finally{clearTimeout(timer)}}
+function photonRow(payload){const f=payload?.features?.[0],p=f?.properties||{},c=f?.geometry?.coordinates||[],point={lat:Number(c[1]),lon:Number(c[0])},name=p.city||p.town||p.village||p.locality||p.county||p.name,country=p.country,countryCode=String(p.countrycode||p.country_code||'').toUpperCase();return name&&country&&finite(point)?{...point,name,country,countryCode}:null}
+async function photonReverse(seed,fetchImpl,timeoutMs){const u=new URL(PHOTON_REVERSE);u.search=new URLSearchParams({lat:String(seed.lat),lon:String(seed.lon),limit:'1',lang:'nl'});return photonRow(await fetchJson(u,{headers:{accept:'application/json'}},fetchImpl,timeoutMs))}
+function nominatimRow(row){const a=row?.address||{},point={lat:Number(row?.lat),lon:Number(row?.lon)},name=a.city||a.town||a.village||a.municipality||a.county||row?.name,country=a.country,countryCode=String(a.country_code||'').toUpperCase();return name&&country&&finite(point)?{...point,name,country,countryCode}:null}
+async function nominatimReverse(seed,fetchImpl,timeoutMs){const u=new URL(NOMINATIM_REVERSE);u.search=new URLSearchParams({lat:String(seed.lat),lon:String(seed.lon),format:'jsonv2',zoom:'10',addressdetails:'1'});return nominatimRow(await fetchJson(u,{headers:{accept:'application/json'}},fetchImpl,timeoutMs))}
+async function mapConcurrent(items,worker,concurrency=6){const list=[...items],out=new Array(list.length);let next=0;async function run(){while(true){const i=next++;if(i>=list.length)return;try{out[i]=await worker(list[i],i)}catch{out[i]=null}}}await Promise.all(Array.from({length:Math.min(concurrency,list.length||1)},run));return out}
+async function overpass(trip,cursor,fetchImpl,timeoutMs,onProgress){const q=buildDiscoveryQuery(trip,cursor);return await new Promise(resolve=>{let left=OVERPASS_ENDPOINTS.length,done=false;for(const endpoint of OVERPASS_ENDPOINTS){onProgress?.({type:'endpoint-start',endpoint});fetchJson(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body:new URLSearchParams({data:q})},fetchImpl,timeoutMs).then(payload=>{if(done)return;const rows=normalizeDiscoveredDestinations(trip,payload||{});if(rows.length){done=true;onProgress?.({type:'endpoint-success',endpoint,elapsedMs:0});resolve(rows);return}onProgress?.({type:'endpoint-failure',endpoint});if(--left===0){done=true;resolve([])}}).catch(()=>{if(--left===0&&!done){done=true;resolve([])}})}})}
+function dedupe(items,excludedIds){const ex=new Set(excludedIds),out=[];for(const item of items||[]){if(!item||ex.has(item.id)||out.some(x=>haversineKm(x.bases?.[0],item.bases?.[0])<14))continue;out.push(item)}return out}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fetchImpl=globalThis.fetch,storage=globalThis.localStorage,timeoutMs=5200,bypassCache=false,onProgress,onBatch}={}){
+ const origin=resolveOrigin(trip);if(!origin)return{destinations:regionalMotorAnchors(trip,excludedIds),live:false,reason:'Vertrekcoördinaten ontbreken.'};
+ onProgress?.({type:'discovery-start',origin:trip.origin,reachKm:reachFor(trip),totalPasses:DISCOVERY_PASSES});
+ const all=[];let cacheHits=0,successful=0;
+ for(let pass=0;pass<DISCOVERY_PASSES;pass++){
+   const current=cursor*DISCOVERY_PASSES+pass,k=cacheKey(trip,current);
+   onProgress?.({type:'pass-start',pass:pass+1,totalPasses:DISCOVERY_PASSES});
+   let rows=!bypassCache?cacheRead(storage,k,FRESH_MS):null;
+   if(rows?.length){cacheHits++;onProgress?.({type:'cache-hit',pass:pass+1});}
+   else{
+     if(bypassCache)onProgress?.({type:'cache-bypass',pass:pass+1});
+     const seeds=discoverySeeds(trip,current,DEFAULT_BATCH_SEEDS);
+     onProgress?.({type:'provider-stage',message:'Snelle plaatsendienst en OpenStreetMap-detailservers parallel raadplegen…'});
+     const photon=await mapConcurrent(seeds,s=>photonReverse(s,fetchImpl,Math.min(3200,timeoutMs)),6);
+     rows=dedupe(photon.map(p=>p?profileFromPoint(trip,p,{},'Photon'):null).filter(Boolean),excludedIds);
+     if(rows.length<6){
+       const op=await overpass(trip,current,fetchImpl,Math.min(4200,timeoutMs),onProgress);
+       rows=dedupe([...rows,...op],excludedIds);
+     }
+     if(rows.length<3){
+       for(let i=0;i<Math.min(2,seeds.length);i++){
+         if(i)await wait(1050);
+         const p=await nominatimReverse(seeds[i],fetchImpl,Math.min(3000,timeoutMs));
+         const item=p&&profileFromPoint(trip,p,{},'Nominatim');
+         if(item)rows=dedupe([...rows,item],excludedIds);
+       }
+     }
+     if(rows.length)cacheWrite(storage,k,rows);
+     else{
+       const stale=cacheRead(storage,k,STALE_MS);
+       if(stale?.length)rows=stale.map(x=>({...x,cacheStale:true,discoverySource:'ReisSlim resilient cache'}));
+     }
+   }
+   if(rows?.length){successful++;all.push(...rows);onBatch?.({destinations:rows,pass:pass+1});onProgress?.({type:'pass-success',pass:pass+1,totalPasses:DISCOVERY_PASSES,newDestinations:rows.length,totalDestinations:all.length,totalCandidateElements:all.length})}
+   else onProgress?.({type:'pass-empty',pass:pass+1,totalPasses:DISCOVERY_PASSES,reason:'Geen bruikbare regio uit deze zoekzone.'});
+ }
+ const anchors=regionalMotorAnchors(trip,excludedIds),destinations=dedupe([...anchors,...all],excludedIds).slice(0,DEFAULT_RESULT_LIMIT);
+ if(destinations.length){onProgress?.({type:'discovery-complete',totalDestinations:destinations.length,candidateElements:all.length,successfulPasses:successful,totalPasses:DISCOVERY_PASSES});return{destinations,live:successful>0,cached:cacheHits===DISCOVERY_PASSES,source:'OpenStreetMap multi-source + resilient cache',passes:DISCOVERY_PASSES,candidateElements:all.length}}
+ onProgress?.({type:'discovery-failure',reason:'Geen nieuwe regio gevonden via de beschikbare kaartbronnen.'});return{destinations:[],live:false,reason:'Geen nieuwe regio gevonden via de beschikbare kaartbronnen.'}
 }
-
-function destinationPoint(origin, distanceKm, bearingDegrees) {
-  const radius = 6371; const bearing = bearingDegrees * Math.PI / 180;
-  const lat1 = origin.lat * Math.PI / 180; const lon1 = origin.lon * Math.PI / 180;
-  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distanceKm / radius) + Math.cos(lat1) * Math.sin(distanceKm / radius) * Math.cos(bearing));
-  const lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(distanceKm / radius) * Math.cos(lat1), Math.cos(distanceKm / radius) - Math.sin(lat1) * Math.sin(lat2));
-  return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
-}
-
-function reachFor(trip) {
-  const global = trip.travelMode && trip.travelMode !== 'direct';
-  const legs = Math.max(1, Math.min(5, Math.floor((trip.days - 1) / 2)));
-  return global
-    ? Math.min(15000, 2600 + trip.days * 600)
-    : Math.max(250, Math.min(4200, trip.maxDrive * 86 * legs));
-}
-
-export function discoverySeeds(trip, cursor = 0, count = DEFAULT_BATCH_SEEDS) {
-  const origin = resolveOrigin(trip);
-  if (!origin) return [];
-
-  if (trip.destinationPoint) {
-    const rings = [10, 25, 45, 70, 100, 140];
-    return Array.from({ length: count }, (_, index) => {
-      const sequence = cursor * count + index;
-      const ringIndex = (sequence + cursor) % rings.length;
-      const distanceKm = rings[ringIndex] + Math.floor(cursor / 2) * 12;
-      return {
-        ...destinationPoint(trip.destinationPoint, distanceKm, sequence * GOLDEN_ANGLE),
-        distanceKm, sequence, targeted: true, ring: ringIndex
-      };
-    });
-  }
-
-  const global = trip.travelMode && trip.travelMode !== 'direct';
-  const reach = reachFor(trip);
-  const radialBands = global
-    ? [.16, .27, .40, .55, .70, .84, .96]
-    : [.12, .20, .30, .42, .56, .70, .84, .96];
-
-  return Array.from({ length: count }, (_, index) => {
-    const sequence = cursor * count + index;
-    const bandIndex = (sequence + Math.floor(sequence / radialBands.length)) % radialBands.length;
-    const jitter = (((sequence * 17) % 9) - 4) * .012;
-    const fraction = Math.max(global ? .12 : .08, Math.min(.98, radialBands[bandIndex] + jitter));
-    const distanceKm = reach * fraction;
-    const bearing = sequence * GOLDEN_ANGLE + (cursor % 5) * 11.25;
-    return { ...destinationPoint(origin, distanceKm, bearing), distanceKm, sequence, ring: bandIndex };
-  });
-}
-
-function queryClauses(point) {
-  const around = point.targeted ? 30000 : 36000;
-  const lat = point.lat.toFixed(4); const lon = point.lon.toFixed(4);
-  return [
-    `nwr(around:${around},${lat},${lon})["place"~"city|town|village"]["name"];`,
-    `nwr(around:${around},${lat},${lon})["boundary"="national_park"]["name"];`,
-    `nwr(around:${around},${lat},${lon})["boundary"="protected_area"]["name"];`,
-    `nwr(around:${around},${lat},${lon})["natural"~"peak|bay|beach|water"]["name"];`,
-    `nwr(around:${around},${lat},${lon})["tourism"~"attraction|resort"]["name"];`
-  ].join('');
-}
-
-export function buildDiscoveryQuery(trip, cursor = 0, count = DEFAULT_BATCH_SEEDS) {
-  const seeds = discoverySeeds(trip, cursor, count);
-  const clauses = seeds.map(queryClauses).join('\n');
-  return `[out:json][timeout:16][maxsize:33554432];\n(\n${clauses}\n);\nout center 360;`;
-}
-
-const slug = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55);
-const hash = value => [...String(value)].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) >>> 0, 2166136261);
-const pointOf = element => Number.isFinite(element.lat) && Number.isFinite(element.lon) ? { lat: element.lat, lon: element.lon } : Number.isFinite(element.center?.lat) && Number.isFinite(element.center?.lon) ? { lat: element.center.lat, lon: element.center.lon } : null;
-
-function corridorStops(origin, target, name, distanceKm) {
-  const count = Math.max(2, Math.min(7, Math.ceil(distanceKm / 260)));
-  return Array.from({ length: count }, (_, index) => {
-    const progress = (index + 1) / (count + 1);
-    return { name: `Routepunt ${index + 1} richting ${name}`, lat: origin.lat + (target.lat - origin.lat) * progress, lon: origin.lon + (target.lon - origin.lon) * progress, progress };
-  });
-}
-
-function typeTags(element) {
-  const tags = element.tags || {};
-  const derived = [];
-  if (tags.natural === 'peak') derived.push('bergen', 'wandelen', 'natuur');
-  if (['beach', 'bay'].includes(tags.natural)) derived.push('kust', 'zwemmen', 'natuur');
-  if (tags.natural === 'water') derived.push('zwemmen', 'natuur');
-  if (tags.boundary === 'national_park' || tags.boundary === 'protected_area') derived.push('natuur', 'wandelen');
-  if (tags.tourism === 'resort') derived.push('eten');
-  if (tags.tourism === 'attraction') derived.push('cultuur');
-  return [...new Set(derived)];
-}
-
-function dynamicProfile(trip, element) {
-  const origin = resolveOrigin(trip); const point = pointOf(element); const name = element.tags?.['name:nl'] || element.tags?.name;
-  if (!origin || !point || !name) return null;
-  const multimodal = trip.travelMode && trip.travelMode !== 'direct';
-  const direct = haversineKm(origin, point); const distanceKm = Math.round(direct * (multimodal ? 1 : 1.18));
-  const code = String(element.tags?.['addr:country'] || element.tags?.['is_in:country_code'] || '').toUpperCase();
-  const country = countryNames[code] || element.tags?.['is_in:country'] || element.tags?.['addr:country'] || 'Wereldregio';
-  const seed = hash(`${name}:${point.lat.toFixed(3)}:${point.lon.toFixed(3)}`);
-  const nightMid = countryCosts[code] || 125 + (seed % 25);
-  const family = 6 + seed % 4; const motorcycle = 6 + (seed >> 3) % 4; const camper = 6 + (seed >> 5) % 4; const weather = 5 + (seed >> 7) % 4; const crowds = 6 + (seed >> 9) % 4;
-  const basePoint = { name, ...point };
-  const discoveredTags = typeTags(element);
-  return {
-    id: `osm-${slug(name)}-${Math.round(point.lat * 100)}-${Math.round(point.lon * 100)}`, name: `${name} & omgeving`, country,
-    distanceKm, driveHours: Number((distanceKm / (multimodal ? 780 : 88)).toFixed(1)), nightMid, activityDaily: 38 + seed % 25, toll: multimodal ? 0 : Math.round(distanceKm * (['FR','IT','AT','CH'].includes(code) ? .08 : .025)),
-    tags: [...new Set(['natuur', 'cultuur', 'eten', ...discoveredTags, ...(trip.children ? ['kinderen'] : []), ...(trip.transport === 'motorcycle' ? ['motor'] : [])])],
-    season: [3,4,5,6,7,8,9,10], family, motorcycle, camper, weather, crowds,
-    summary: `Live ontdekt reisgebied rond ${name}; route, verblijf, restaurants en activiteiten worden na selectie met actuele bronnen ingevuld.`,
-    pros: ['Geen vast catalogusitem: live ontdekt', 'Wordt volledig voertuigbewust doorgerekend', 'Plaatsen en weer worden na selectie verrijkt'],
-    cons: ['Regioprofiel is voorlopig tot live verrijking', 'Prijzen en wegroute moeten nog worden bevestigd'],
-    routeStops: corridorStops(origin, point, name, distanceKm), bases: [basePoint],
-    activities: [
-      { type: 'natuur', title: `Verken het beste natuurgebied binnen korte rijafstand van ${name}.`, rainAlternative: `Kies een museum, markt of wellnesslocatie in ${name}.`, tags: ['natuur','wandelen'] },
-      { type: 'cultuur', title: `Combineer het historische centrum van ${name} met een lokale markt.`, rainAlternative: `Bezoek twee compacte binnenlocaties in ${name}.`, tags: ['cultuur','eten'] },
-      { type: trip.transport === 'motorcycle' ? 'motor' : 'eten', title: trip.transport === 'motorcycle' ? `Rijd een live gevalideerde landschappelijke lus rond ${name}.` : `Plan een lokale producent en een ontspannen maaltijd rond ${name}.`, rainAlternative: `Kies een korte route en een overdekte culinaire stop in ${name}.`, tags: trip.transport === 'motorcycle' ? ['motor','natuur'] : ['eten'] }
-    ],
-    dynamic: true, discoverySource: 'OpenStreetMap Overpass', osm: { type: element.type, id: element.id }, discoveredAt: new Date().toISOString()
-  };
-}
-
-function spatialKey(item) {
-  const base = item.bases?.[0];
-  return base ? `${Math.round(base.lat * 8) / 8}:${Math.round(base.lon * 8) / 8}` : item.id;
-}
-
-export function normalizeDiscoveredDestinations(trip, payload, { excludedIds = [], limit = DEFAULT_RESULT_LIMIT } = {}) {
-  const excluded = new Set(excludedIds); const seenNames = new Set(); const seenSpatial = new Map();
-  const maximumDistance = trip.travelMode && trip.travelMode !== 'direct' ? 15000 : 4200;
-  const candidates = (payload?.elements || []).map(element => dynamicProfile(trip, element)).filter(Boolean)
-    .filter(item => item.distanceKm >= 70 && item.distanceKm <= maximumDistance && !excluded.has(item.id))
-    .sort((a, b) => a.distanceKm - b.distanceKm || a.id.localeCompare(b.id));
-
-  const deduped = [];
-  for (const item of candidates) {
-    const nameKey = item.name.toLocaleLowerCase('nl-NL');
-    if (seenNames.has(nameKey)) continue;
-    const geoKey = spatialKey(item);
-    const geoCount = seenSpatial.get(geoKey) || 0;
-    if (geoCount >= 3) continue;
-    seenNames.add(nameKey);
-    seenSpatial.set(geoKey, geoCount + 1);
-    deduped.push(item);
-    if (deduped.length >= limit) break;
-  }
-  return deduped;
-}
-
-async function fetchDiscoveryPayload(trip, cursor, { fetchImpl, endpoint, storage }) {
-  const query = buildDiscoveryQuery(trip, cursor);
-  if (!query.includes('nwr(')) return { payload: null, cached: false, reason: 'Vertrekcoördinaten ontbreken.' };
-  const cacheKey = `reisslim.destination-discovery.v3:${trip.origin}:${trip.destinationQuery || ''}:${trip.travelMode}:${trip.days}:${trip.maxDrive}:${cursor}`;
-  try {
-    const cached = storage?.getItem(cacheKey);
-    if (cached) return { payload: JSON.parse(cached), cached: true };
-  } catch { /* optional */ }
-
-  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 18000);
-  try {
-    const response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: new URLSearchParams({ data: query }), signal: controller.signal });
-    if (!response.ok) throw new Error(`Overpass ${response.status}`);
-    const payload = await response.json();
-    try { storage?.setItem(cacheKey, JSON.stringify(payload)); } catch { /* optional */ }
-    return { payload, cached: false };
-  } catch (error) {
-    return { payload: null, cached: false, reason: error.name === 'AbortError' ? 'Live ontdekking duurde te lang.' : 'Live ontdekking is tijdelijk niet beschikbaar.' };
-  } finally { clearTimeout(timer); }
-}
-
-export async function discoverDestinationBatch(trip, { cursor = 0, excludedIds = [], fetchImpl = fetch, endpoint = DEFAULT_ENDPOINT, storage = globalThis.localStorage } = {}) {
-  const combined = [];
-  let usedCache = true;
-  let lastReason = '';
-
-  // One user action now explores three adjacent discovery passes. This produces a
-  // much larger candidate universe without changing the app's external API.
-  for (let pass = 0; pass < DISCOVERY_PASSES; pass += 1) {
-    const currentCursor = cursor * DISCOVERY_PASSES + pass;
-    const result = await fetchDiscoveryPayload(trip, currentCursor, { fetchImpl, endpoint, storage });
-    usedCache = usedCache && Boolean(result.cached);
-    if (result.payload?.elements?.length) combined.push(...result.payload.elements);
-    if (result.reason) lastReason = result.reason;
-  }
-
-  if (!combined.length) {
-    const anchors=regionalMotorAnchors(trip, excludedIds);
-    return { destinations: anchors, live: false, reason: anchors.length ? 'Regionale motorbestemmingen beschikbaar; live uitbreiding tijdelijk beperkt.' : (lastReason || 'Geen nieuwe live regio’s gevonden.') };
-  }
-  const discovered = normalizeDiscoveredDestinations(trip, { elements: combined }, { excludedIds, limit: DEFAULT_RESULT_LIMIT });
-  const anchors = regionalMotorAnchors(trip, excludedIds);
-  const byId = new Map([...anchors, ...discovered].map(item => [item.id, item]));
-  const destinations = [...byId.values()].slice(0, DEFAULT_RESULT_LIMIT);
-  return {
-    destinations,
-    live: true,
-    cached: usedCache,
-    source: 'OpenStreetMap Overpass',
-    passes: DISCOVERY_PASSES,
-    candidateElements: combined.length
-  };
-}
-
-export const destinationDiscoveryConfig = Object.freeze({
-  endpoint: DEFAULT_ENDPOINT,
-  attribution: '© OpenStreetMap-bijdragers, ODbL',
-  coverage: 'global-multi-ring',
-  batchSeeds: DEFAULT_BATCH_SEEDS,
-  discoveryPasses: DISCOVERY_PASSES,
-  resultLimit: DEFAULT_RESULT_LIMIT,
-  publicInstanceNote: 'Meerdere begrensde, door de gebruiker gestarte zoekpasses per actie; voor productie op schaal is een eigen/proxy-instantie nodig.'
-});
+export const destinationDiscoveryConfig=Object.freeze({endpoint:'multi-source',attribution:'© OpenStreetMap-bijdragers, ODbL',coverage:'global-multi-ring-resilient',batchSeeds:DEFAULT_BATCH_SEEDS,discoveryPasses:DISCOVERY_PASSES,resultLimit:DEFAULT_RESULT_LIMIT,publicInstanceNote:'Photon primair, Overpass-mirrors secundair, rate-limited Nominatim fallback en persistente lokale cache.'});
