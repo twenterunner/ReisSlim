@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "root_cause": "The dashboard 'Start een nieuwe reis' button was wired only to showView('plannerView'), so it opened the existing planner state instead of starting a new trip. The header '+ Nieuwe reis' used startNewTrip(), creating inconsistent behavior.",
+  "checks": {
+    "syntax_app.js": true,
+    "syntax_roadtrip-policy.js": true,
+    "syntax_overnight-accommodation.js": true,
+    "syntax_config.js": true,
+    "syntax_service-worker.js": true,
+    "syntax_ui-feature-flags.js": true,
+    "syntax_image-provider.js": true,
+    "hero_new_trip_calls_reset_flow": true,
+    "header_new_trip_calls_same_reset_flow": true,
+    "continue_trip_does_not_reset": true,
+    "new_trip_clears_draft": true,
+    "new_trip_opens_planner": true,
+    "new_trip_lifecycle_acceptance": true
+  },
+  "acceptance": {
+    "pass": true,
+    "events": [
+      "draft-cleared",
+      "state-reset",
+      "planner-opened"
+    ],
+    "state": {
+      "trip": {
+        "origin": "Saasveld",
+        "days": 10,
+        "transport": "motorcycle"
+      },
+      "destination": null,
+      "plan": null
+    },
+    "view": "plannerView"
+  }
+}
