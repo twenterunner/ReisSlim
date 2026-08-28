@@ -24,7 +24,7 @@ import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, r
 import { enrichOvernightAccommodations } from './overnight-accommodation.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
-const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false};
+const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const portfolioOptions=(extra={})=>{state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);return{preferenceProfile:state.preferenceProfile,...extra}};
 function learn(kind,destination){if(!destination)return;state.preferenceProfile.privateMode=Boolean(state.trip?.privateMode);state.preferenceProfile=recordPreferenceEvent(state.preferenceProfile,{kind,destinationId:destination.id,tags:destination.tags});savePreferenceProfile(state.preferenceProfile)}
@@ -995,24 +995,34 @@ async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=850
    globalThis.__REISSLIM_DISCOVERY={status:'already-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
  }
  if(state.globalDiscoveryBusy){
-   const until=Date.now()+26000;
-   while(state.globalDiscoveryBusy&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,120));
-   if(state.globalDiscoveryBusy)return 0;
+   // A user-selected itinerary has priority over background portfolio discovery.
+   // Build 1805 could make the selected Sauerland request wait behind a full
+   // origin-wide search for longer than the 26 s wait window, then return zero.
+   if(anchor)state.anchorDiscoveryPriority=true;
+   const until=Date.now()+(anchor?15000:26000);
+   while(state.globalDiscoveryBusy&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));
+   if(state.globalDiscoveryBusy){
+     if(anchor)globalThis.__REISSLIM_DISCOVERY={status:'anchor-wait-timeout',added:0,batches:0,providers:[],feasible:false};
+     return 0;
+   }
    if(anchor&&roadtripPoolSupportsTrip(trip,origin,anchor)){
+     state.anchorDiscoveryPriority=false;
      globalThis.__REISSLIM_DISCOVERY={status:'became-feasible',added:0,batches:0,providers:[],feasible:true};return 0;
    }
  }
+ if(anchor)state.anchorDiscoveryPriority=false;
  state.globalDiscoveryBusy=true;updateManualLiveDiscoveryButton();
  const batches=buildRoadtripPlaceQueries(trip,origin,anchor);
  const endpoints=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
- const seenOsm=new Set(),discoveryDeadline=Date.now()+(anchor?36000:24000);
+ const seenOsm=new Set();
  const diag={status:'running',added:0,batches:0,failedBatches:0,providers:[],origin:{lat:origin.lat,lon:origin.lon},anchor:anchor?{lat:anchor.lat,lon:anchor.lon}:null,feasible:false};
  globalThis.__REISSLIM_DISCOVERY=diag;
  try{
-   for(let q=0;q<batches.length&&Date.now()<discoveryDeadline;q++){
+   for(let q=0;q<batches.length;q++){
+     if(!anchor&&state.anchorDiscoveryPriority){diag.status='yielded-to-selected-trip';break}
      let batch=null,usedProvider=null;
-     for(let e=0;e<endpoints.length&&Date.now()<discoveryDeadline;e++){
-       const endpoint=endpoints[(q+e)%endpoints.length],controller=new AbortController(),remaining=Math.max(1200,Math.min(timeoutMs,discoveryDeadline-Date.now())),timer=setTimeout(()=>controller.abort(),remaining);
+     for(let e=0;e<endpoints.length;e++){
+       const endpoint=endpoints[(q+e)%endpoints.length],controller=new AbortController(),remaining=Math.max(1200,Math.min(timeoutMs,anchor?6500:5000)),timer=setTimeout(()=>controller.abort(),remaining);
        try{
          const response=await fetchImpl(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','Accept':'application/json'},body:new URLSearchParams({data:batches[q].query}),signal:controller.signal});
          if(!response.ok)continue;
@@ -1027,12 +1037,18 @@ async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=850
      const unique=[];
      for(const el of batch){const key=`${el.type||'x'}:${el.id||`${el.lat}:${el.lon}`}`;if(seenOsm.has(key))continue;seenOsm.add(key);unique.push(el)}
      diag.added+=ingestRoadtripElements(trip,unique,origin);
+     if(!anchor&&state.anchorDiscoveryPriority){diag.status='yielded-to-selected-trip';break}
      if(anchor){
        diag.feasible=roadtripPoolSupportsTrip(trip,origin,anchor);
        if(diag.feasible){diag.status='feasible';break}
-     }else if(diag.added>=24){diag.status='portfolio-ready';break}
+     }else{
+       // Before a destination is selected, raw place count is not evidence of
+       // usable roadtrip supply. Complete the geographic spread search.
+       diag.status='origin-spread-search';
+     }
    }
-   if(diag.status==='running')diag.status=diag.feasible?'feasible':diag.added?'partial':'empty';
+   if(anchor)diag.status=diag.feasible?'feasible':diag.added?'partial':'empty';
+   else if(diag.status!=='yielded-to-selected-trip')diag.status=diag.added?'origin-complete':'empty';
    return diag.added;
  }finally{state.globalDiscoveryBusy=false;updateManualLiveDiscoveryButton()}
 }

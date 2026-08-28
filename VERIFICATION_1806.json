@@ -1,0 +1,70 @@
+{
+  "status": "PASS",
+  "root_cause": [
+    "Build 1805 made origin-wide discovery complete every geographic batch to protect Cape Town coverage.",
+    "That background search owns the same global discovery lock used by a user-selected Sauerland itinerary.",
+    "When Sauerland was selected while background discovery was still running, the selected anchor search waited up to 26 seconds and could then return zero without ever querying Sauerland. The UI therefore showed 'onvoldoende echte overnachtingsregio\u2019s' even though the solver itself was capable of building the route."
+  ],
+  "fix": [
+    "Selected-trip anchor discovery now has priority over background portfolio discovery.",
+    "A selected anchor request sets an explicit priority flag. Origin-wide discovery yields after its current bounded batch and releases the lock.",
+    "The selected Sauerland search then acquires the lock and continues until the production solver says all four overnight stops are feasible.",
+    "Cape Town's full origin-spread behavior is retained when no user-selected itinerary is waiting."
+  ],
+  "tests": {
+    "regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "cape_exact": {
+      "pass": true,
+      "denseCount": 24,
+      "denseFeasible": false,
+      "path": [
+        "Worcester",
+        "Langebaan",
+        "Hermanus",
+        "Tulbagh"
+      ],
+      "validation": {
+        "valid": true,
+        "code": "roadtrip-ok",
+        "violations": [],
+        "distinct": 4,
+        "required": 4,
+        "moves": [
+          118,
+          172,
+          218,
+          149
+        ],
+        "repeatedNights": 0
+      }
+    },
+    "concurrency_exact_production_function": {
+      "pass": true,
+      "selectedMs": 898,
+      "originBatchesCompleted": 1,
+      "anchorBatchesCompleted": 4,
+      "anchorSupply": 4,
+      "calls": [
+        "origin-0",
+        "anchor-0",
+        "anchor-1",
+        "anchor-2",
+        "anchor-3"
+      ]
+    },
+    "checks": {
+      "49_regressions_pass": true,
+      "cape_exact_still_passes": true,
+      "selected_trip_preempts_background": true,
+      "background_yields_before_all_batches": true,
+      "anchor_discovery_gets_required_supply": true,
+      "priority_flag_in_state": true,
+      "origin_checks_priority_before_batch": true,
+      "origin_checks_priority_after_batch": true
+    }
+  },
+  "limitations": "Public Overpass cannot be live-called from this sandbox. The actual production discoverRoadtripOvernightPool function was extracted from build 1806 and executed with a deliberately slow background discovery plus a concurrent selected Sauerland request; the selected request preempted the background search and obtained feasible anchor supply."
+}
