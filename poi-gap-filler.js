@@ -1,6 +1,6 @@
-import {mapConcurrent} from './roadtrip-runtime-engine.js?v=1923';
+import {mapConcurrent} from './roadtrip-runtime-engine.js?v=1928';
 const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'],PHOTON='https://photon.komoot.io/api/';
-const PREFIX='reisslim.poi-cache.v3',FRESH=14*24*60*60*1000,STALE=90*24*60*60*1000;
+const PREFIX='reisslim.poi-cache.v4',FRESH=14*24*60*60*1000,STALE=90*24*60*60*1000;
 const valid=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)),esc=s=>String(s||'').replace(/[^\p{L}\p{N} .,'’&-]/gu,'').trim(),rad=x=>x*Math.PI/180;
 function km(a,b){if(!valid(a)||!valid(b))return Infinity;const R=6371,d1=rad(b.lat-a.lat),d2=rad(b.lon-a.lon),x=rad(a.lat),y=rad(b.lat),h=Math.sin(d1/2)**2+Math.cos(x)*Math.cos(y)*Math.sin(d2/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
 function path(day){const g=(day.geometry||[]).filter(valid);return g.length>=2?g:[day.fromPoint,day.toPoint].filter(valid)}
@@ -15,8 +15,56 @@ async function overpassResolve(day,target,type,fetchImpl,timeoutMs){const q=`[ou
 function photonTerms(type){return type==='restaurant'?['restaurant','cafe']:type==='fuel'?['fuel station']:type==='rest'?['rest area','services']:['viewpoint','museum','attraction']}
 function photonKind(p,type){const key=String(p.osm_key||'').toLowerCase(),val=String(p.osm_value||'').toLowerCase(),text=`${key} ${val} ${p.name||''}`.toLowerCase();if(type==='restaurant')return /restaurant|cafe|fast_food/.test(text);if(type==='fuel')return /fuel|charging_station/.test(text);if(type==='rest')return /rest_area|services|parking|cafe/.test(text);return /attraction|museum|viewpoint|gallery|historic|castle|park/.test(text)}
 async function photonResolve(day,target,type,fetchImpl,timeoutMs){for(const term of photonTerms(type)){const u=new URL(PHOTON);u.search=new URLSearchParams({q:term,lat:String(target.lat),lon:String(target.lon),limit:'12',lang:'nl'});const payload=await fetchJson(u,{headers:{accept:'application/json'}},fetchImpl,timeoutMs),rows=(payload?.features||[]).map(f=>{const p=f.properties||{},c=f.geometry?.coordinates||[],point={lat:Number(c[1]),lon:Number(c[0])},name=esc(p.name||p.street||p.city);if(!name||!valid(point)||!photonKind(p,type))return null;const d=km(target,point);return{type,name,point,lat:point.lat,lon:point.lon,day:day.day,live:true,genericFallback:false,verified:false,source:'OpenStreetMap Photon',detourKm:Number(d.toFixed(1)),reason:`Specifieke ${type} via onafhankelijke kaartzoekbron.`,mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name+' '+point.lat+','+point.lon)}`}}).filter(Boolean).filter(x=>x.detourKm<=18).sort((a,b)=>a.detourKm-b.detourKm);if(rows[0])return rows[0]}return null}
-function externalFallback(day,target,type){const labels={restaurant:'restaurant of café',fuel:'tankstation',rest:'rust- of serviceplaats',activity:'bezienswaardigheid'},label=labels[type]||type,q=`${label} near ${day.location||day.to||''} ${target.lat},${target.lon}`,url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;return{type,name:`Bekijk ${label} langs dag ${day.day}`,point:{...target},day:day.day,live:false,genericFallback:true,lookupComplete:true,source:'Externe live zoeklink',detourKm:0,reason:'Gestructureerde kaartbronnen leverden tijdelijk geen betrouwbaar genoemd resultaat. Gebruik deze gerichte kaartzoekopdracht.',mapUrl:url,url}}
+function externalFallback(day,target,type){const labels={restaurant:'restaurant of café',fuel:'tankstation',rest:'rust- of serviceplaats',activity:'bezienswaardigheid'},label=labels[type]||type,q=`${label} near ${day.location||day.to||''} ${target.lat},${target.lon}`,url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;return{type,name:`Bekijk ${label} langs dag ${day.day}`,point:{...target},lat:target.lat,lon:target.lon,day:day.day,live:false,genericFallback:true,lookupComplete:true,source:'Externe live zoeklink',detourKm:0,reason:'Gestructureerde kaartbronnen leverden tijdelijk geen betrouwbaar genoemd resultaat. Gebruik deze gerichte kaartzoekopdracht.',mapUrl:url,url}}
 async function resolve(day,target,type,fetchImpl,timeoutMs,storage){const k=cacheKey(type,target),cached=readCache(storage,k,FRESH);if(cached)return{...cached,cached:true};let found=await overpassResolve(day,target,type,fetchImpl,Math.min(3800,timeoutMs));if(!found)found=await photonResolve(day,target,type,fetchImpl,Math.min(3200,timeoutMs));if(found){writeCache(storage,k,found);return found}const stale=readCache(storage,k,STALE);if(stale)return{...stale,cached:true,cacheStale:true,source:`${stale.source||'Kaartbron'} · recente cache`};return externalFallback(day,target,type)}
 const pending=(d,t)=>(d.recommendations||[]).filter(x=>x.type===t&&(!x.live||x.genericFallback===true)),resolved=(d,t)=>(d.recommendations||[]).filter(x=>x.type===t&&x.live&&x.genericFallback!==true&&valid(x.point));
-function jobsFor(day){const out=[],travel=['outward','transfer','return','daytrip'].includes(day.kind),distance=+day.distanceKm||0,hours=+day.roadHours||+day.driveHours||0;for(const type of ['restaurant','fuel','rest','activity']){const unresolved=pending(day,type);unresolved.forEach(item=>valid(item.point)&&out.push({type,point:item.point,replace:item}));if(resolved(day,type).length||unresolved.length)continue;if(type==='restaurant')out.push({type,point:pointAt(day,.52)});if(type==='rest'&&travel&&(distance>=70||hours>=1.4))out.push({type,point:pointAt(day,.42)});if(type==='fuel'&&travel&&distance>=90)out.push({type,point:pointAt(day,.62)});if(type==='activity'&&day.kind!=='return')out.push({type,point:day.destinationPoint||day.toPoint||pointAt(day,.65)})}return out.filter(x=>valid(x.point))}
-export async function fillMissingDayPois(plan,{trip={},fetchImpl=globalThis.fetch,timeoutMs=4500,onProgress,storage=globalThis.localStorage}={}){if(typeof fetchImpl!=='function')return plan;const jobs=[];for(const day of plan.days||[])for(const job of jobsFor(day))jobs.push({day,...job});let completed=0;await mapConcurrent(jobs,async job=>{const found=await resolve(job.day,job.point,job.type,fetchImpl,timeoutMs,storage),recs=job.day.recommendations||[],i=job.replace?recs.indexOf(job.replace):-1;if(i>=0)recs.splice(i,1,found);else recs.push(found);job.day.recommendations=recs;completed++;onProgress?.({completed,total:jobs.length,type:job.type,day:job.day.day,found:Boolean(found&&!found.genericFallback),name:found?.name||null,cached:Boolean(found?.cached)})},{concurrency:Math.min(4,Math.max(1,jobs.length))});plan.recommendations=(plan.days||[]).flatMap(d=>d.recommendations||[]);plan.poiData={specific:plan.recommendations.filter(x=>x.live&&x.genericFallback!==true).length,fallbackLinks:plan.recommendations.filter(x=>x.genericFallback).length,source:'Overpass + Photon + resilient cache'};return plan}
+
+function fallbackTarget(day,type){
+ if(type==='restaurant')return pointAt(day,.52);
+ if(type==='rest')return pointAt(day,.42);
+ if(type==='fuel')return pointAt(day,.62);
+ return day.destinationPoint||day.toPoint||pointAt(day,.65);
+}
+
+// Important: an unresolved placeholder without coordinates must NOT suppress a
+// real route-based POI lookup. Older code did `if(unresolved.length) continue`
+// even when every placeholder had no usable point, which left POIs/waypoints
+// permanently unresolved.
+function jobsFor(day){
+ const out=[],travel=['outward','transfer','return','daytrip'].includes(day.kind),distance=+day.distanceKm||0,hours=+day.roadHours||+day.driveHours||0;
+ for(const type of ['restaurant','fuel','rest','activity']){
+  if(resolved(day,type).length)continue;
+  const unresolved=pending(day,type);
+  const validPending=unresolved.filter(item=>valid(item.point));
+  validPending.forEach(item=>out.push({type,point:item.point,replace:item}));
+  if(validPending.length)continue;
+
+  const needed=
+   type==='restaurant' ||
+   (type==='rest'&&travel&&(distance>=70||hours>=1.4)) ||
+   (type==='fuel'&&travel&&distance>=90) ||
+   (type==='activity'&&day.kind!=='return');
+  if(!needed)continue;
+
+  const point=fallbackTarget(day,type);
+  if(valid(point))out.push({type,point,replace:unresolved[0]||null});
+ }
+ return out;
+}
+
+export async function fillMissingDayPois(plan,{trip={},fetchImpl=globalThis.fetch,timeoutMs=4500,onProgress,storage=globalThis.localStorage}={}){
+ if(typeof fetchImpl!=='function')return plan;
+ const jobs=[];
+ for(const day of plan.days||[])for(const job of jobsFor(day))jobs.push({day,...job});
+ let completed=0;
+ await mapConcurrent(jobs,async job=>{
+  const found=await resolve(job.day,job.point,job.type,fetchImpl,timeoutMs,storage),recs=job.day.recommendations||[],i=job.replace?recs.indexOf(job.replace):-1;
+  if(i>=0)recs.splice(i,1,found);else recs.push(found);
+  job.day.recommendations=recs;
+  completed++;
+  onProgress?.({completed,total:jobs.length,type:job.type,day:job.day.day,found:Boolean(found&&!found.genericFallback),name:found?.name||null,cached:Boolean(found?.cached)});
+ },{concurrency:Math.min(4,Math.max(1,jobs.length))});
+ plan.recommendations=(plan.days||[]).flatMap(d=>d.recommendations||[]);
+ plan.poiData={specific:plan.recommendations.filter(x=>x.live&&x.genericFallback!==true).length,fallbackLinks:plan.recommendations.filter(x=>x.genericFallback).length,source:'Overpass + Photon + resilient cache'};
+ return plan;
+}
