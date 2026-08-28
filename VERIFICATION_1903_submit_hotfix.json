@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "scope": "Surgical hotfix only; no planner, routing, UI, trip-structure, accommodation, or roadtrip-engine logic changed.",
+  "root_cause": "The deployed 1.9.3 app.js still registers submitTripForm inside initialize(). If initialize() fails or stalls before that point, window.reisslimSubmitTrip never exists and critical-ui.js shows 'De planner is nog niet volledig geladen.'",
+  "fix": "Move submitTripForm and window.reisslimSubmitTrip assignment before initialize(), with the function correctly closed.",
+  "checks": {
+    "app_js_syntax": true,
+    "single_submit_function": true,
+    "submit_defined_before_initialize": true,
+    "handler_exposed_before_initialize": true
+  }
+}
