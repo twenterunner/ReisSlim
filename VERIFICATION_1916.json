@@ -1,0 +1,32 @@
+{
+  "release": "1.10.6 / 1916",
+  "root_cause": {
+    "conditional_skip": "1915 only called discoverLiveOptions when discoverRoadtripOvernightPool added fewer than 10 items. The destination provider is the component that injects the Eifel/Sauerland regional candidates, so >=10 overnight-place additions could prevent those candidates entering the initial ranking at all.",
+    "timeout_race": "1915 wrapped initial discovery in a 12-second Promise.race. destination-provider performs 3 sequential discovery passes and each pass allows up to 18 seconds. The initial ranking could therefore run before destination discovery completed; the unfinished search could continue mutating the catalogue afterward."
+  },
+  "change": {
+    "initial_pool": "Before the first refreshPortfolio(), app now always calls discoverDestinationBatch directly for cursor 0, merges its full returned candidate set, and advances discoveryCursor to 1.",
+    "bounded_network": "Each of the provider's 3 initial passes is capped at 3.5 seconds, so the full initial destination pass finishes (including fallback regional candidates) instead of being abandoned by an outer timeout.",
+    "overnight_pool": "Roadtrip overnight discovery runs in parallel with the destination-candidate pass; neither can conditionally suppress the other.",
+    "later_discovery": "Background reserve discovery remains enabled, but cursor 0 is already consumed before the first ranking."
+  },
+  "verification": {
+    "node_syntax": {
+      "app.js": true,
+      "routing-provider-1914.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "initial_destination_batch_precedes_first_ranking": true,
+    "old_added_lt_10_gate_removed": true,
+    "old_12_second_outer_race_removed": true,
+    "cursor_zero_consumed_before_first_render": true,
+    "android_live_network_not_executed_here": true
+  }
+}
