@@ -1,0 +1,23 @@
+{
+  "release": "1.10.1 / 1911",
+  "revision_analysis": {
+    "working_revision": "1.8.8 / 1808",
+    "breaking_revision": "1.9.0 / 1900",
+    "start_button_html_changed": false,
+    "start_listener_changed": false,
+    "actual_break": "During the 1900 tripStructure edit, normalizeTrip in trip-model.js lost one closing parenthesis in the preference weight expression. That made the imported module syntactically invalid, so app.js could not execute and initialize() could not attach the Start button listener."
+  },
+  "current_repo_observation": "Build 1910 still leaves the old malformed trip-model-1909.js file in the repository. GitHub Quality therefore still fails on that orphan file even though active trip-model.js was corrected.",
+  "1911_design": {
+    "start_button_owner": "start-new-trip.js, classic script with zero module imports",
+    "normal_path": "If app.js is healthy, it calls the existing full startNewTrip() exactly once.",
+    "failure_path": "If app.js never loads, the same button still clears the current draft keys and opens plannerView directly.",
+    "app_change": "Removed the app.js DOM click listener for Start to prevent duplicate ownership; app.js only exposes the existing startNewTrip function.",
+    "legacy_cleanup": "trip-model-1909.js is included corrected so uploading the release overwrites the malformed orphan file."
+  },
+  "browser_execution": {
+    "module_absent": "Start button opened plannerView",
+    "module_ready": "Existing full app start handler invoked exactly once and plannerView opened",
+    "button_node_replaced": "Delegated Start listener still opened plannerView"
+  }
+}
