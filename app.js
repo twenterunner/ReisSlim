@@ -837,7 +837,34 @@ function showProposalDetails(id){
   setTimeout(()=>target?.classList.remove('proposal-focus-flash'),1400);
 }
 
-function applyVariant(id){const variant=state.variants.find(item=>item.id===id);if(!variant)return;if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We starten met route, plaatsen en dagplanning.');const destination={...state.destination,...variant.destination};Object.assign(state,{destination,selectedVariantId:variant.id,plan:variant.plan,budget:variant.budget,quality:variant.quality,constraintStatus:variant.constraintStatus,validation:validatePlan(state.trip,destination,variant.plan,variant.budget),optimized:false});$('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)}
+async function ensureTourPlanSupply(destination,basePlan){
+  let plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
+  if(plan?.progressionRepair||Number(state.trip?.days||0)<3||state.trip?.routeTopology==='open-ended'||Number(state.trip?.maxChanges||0)===0)return plan;
+  if(!state.trip?.liveData)return plan;
+  for(let round=0;round<6&&!plan?.progressionRepair;round++){
+    const deadline=Date.now()+9000;
+    while(state.discoveryBusy&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,120));
+    if(state.discoveryBusy)break;
+    const before=state.catalog.length;
+    await discoverLiveOptions({append:true,quiet:true});
+    plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
+    if(plan?.progressionRepair)break;
+    if(state.catalog.length===before&&round>=2)break;
+  }
+  return plan;
+}
+async function applyVariant(id){
+  const variant=state.variants.find(item=>item.id===id);if(!variant)return;
+  if(state.trip?.liveData)showPlanLoading('Reisplan opbouwen…','We zoeken echte overnachtingsregio’s voor iedere etappe.');
+  const destination={...state.destination,...variant.destination};
+  let plan=await ensureTourPlanSupply(destination,variant.plan);
+  const derived=derivePlanState(destination,plan);
+  plan=derived.plan;
+  Object.assign(state,{destination,selectedVariantId:variant.id,plan,budget:derived.budget,quality:derived.quality,constraintStatus:derived.constraintStatus,validation:derived.validation,optimized:false});
+  $('variantSection').classList.add('hidden');$('planSection').classList.remove('hidden');$('mapHint').classList.add('hidden');
+  renderPlan(state);syncPlanVisualHero();prepareItineraryCarousel();renderOptimizationPreview(state);renderStrongOptimizationPreview();renderMap(state.plan);persistDraft();
+  if(state.trip.liveData)void enhanceLiveData(destination.id,state.plan)
+}
 function resetState(trip=defaults()){Object.assign(state,{trip,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,routingRun:state.routingRun+1,liveDiscoveryProgress:null});writeTripForm(trip);renderVehicleControls();$('resultsSection').classList.add('hidden');$('planSection').classList.add('hidden');$('variantSection').classList.add('hidden');$('noPlanItinerary').classList.remove('hidden');$('mapHint').classList.remove('hidden');persistDraft('Nieuw concept opgeslagen');renderDashboard(state,loadTrips())}
 function rebuildFromRecord(record){state.trip=normalizeTrip(record.trip);state.compareIds=record.compareIds||[];state.savedProposalIds=record.savedProposalIds||[];state.dismissedIds=record.dismissedIds||[];writeTripForm(state.trip);renderVehicleControls();state.catalog=record.destinationProfile?.dynamic?[...destinations,record.destinationProfile]:[...destinations];refreshPortfolio();state.destination=state.ranking.candidates.find(i=>i.id===record.destinationId)||record.destinationProfile||null;if(state.destination){applyDestination(state.destination,Boolean(record.optimized));$('resultsSection').classList.remove('hidden')}}
 
