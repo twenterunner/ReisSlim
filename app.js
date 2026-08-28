@@ -1,28 +1,28 @@
-import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1911';
-import { destinations } from './destinations.js?v=1911';
-import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1911';
-import { discoverDestinationBatch } from './destination-provider.js?v=1911';
-import { buildItinerary } from './itinerary-engine.js?v=1911';
-import { buildItineraryVariants } from './itinerary-variants.js?v=1911';
-import { buildBudget } from './budget-engine.js?v=1911';
-import { calculateTripQuality } from './trip-quality-engine.js?v=1911';
-import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1911';
-import { validatePlan } from './itinerary-validator.js?v=1911';
-import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1911';
-import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1911';
-import { downloadGpx, downloadJson } from './gpx-generator.js?v=1911';
-import { invalidateMap, renderMap } from './map-view.js?v=1911';
-import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1911';
-import { evaluatePlanConstraints } from './constraint-engine.js?v=1911';
-import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1911';
-import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1911';
-import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1911';
-import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1911';
-import { enrichDestinationImages } from './image-provider.js?v=1911';
-import { weatherWindowScore } from './weather-engine.js?v=1911';
-import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1911';
-import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1911';
-import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1911';
+import { BUILD, ENGINE_VERSION, STORAGE_SCHEMA_VERSION, VERSION, preferenceDefinitions } from './config.js?v=1912';
+import { destinations } from './destinations.js?v=1912';
+import { buildProposalPortfolio, getMoreProposals } from './proposal-engine.js?v=1912';
+import { discoverDestinationBatch } from './destination-provider.js?v=1912';
+import { buildItinerary } from './itinerary-engine.js?v=1912';
+import { buildItineraryVariants } from './itinerary-variants.js?v=1912';
+import { buildBudget } from './budget-engine.js?v=1912';
+import { calculateTripQuality } from './trip-quality-engine.js?v=1912';
+import { applyOptimizationProposal, optimisePlan, proposeOptimizations } from './trip-optimizer.js?v=1912';
+import { validatePlan } from './itinerary-validator.js?v=1912';
+import { clearDraft, deleteTrip, loadDraft, loadTrips, saveDraft, saveTrip } from './storage.js?v=1912';
+import { localDate, normalizeTrip, readTripForm, validateTripInput, writeTripForm } from './trip-model.js?v=1912';
+import { downloadGpx, downloadJson } from './gpx-generator.js?v=1912';
+import { invalidateMap, renderMap } from './map-view.js?v=1912';
+import { enrichPlanWithLiveRouting, readRoutingSettings, routingConfigured, saveRoutingSettings } from './routing-provider.js?v=1912';
+import { evaluatePlanConstraints } from './constraint-engine.js?v=1912';
+import { enrichPlanWithPlaces, fetchWeatherForDestination, geocodeOrigin, prepareGeneratedRouteStops } from './place-provider.js?v=1912';
+import { $, renderComparison, renderDashboard, renderDestinations, renderItineraryVariants, renderOptimizationPreview, renderPlan, renderPreferenceGrid, renderVehicleControls, setStatus, showError, showView } from './ui-renderer.js?v=1912';
+import { loadPreferenceProfile, recordPreferenceEvent, savePreferenceProfile } from './preference-engine.js?v=1912';
+import { applyAssistantPatch, interpretAssistantMessage } from './assistant-engine.js?v=1912';
+import { enrichDestinationImages } from './image-provider.js?v=1912';
+import { weatherWindowScore } from './weather-engine.js?v=1912';
+import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips, validateRoadtrip } from './roadtrip-policy.js?v=1912';
+import { enrichOvernightAccommodations } from './overnight-accommodation.js?v=1912';
+import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js?v=1912';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripStructure:'moving',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
@@ -335,12 +335,17 @@ function ensureRenderableDayGeometries(plan){
  }
  return plan;
 }
-function renderRoadtripMap(plan){
+function renderRoadtripMap(plan,{force=false}={}){
  ensureRenderableDayGeometries(plan);
- const result=renderMap(plan);
  const expected=(plan?.days||[]).filter(day=>Array.isArray(day.geometry)&&day.geometry.filter(p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon)).length>1).length;
+ const mapView=$('mapView');
+ if(!force&&mapView&&!mapView.classList.contains('active')){
+   if(plan)plan.mapDiagnostics={expectedSegments:expected,renderedSegments:0,complete:false,deferred:true};
+   return{rendered:false,deferred:true,segments:0};
+ }
+ const result=renderMap(plan);
  if(result?.rendered&&Number(result.segments||0)<expected)console.warn('Kaart mist dagsegmenten',{expected,rendered:result.segments});
- if(plan)plan.mapDiagnostics={expectedSegments:expected,renderedSegments:Number(result?.segments||0),complete:Boolean(result?.rendered&&Number(result.segments||0)>=expected)};
+ if(plan)plan.mapDiagnostics={expectedSegments:expected,renderedSegments:Number(result?.segments||0),complete:Boolean(result?.rendered&&Number(result.segments||0)>=expected),deferred:false};
  return result;
 }
 async function enhanceLiveData(destinationId,originalPlan){
@@ -1209,7 +1214,16 @@ function initialize(){
   });
   renderPreferenceGrid();setupPremiumPlannerControls();renderVehicleControls();$('versionLabel').textContent=`ReisSlim v${VERSION} · Build ${BUILD}`;$('orsApiKey').value=readRoutingSettings().orsApiKey;
   const restored=loadDraft();if(restored?.trip)rebuildFromRecord(restored);else resetState();renderDashboard(state,loadTrips());
-  document.querySelectorAll('.nav-item').forEach(button=>button.addEventListener('click',()=>{showView(button.dataset.view);if(button.dataset.view==='mapView')invalidateMap()}));
+  document.querySelectorAll('.nav-item').forEach(button=>button.addEventListener('click',()=>{
+    const viewId=button.dataset.view;
+    showView(viewId);
+    if(viewId==='mapView'){
+      requestAnimationFrame(()=>{
+        if(state.plan)renderRoadtripMap(state.plan,{force:true});
+        invalidateMap();
+      });
+    }
+  }));
   document.querySelectorAll('[data-go-planner]').forEach(b=>b.addEventListener('click',()=>showView('plannerView')));
   $('continueTripBtn').addEventListener('click',event=>{event.preventDefault();showView('plannerView')});
   $('transport').addEventListener('change',()=>renderVehicleControls({resetDefaults:true}));$('routeStyle').addEventListener('change',()=>renderVehicleControls());

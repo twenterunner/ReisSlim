@@ -1,0 +1,8 @@
+{
+  "release": "1.10.2 / 1912",
+  "ranking_root_cause": "selectDiversePortfolio deliberately applied diversity/near-duplicate/same-country penalties, so a lower-scoring proposal could be shown before a higher-scoring Sauerland proposal.",
+  "ranking_change": "Visible proposals are now ordered strictly by portfolioScore, then raw score, then preference coverage. Diversity no longer reorders higher scores behind lower scores.",
+  "route_root_cause": "Leaflet route rendering was invoked while mapView was hidden. The app then relied on invalidateSize later. On mobile this can leave the map initialized without a reliably drawn route.",
+  "route_change": "Route rendering is deferred while mapView is hidden. Opening Kaart now renders the current plan after the view becomes visible, then invalidates/fits the map.",
+  "engine_version_unchanged": 63
+}
