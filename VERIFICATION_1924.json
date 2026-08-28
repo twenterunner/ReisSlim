@@ -1,0 +1,44 @@
+{
+  "release": "1.13.1 / 1924",
+  "baseline_inspected": "GitHub main was 1.13.0 build 1923 before this package.",
+  "root_causes": {
+    "five_minute_runtime": "1923 performed many specific POI lookups individually with concurrency 3. Each item could serially try multiple Nominatim queries and multiple Overpass radii/endpoints. It also searched accommodation in place-provider and then app.js discarded those accommodation results before running overnight-accommodation again.",
+    "accommodation_false_negative": "1923 overnight accommodation only trusted a narrow set of OSM tourism tags. Real accommodation can exist without those exact tags. Ulbeek is a concrete example: public web results show actual accommodation there, so an empty structured OSM result must not be presented as 'there is no accommodation'.",
+    "pending_images_too_fast": "app.js changes the pending image every 1 second."
+  },
+  "changes": {
+    "poi_pipeline": "Specific non-accommodation POIs are now resolved with one batched Overpass query per travel day instead of one multi-provider chain per individual POI.",
+    "single_accommodation_authority": "place-provider no longer performs the accommodation search that app.js immediately discards. overnight-accommodation is the only accommodation resolver.",
+    "accommodation_pipeline": "All overnight points are searched together: 25 km batched Overpass first, then one 60 km batch only for unresolved nights, then Photon and Nominatim fallbacks.",
+    "no_blank_accommodation": "If all structured sources fail, each night gets an actionable live Google Maps search link instead of a false 'no accommodation' conclusion.",
+    "pending_images": "Visible pending image changes are throttled to 4 seconds, within the requested 3–5 second interval.",
+    "generated_stop_speed": "Generated-stop land validation now races Nominatim and Photon reverse lookup and processes up to 3 stops concurrently; the old 32-point serial ring scan is removed."
+  },
+  "verification": {
+    "syntax": {
+      "place-provider.js": true,
+      "overnight-accommodation.js": true,
+      "planner-submit-guard.js": true,
+      "config.js": true,
+      "service-worker.js": true
+    },
+    "structural": {
+      "place_search_excludes_accommodation": true,
+      "place_search_batched_per_day": true,
+      "overnight_batched_overpass": true,
+      "overnight_wider_second_batch_only_for_unresolved": true,
+      "photon_fallback": true,
+      "nominatim_fallback": true,
+      "actionable_external_fallback": true,
+      "pending_image_delay_4000ms": true
+    },
+    "mocked_overnight_test": {
+      "fallbackGuaranteed": true,
+      "photonNamedResult": "Op de Borgt",
+      "apiCalls": 6,
+      "callsFirstScenario": 12
+    },
+    "live_android_device_not_executed_here": true,
+    "live_external_api_execution_not_available_in_container": true
+  }
+}

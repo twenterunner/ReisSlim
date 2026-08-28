@@ -1,5 +1,5 @@
-export const VERSION = '1.13.0';
-export const BUILD = '1923';
+export const VERSION = '1.13.1';
+export const BUILD = '1924';
 export const ENGINE_VERSION = 64;
 export const STORAGE_SCHEMA_VERSION = 7;
 export const preferenceDefinitions=[['natuur','Natuur'],['bergen','Bergen'],['zwemmen','Zwemmen'],['wandelen','Wandelen'],['kinderen','Kindvriendelijk'],['motor','Mooie wegen'],['cultuur','Cultuur'],['eten','Eten'],['kust','Kust'],['budget','Budget']];
