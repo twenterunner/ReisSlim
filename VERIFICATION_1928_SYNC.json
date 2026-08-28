@@ -1,0 +1,18 @@
+{
+  "release": "1.14.1 / 1928 synchronized deployment",
+  "checks": {
+    "syntax": {
+      "config.js": true,
+      "roadtrip-policy.js": true,
+      "service-worker.js": true,
+      "release-sync-1928.js": true
+    },
+    "new_cache_epoch": true,
+    "navigation_html_rewrites_1923_to_1928": true,
+    "js_module_rewrites_1923_to_1928": true,
+    "visible_badge_rewrite": true,
+    "release_script_injection": true,
+    "code_requests_no_store": true
+  },
+  "note": "This package deliberately does not overwrite current app.js/index.html; it synchronizes their stale cache/version references at the service-worker boundary, avoiding regression to an older local copy."
+}
