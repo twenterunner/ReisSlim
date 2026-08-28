@@ -1,78 +1,15 @@
-// ReisSlim canonical roadtrip policy.
-// This is the single authority for multi-day roadtrip structure and validation.
-export const ROADTRIP_POLICY=Object.freeze({
-  minRoadMoveKm:50,
-  estimatedRoadFactor:1.18,
-  motorcycleScenicAverageKmh:55,
-  vehicleAverageKmh:Object.freeze({motorcycle:55,car:65,motorhome:55,caravan:50}),
-  repeatStayMinDays:6,
-  repeatPoiThreshold:85,
-  maxRepeatNights:1
-});
+export const ROADTRIP_POLICY=Object.freeze({minRoadMoveKm:50,estimatedRoadFactor:1.18,motorcycleScenicAverageKmh:55,motorcycleComfortableDayKm:350,vehicleAverageKmh:Object.freeze({motorcycle:55,car:65,motorhome:55,caravan:50}),repeatStayMinDays:6,repeatPoiThreshold:85,maxRepeatNights:1,shortTripRegionRadiusKm:190,anchorVisitRadiusKm:75,corridorRadiusKm:95});
 const finitePoint=p=>Boolean(p)&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
-export function geoKm(a,b){
-  if(!finitePoint(a)||!finitePoint(b))return Infinity;
-  const r=x=>Number(x)*Math.PI/180,R=6371,dLat=r(b.lat-a.lat),dLon=r(b.lon-a.lon),la=r(a.lat),lb=r(b.lat);
-  const h=Math.sin(dLat/2)**2+Math.cos(la)*Math.cos(lb)*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
-}
+export function geoKm(a,b){if(!finitePoint(a)||!finitePoint(b))return Infinity;const r=x=>Number(x)*Math.PI/180,R=6371,dLat=r(b.lat-a.lat),dLon=r(b.lon-a.lon),la=r(a.lat),lb=r(b.lat),h=Math.sin(dLat/2)**2+Math.cos(la)*Math.cos(lb)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
 export const estimatedRoadKm=(a,b)=>geoKm(a,b)*ROADTRIP_POLICY.estimatedRoadFactor;
 export function planningSpeedKmh(trip){return ROADTRIP_POLICY.vehicleAverageKmh[trip?.transport]||60}
-export function maximumRoadLegKm(trip){
-  const hours=Math.max(2,Number(trip?.maxDrive||5));
-  return Math.max(120,hours*planningSpeedKmh(trip));
-}
-export function repeatStayAllowed(point,trip,nightIndex,nightCount){
-  const days=Number(trip?.days||0),mid=nightIndex===Math.floor(nightCount/2);
-  if(days<ROADTRIP_POLICY.repeatStayMinDays)return false;
-  const explicitRest=days>=7&&mid;
-  const relaxedRest=trip?.tripPace==='relaxed'&&mid;
-  const exceptionalPoi=Number(point?.poiRichness||0)>=ROADTRIP_POLICY.repeatPoiThreshold;
-  return Boolean(explicitRest||relaxedRest||exceptionalPoi);
-}
-export function requiredDistinctOvernights(trip){
-  const nights=Math.max(0,Number(trip?.days||0)-1);
-  if(nights<=4)return nights;
-  return Math.max(3,nights-ROADTRIP_POLICY.maxRepeatNights);
-}
-function logicalSamePlace(day){
-  const a=day?.fromPoint,b=day?.toPoint;
-  if(!finitePoint(a)||!finitePoint(b))return false;
-  const sameId=String(a.catalogId||day.from||'')===String(b.catalogId||day.to||'');
-  return sameId&&geoKm(a,b)<12;
-}
-export function validateRoadtrip(trip,plan){
-  const days=Number(trip?.days||0);
-  if(days<=1)return{valid:true,code:'single-day',violations:[],distinct:0,required:0,moves:[]};
-  const rows=plan?.days||[],violations=[];
-  if(rows.length!==days)violations.push(`day-count:${rows.length}/${days}`);
-  const origin=plan?.routeMetrics?.origin||plan?.origin||rows[0]?.fromPoint;
-  const overnightRows=trip?.routeTopology==='open-ended'?rows:rows.slice(0,-1);
-  const ids=[],moves=[];let repeatedNights=0;
-  for(let i=0;i<overnightRows.length;i++){
-    const d=overnightRows[i],a=d.fromPoint,b=d.toPoint;
-    if(!finitePoint(a)||!finitePoint(b)){violations.push(`missing-coordinate:${i+1}`);continue}
-    const same=logicalSamePlace(d);
-    const road=Number(d.distanceKm)>0?Number(d.distanceKm):estimatedRoadKm(a,b);
-    if(same){
-      repeatedNights++;
-      if(!d.intentionalStay||!d.stayJustification)violations.push(`unjustified-repeat:${i+1}`);
-    }else if(road<ROADTRIP_POLICY.minRoadMoveKm){
-      violations.push(`short-move:${i+1}:${Math.round(road)}`);
-    }
-    moves.push(road);
-    ids.push(String(d.toPoint?.catalogId||d.overnight||`${Number(b.lat).toFixed(3)},${Number(b.lon).toFixed(3)}`));
-    if(d.toPoint?.generatedExploration===true||d.toPoint?.landValidated===false)violations.push(`synthetic-stop:${i+1}`);
-    if(Number(d.elapsedHours??d.driveHours??0)>Number(trip.maxDrive||5)+.05)violations.push(`drive-limit:${i+1}`);
-  }
-  if(repeatedNights>ROADTRIP_POLICY.maxRepeatNights)violations.push(`too-many-repeat-nights:${repeatedNights}/${ROADTRIP_POLICY.maxRepeatNights}`);
-  const distinct=new Set(ids).size,required=requiredDistinctOvernights(trip);
-  if(distinct<required)violations.push(`distinct-overnights:${distinct}/${required}`);
-  const last=rows.at(-1);
-  if(trip?.routeTopology!=='open-ended'){
-    if(!finitePoint(origin)||!finitePoint(last?.toPoint)||geoKm(origin,last.toPoint)>12)violations.push('does-not-return-origin');
-  }else{
-    if(finitePoint(origin)&&finitePoint(last?.toPoint)&&geoKm(origin,last.toPoint)<ROADTRIP_POLICY.minRoadMoveKm)violations.push('open-ended-no-progression');
-  }
-  return{valid:violations.length===0,code:violations.length?'roadtrip-invalid':'roadtrip-ok',violations,distinct,required,moves,repeatedNights};
-}
+export function maximumRoadLegKm(trip){const hours=Math.max(2,Number(trip?.maxDrive||5)),timeBased=hours*planningSpeedKmh(trip);return trip?.transport==='motorcycle'?Math.max(120,Math.min(ROADTRIP_POLICY.motorcycleComfortableDayKm,timeBased)):Math.max(120,timeBased)}
+export function repeatStayAllowed(point,trip,nightIndex,nightCount){const days=Number(trip?.days||0),mid=nightIndex===Math.floor(nightCount/2);if(days<ROADTRIP_POLICY.repeatStayMinDays)return false;return Boolean((days>=7&&mid)||(trip?.tripPace==='relaxed'&&mid)||Number(point?.poiRichness||0)>=ROADTRIP_POLICY.repeatPoiThreshold)}
+export function requiredDistinctOvernights(trip){const nights=Math.max(0,Number(trip?.days||0)-1);return nights<=4?nights:Math.max(3,nights-ROADTRIP_POLICY.maxRepeatNights)}
+function pointSegmentDistanceKm(p,a,b){if(!finitePoint(p)||!finitePoint(a)||!finitePoint(b))return Infinity;const lat0=p.lat*Math.PI/180,kx=111.32*Math.cos(lat0),ky=110.57,ax=(a.lon-p.lon)*kx,ay=(a.lat-p.lat)*ky,bx=(b.lon-p.lon)*kx,by=(b.lat-p.lat)*ky,dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy,t=den?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/den)):0;return Math.hypot(ax+t*dx,ay+t*dy)}
+function regionRadiusKm(trip){const days=Number(trip?.days||0);return days<=5?ROADTRIP_POLICY.shortTripRegionRadiusKm:Math.min(420,ROADTRIP_POLICY.shortTripRegionRadiusKm+(days-5)*35)}
+function candidateRelevant(point,origin,anchor,trip){if(!finitePoint(anchor))return true;const nearAnchor=estimatedRoadKm(point,anchor)<=regionRadiusKm(trip),corridor=pointSegmentDistanceKm(point,origin,anchor)<=ROADTRIP_POLICY.corridorRadiusKm,notPastAnchor=geoKm(origin,point)<=geoKm(origin,anchor)+ROADTRIP_POLICY.corridorRadiusKm;return nearAnchor||(corridor&&notPastAnchor)}
+function anchorVisited(path,anchor,destinationId){if(!finitePoint(anchor))return true;return path.some(p=>p.catalogId===destinationId||estimatedRoadKm(p,anchor)<=ROADTRIP_POLICY.anchorVisitRadiusKm)}
+export function selectRoadtripOvernights({origin,trip,destination,candidates}){const nights=Math.max(0,Number(trip?.days||0)-1),maxRoadKm=maximumRoadLegKm(trip),anchor=destination?.bases?.[0]||destination?.anchor||null,destinationId=destination?.id||null;if(!finitePoint(origin)||nights<1)return[];const pool=(candidates||[]).filter(p=>finitePoint(p)&&p.catalogId).filter(p=>estimatedRoadKm(origin,p)>=ROADTRIP_POLICY.minRoadMoveKm).filter(p=>candidateRelevant(p,origin,anchor,trip));if(!pool.length)return[];let beam=[{path:[],score:0,consecutive:0}],beamWidth=320;const targetLeg=Math.min(maxRoadKm*.58,trip?.transport==='motorcycle'?185:215);for(let night=0;night<nights;night++){const remaining=nights-night-1,next=[];for(const row of beam){const current=row.path.at(-1)||origin;for(const p of pool){const same=row.path.length>0&&current.catalogId===p.catalogId,road=same?0:estimatedRoadKm(current,p);if(!same&&(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm))continue;if(same&&!repeatStayAllowed(p,trip,night,nights))continue;const consecutive=same?row.consecutive+1:1;if(consecutive>2)continue;const home=estimatedRoadKm(p,origin);if(trip?.routeTopology!=='open-ended'&&home>maxRoadKm*Math.max(1,remaining+1))continue;const path=[...row.path,p],distinct=new Set(path.map(x=>x.catalogId)).size,anchorRoad=finitePoint(anchor)?estimatedRoadKm(p,anchor):0,legComfort=same?0:Math.abs(road-targetLeg),anchorBonus=(p.catalogId===destinationId?180:0)+(finitePoint(anchor)?Math.max(0,130-anchorRoad*.45):0),variety=distinct*145,repeatPenalty=same?220:0,comfortPenalty=legComfort*.20;next.push({path,score:row.score+variety+anchorBonus-comfortPenalty-repeatPenalty,consecutive})}}next.sort((a,b)=>b.score-a.score);beam=next.slice(0,beamWidth);if(!beam.length)return[]}const required=requiredDistinctOvernights(trip);return beam.filter(row=>{const distinct=new Set(row.path.map(x=>x.catalogId)).size;if(distinct<required||!anchorVisited(row.path,anchor,destinationId))return false;if(trip?.routeTopology==='open-ended')return true;const home=estimatedRoadKm(row.path.at(-1),origin);return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm}).sort((a,b)=>b.score-a.score)[0]?.path||[]}
+function logicalSamePlace(day){const a=day?.fromPoint,b=day?.toPoint;if(!finitePoint(a)||!finitePoint(b))return false;return String(a.catalogId||day.from||'')===String(b.catalogId||day.to||'')&&geoKm(a,b)<12}
+export function validateRoadtrip(trip,plan){const days=Number(trip?.days||0);if(days<=1)return{valid:true,code:'single-day',violations:[],distinct:0,required:0,moves:[]};const rows=plan?.days||[],violations=[];if(rows.length!==days)violations.push(`day-count:${rows.length}/${days}`);const origin=plan?.routeMetrics?.origin||plan?.origin||rows[0]?.fromPoint,overnightRows=trip?.routeTopology==='open-ended'?rows:rows.slice(0,-1),ids=[],moves=[];let repeatedNights=0;for(let i=0;i<overnightRows.length;i++){const d=overnightRows[i],a=d.fromPoint,b=d.toPoint;if(!finitePoint(a)||!finitePoint(b)){violations.push(`missing-coordinate:${i+1}`);continue}const same=logicalSamePlace(d),road=Number(d.distanceKm)>0?Number(d.distanceKm):estimatedRoadKm(a,b);if(same){repeatedNights++;if(!d.intentionalStay||!d.stayJustification)violations.push(`unjustified-repeat:${i+1}`)}else if(road<ROADTRIP_POLICY.minRoadMoveKm)violations.push(`short-move:${i+1}:${Math.round(road)}`);moves.push(road);ids.push(String(d.toPoint?.catalogId||d.overnight||`${Number(b.lat).toFixed(3)},${Number(b.lon).toFixed(3)}`));if(d.toPoint?.generatedExploration===true||d.toPoint?.landValidated===false)violations.push(`synthetic-stop:${i+1}`);if(Number(d.elapsedHours??d.driveHours??0)>Number(trip.maxDrive||5)+.05)violations.push(`drive-limit:${i+1}`)}if(repeatedNights>ROADTRIP_POLICY.maxRepeatNights)violations.push(`too-many-repeat-nights:${repeatedNights}/${ROADTRIP_POLICY.maxRepeatNights}`);const distinct=new Set(ids).size,required=requiredDistinctOvernights(trip);if(distinct<required)violations.push(`distinct-overnights:${distinct}/${required}`);const last=rows.at(-1);if(trip?.routeTopology!=='open-ended'){if(!finitePoint(origin)||!finitePoint(last?.toPoint)||geoKm(origin,last.toPoint)>12)violations.push('does-not-return-origin')}else if(finitePoint(origin)&&finitePoint(last?.toPoint)&&geoKm(origin,last.toPoint)<ROADTRIP_POLICY.minRoadMoveKm)violations.push('open-ended-no-progression');return{valid:violations.length===0,code:violations.length?'roadtrip-invalid':'roadtrip-ok',violations,distinct,required,moves,repeatedNights}}

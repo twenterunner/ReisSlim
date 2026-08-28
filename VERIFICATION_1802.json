@@ -1,0 +1,240 @@
+{
+  "status": "PASS",
+  "root_causes": [
+    "The old overnight solver maximised distance and distinctness across the global candidate catalogue, so a Sauerland selection could be routed through Belgium/Luxembourg/eastern Germany.",
+    "The selected destination had only a small score bonus and was not a hard route anchor.",
+    "Plan-time overnight discovery could collide with the background discovery lock and then fall back to the legacy generic destination discovery path.",
+    "Anchor-specific discovery queries were ordered after origin-wide queries, so the early candidate stop could finish before the chosen region was searched.",
+    "The roadtrip live-candidate profile still estimated motorcycle travel at a legacy 72 km/h.",
+    "The generic accommodation provider treated motorcycle + 'any' as non-camping and did not score motorcycle access, secure parking, garage or covered parking."
+  ],
+  "fixes": [
+    "Canonical pure overnight solver anchors short roadtrips to the selected destination region and rejects unrelated routes.",
+    "Five-day trips require four distinct overnight regions with >=50 km road movement.",
+    "Destination-anchor discovery now runs before broad origin discovery and is explicitly invoked when the selected plan lacks overnight supply.",
+    "Plan supply no longer calls legacy discoverLiveOptions as a fallback.",
+    "Motorcycle planning uses 55 km/h with a 350 km comfortable-day cap.",
+    "A single final vehicle-aware accommodation authority discards the generic accommodation result; motorcycle 'any' accepts camping and lodging and ranks motorcycle access/parking/garage/covered parking."
+  ],
+  "checks": {
+    "all_49_cases_pass": true,
+    "anchor_discovery_runs_before_origin_discovery": true,
+    "selected_destination_anchor_passed_to_discovery": true,
+    "legacy_generic_discovery_removed_from_plan_supply": true,
+    "canonical_solver_is_final_overnight_authority": true,
+    "legacy_72_kmh_removed_from_roadtrip_profile": true,
+    "generic_accommodation_removed_before_vehicle_selection": true,
+    "vehicle_accommodation_final_authority": true,
+    "syntax_app.js": true,
+    "syntax_roadtrip-policy.js": true,
+    "syntax_overnight-accommodation.js": true,
+    "syntax_config.js": true,
+    "syntax_service-worker.js": true,
+    "syntax_ui-feature-flags.js": true,
+    "syntax_image-provider.js": true
+  },
+  "tests": {
+    "total": 49,
+    "passed": 49,
+    "failed": [],
+    "cases": [
+      {
+        "name": "speed motorcycle",
+        "pass": true
+      },
+      {
+        "name": "speed car",
+        "pass": true
+      },
+      {
+        "name": "speed motorhome",
+        "pass": true
+      },
+      {
+        "name": "speed caravan",
+        "pass": true
+      },
+      {
+        "name": "motorcycle max 10h capped 350",
+        "pass": true
+      },
+      {
+        "name": "motorcycle 2h minimum 120",
+        "pass": true
+      },
+      {
+        "name": "car 10h not motorcycle-capped",
+        "pass": true
+      },
+      {
+        "name": "distinct 2 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 3 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 4 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 5 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 6 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 7 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 10 days",
+        "pass": true
+      },
+      {
+        "name": "5-day repeat forbidden even rich",
+        "pass": true
+      },
+      {
+        "name": "7-day midpoint repeat allowed",
+        "pass": true
+      },
+      {
+        "name": "6-day rich repeat allowed",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver motorcycle",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver car",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver motorhome",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver caravan",
+        "pass": true
+      },
+      {
+        "name": "Cape Town solver exact case",
+        "pass": true
+      },
+      {
+        "name": "solver rejects only unrelated far candidates",
+        "pass": true
+      },
+      {
+        "name": "solver insufficient 3 candidates for 5 days",
+        "pass": true
+      },
+      {
+        "name": "solver ignores candidate <50 road km from origin",
+        "pass": true
+      },
+      {
+        "name": "single base validation rejected",
+        "pass": true
+      },
+      {
+        "name": "49km rejected",
+        "pass": true
+      },
+      {
+        "name": "50km allowed",
+        "pass": true
+      },
+      {
+        "name": "drive limit rejected",
+        "pass": true
+      },
+      {
+        "name": "exact drive limit allowed",
+        "pass": true
+      },
+      {
+        "name": "missing coordinate rejected",
+        "pass": true
+      },
+      {
+        "name": "synthetic rejected",
+        "pass": true
+      },
+      {
+        "name": "landValidated false rejected",
+        "pass": true
+      },
+      {
+        "name": "closed loop must return home",
+        "pass": true
+      },
+      {
+        "name": "open ended progression valid",
+        "pass": true
+      },
+      {
+        "name": "open ended collapse rejected",
+        "pass": true
+      },
+      {
+        "name": "7-day one repeat valid",
+        "pass": true
+      },
+      {
+        "name": "7-day two repeats invalid",
+        "pass": true
+      },
+      {
+        "name": "motorcycle any allows hotel",
+        "pass": true
+      },
+      {
+        "name": "motorcycle any allows campsite",
+        "pass": true
+      },
+      {
+        "name": "camping preference hard filters hotel",
+        "pass": true
+      },
+      {
+        "name": "hotel preference hard filters camp",
+        "pass": true
+      },
+      {
+        "name": "camper any requires camping",
+        "pass": true
+      },
+      {
+        "name": "motor access positive",
+        "pass": true
+      },
+      {
+        "name": "garage strong positive",
+        "pass": true
+      },
+      {
+        "name": "motorcycle no negative",
+        "pass": true
+      },
+      {
+        "name": "secure motor hotel beats much closer generic",
+        "pass": true
+      },
+      {
+        "name": "enrichment chooses motor fit",
+        "pass": true
+      },
+      {
+        "name": "enrichment camping request chooses campsite",
+        "pass": true
+      }
+    ]
+  },
+  "limitations": "External live Overpass/routing availability cannot be executed from this sandbox. Network-independent production solver, validation, discovery integration structure, and mocked accommodation-provider behavior were tested."
+}
