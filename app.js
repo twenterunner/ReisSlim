@@ -22,6 +22,7 @@ import { enrichDestinationImages } from './image-provider.js';
 import { weatherWindowScore } from './weather-engine.js';
 import { ROADTRIP_POLICY, estimatedRoadKm, maximumRoadLegKm, planningSpeedKmh, repeatStayAllowed, requiredDistinctOvernights, selectRoadtripOvernights, validateRoadtrip } from './roadtrip-policy.js';
 import { enrichOvernightAccommodations } from './overnight-accommodation.js';
+import { discoverRegionalOvernightCandidates } from './regional-overnight-provider.js';
 
 const defaults=()=>normalizeTrip({origin:'Saasveld',startDate:localDate(30),days:10,budget:3500,travelMode:'direct',routeTopology:'loop',tripPace:'balanced',destinationQuery:'',adults:2,children:0,transport:'motorcycle',maxDrive:5,maxChanges:5,accommodationType:'any',comfort:'mid',strictBudget:true,strictDrive:true,strictChanges:true,allowStretch:true,liveData:true,remoteTravel:false,privateMode:false,notes:'',preferences:['natuur','motor'],preferenceWeights:{natuur:2,motor:2}});
 const state={trip:null,ranked:[],ranking:null,destination:null,plan:null,budget:null,validation:[],quality:null,compareIds:[],savedProposalIds:[],dismissedIds:[],variants:[],selectedVariantId:null,optimized:false,undoSnapshot:null,optimizationSummary:null,optimizationProposal:null,routingRun:0,catalog:[...destinations],discoveryCursor:0,discoveryBusy:false,preferenceProfile:loadPreferenceProfile(),assistantPreview:null,liveDiscoveryStartedAt:0,liveDiscoveryTimer:null,liveDiscoveryProgress:null,weatherPortfolioRun:0,imageRejectedIds:[],imageHydrationBusy:false,retryDiscoveryQueued:false,globalDiscoveryBusy:false,anchorDiscoveryPriority:false};
@@ -1052,14 +1053,34 @@ async function discoverRoadtripOvernightPool(trip,{fetchImpl=fetch,timeoutMs=850
    return diag.added;
  }finally{state.globalDiscoveryBusy=false;updateManualLiveDiscoveryButton()}
 }
+function mergeRegionalOvernightProfiles(profiles){
+ const known=new Set(state.catalog.map(x=>x.id)),points=state.catalog.flatMap(x=>x.bases||[]);
+ let added=0;
+ for(const item of profiles||[]){
+   const p=item?.bases?.[0];if(!p||known.has(item.id))continue;
+   if(points.some(q=>Number.isFinite(q?.lat)&&Number.isFinite(q?.lon)&&geoDistanceKm(q,p)<12))continue;
+   state.catalog.push(item);known.add(item.id);points.push(p);added++;
+ }
+ if(added)refreshPortfolio();return added;
+}
 async function ensureTourPlanSupply(destination,basePlan){
   let plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   if(Number(state.trip?.days||0)<2||roadtripIntentReport(state.trip,plan).valid||!state.trip?.liveData)return plan;
   const anchor=destination?.bases?.[0]||null;
-  if(anchor&&Number.isFinite(anchor.lat)&&Number.isFinite(anchor.lon)){
-    await discoverRoadtripOvernightPool(state.trip,{anchor});
-    plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
-  }
+  if(!anchor||!Number.isFinite(anchor.lat)||!Number.isFinite(anchor.lon))return plan;
+
+  // Source A: detailed Overpass place discovery.
+  await discoverRoadtripOvernightPool(state.trip,{anchor});
+  plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
+  if(roadtripIntentReport(state.trip,plan).valid)return plan;
+
+  // Source B: independent Nominatim reverse-geocoded regional seeds. This path
+  // deliberately does not use globalDiscoveryBusy, so provider/lock failures in
+  // source A cannot leave the selected trip without an overnight candidate pool.
+  const origin=state.trip.originPoint||plan?.routeMetrics?.origin||plan?.origin;
+  const regional=await discoverRegionalOvernightCandidates(state.trip,origin,anchor,{timeoutMs:3200,maxRequests:20});
+  mergeRegionalOvernightProfiles(regional);
+  plan=ensureMultiDayRoadtripProgression(state.trip,destination,basePlan);
   return plan;
 }
 async function applyVariant(id){
@@ -1117,11 +1138,7 @@ function initialize(){
     brandButton.addEventListener('click',goHome);
     brandButton.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome()}});
   }
-  const bindNewTripButton=button=>{
-    if(!button)return;
-    button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();startNewTrip()});
-  };
-  bindNewTripButton($('newTripBtn'));
+
   const manualLiveButton=$('manualLiveDiscoveryBtn');
   if(manualLiveButton)manualLiveButton.addEventListener('click',async()=>{
     if(manualLiveButton.disabled)return;

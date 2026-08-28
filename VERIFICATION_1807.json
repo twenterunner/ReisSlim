@@ -1,0 +1,48 @@
+{
+  "status": "PASS",
+  "strategy_change": [
+    "Roadtrip supply no longer depends on one discovery system.",
+    "Source A remains Overpass for rich place discovery.",
+    "If Source A still cannot make the selected itinerary feasible, Source B independently reverse-geocodes geographically spread regional seed points through Nominatim into real named settlements.",
+    "Source B has no dependency on the Overpass discovery lock, so lock contention, endpoint failure or sparse Overpass results cannot by themselves collapse the selected trip.",
+    "The solver and hard roadtrip rules remain unchanged after the candidate sources are merged."
+  ],
+  "ui_change": "Removed the top '+ Nieuwe reis' button. The dashboard 'Start een nieuwe reis' is the single new-trip action.",
+  "tests": {
+    "prior_regression": {
+      "passed": 49,
+      "total": 49
+    },
+    "dual_source_acceptance": {
+      "pass": true,
+      "passed": 3,
+      "total": 3,
+      "failed": [],
+      "results": [
+        {
+          "name": "Sauerland independent fallback builds valid 5-day loop",
+          "pass": true
+        },
+        {
+          "name": "Cape Town independent fallback builds valid 5-day loop",
+          "pass": true
+        },
+        {
+          "name": "fallback deduplicates same returned locality",
+          "pass": true
+        }
+      ]
+    },
+    "checks": {
+      "49_prior_regressions": true,
+      "dual_fallback_cases": true,
+      "top_new_trip_removed": true,
+      "dashboard_new_trip_remains": true,
+      "independent_provider_imported": true,
+      "fallback_runs_after_overpass": true,
+      "fallback_does_not_use_global_lock": true,
+      "provider_cached_in_sw": true
+    }
+  },
+  "limitations": "Network calls are mocked in this environment. The independent Nominatim provider module and production roadtrip solver were executed together for both the 5-day Saasveld/Sauerland and 5-day Cape Town cases."
+}
