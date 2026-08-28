@@ -1,0 +1,229 @@
+{
+  "status": "PASS",
+  "release": "1.9.4 / 1904",
+  "scope": "Proper release, not a hidden hotfix. The only functional change is the already-verified submit lifecycle correction; all other changes are release/version/cache identifiers.",
+  "engine_version": 63,
+  "checks": {
+    "config_version": true,
+    "config_build": true,
+    "engine_version_unchanged": true,
+    "index_meta": true,
+    "index_visible_rev": true,
+    "index_no_old_visible_rev": true,
+    "index_cache_busters": true,
+    "sw_cache": true,
+    "ui_release": true,
+    "submit_before_initialize": true
+  },
+  "roadtrip_regression": {
+    "pass": true,
+    "total": 49,
+    "passed": 49,
+    "failed": [],
+    "results": [
+      {
+        "name": "speed motorcycle",
+        "pass": true
+      },
+      {
+        "name": "speed car",
+        "pass": true
+      },
+      {
+        "name": "speed motorhome",
+        "pass": true
+      },
+      {
+        "name": "speed caravan",
+        "pass": true
+      },
+      {
+        "name": "motorcycle max 10h capped 350",
+        "pass": true
+      },
+      {
+        "name": "motorcycle 2h minimum 120",
+        "pass": true
+      },
+      {
+        "name": "car 10h not motorcycle-capped",
+        "pass": true
+      },
+      {
+        "name": "distinct 2 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 3 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 4 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 5 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 6 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 7 days",
+        "pass": true
+      },
+      {
+        "name": "distinct 10 days",
+        "pass": true
+      },
+      {
+        "name": "5-day repeat forbidden even rich",
+        "pass": true
+      },
+      {
+        "name": "7-day midpoint repeat allowed",
+        "pass": true
+      },
+      {
+        "name": "6-day rich repeat allowed",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver motorcycle",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver car",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver motorhome",
+        "pass": true
+      },
+      {
+        "name": "Sauerland solver caravan",
+        "pass": true
+      },
+      {
+        "name": "Cape Town solver exact case",
+        "pass": true
+      },
+      {
+        "name": "solver rejects only unrelated far candidates",
+        "pass": true
+      },
+      {
+        "name": "solver insufficient 3 candidates for 5 days",
+        "pass": true
+      },
+      {
+        "name": "solver ignores candidate <50 road km from origin",
+        "pass": true
+      },
+      {
+        "name": "single base validation rejected",
+        "pass": true
+      },
+      {
+        "name": "49km rejected",
+        "pass": true
+      },
+      {
+        "name": "50km allowed",
+        "pass": true
+      },
+      {
+        "name": "drive limit rejected",
+        "pass": true
+      },
+      {
+        "name": "exact drive limit allowed",
+        "pass": true
+      },
+      {
+        "name": "missing coordinate rejected",
+        "pass": true
+      },
+      {
+        "name": "synthetic rejected",
+        "pass": true
+      },
+      {
+        "name": "landValidated false rejected",
+        "pass": true
+      },
+      {
+        "name": "closed loop must return home",
+        "pass": true
+      },
+      {
+        "name": "open ended progression valid",
+        "pass": true
+      },
+      {
+        "name": "open ended collapse rejected",
+        "pass": true
+      },
+      {
+        "name": "7-day one repeat valid",
+        "pass": true
+      },
+      {
+        "name": "7-day two repeats invalid",
+        "pass": true
+      },
+      {
+        "name": "motorcycle any allows hotel",
+        "pass": true
+      },
+      {
+        "name": "motorcycle any allows campsite",
+        "pass": true
+      },
+      {
+        "name": "camping preference hard filters hotel",
+        "pass": true
+      },
+      {
+        "name": "hotel preference hard filters camp",
+        "pass": true
+      },
+      {
+        "name": "camper any requires camping",
+        "pass": true
+      },
+      {
+        "name": "motor access positive",
+        "pass": true
+      },
+      {
+        "name": "garage strong positive",
+        "pass": true
+      },
+      {
+        "name": "motorcycle no negative",
+        "pass": true
+      },
+      {
+        "name": "secure motor hotel beats much closer generic",
+        "pass": true
+      },
+      {
+        "name": "enrichment chooses motor fit",
+        "pass": true
+      },
+      {
+        "name": "enrichment camping request chooses campsite",
+        "pass": true
+      }
+    ]
+  },
+  "files_changed": [
+    "app.js",
+    "config.js",
+    "index.html",
+    "service-worker.js",
+    "ui-feature-flags.js"
+  ]
+}
