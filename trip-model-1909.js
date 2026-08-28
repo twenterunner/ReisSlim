@@ -1,5 +1,5 @@
-import { originCatalog, preferenceDefinitions, validCoordinate } from './config.js?v=1918';
-import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence.js?v=1918';
+import { originCatalog, preferenceDefinitions, validCoordinate } from './config.js?v=1919';
+import { transportId, vehicleProfile, vehicleSpec } from './vehicle-intelligence.js?v=1919';
 const FIELD_IDS=['tripName','origin','startDate','days','budget','adults','children','transport','travelMode','routeTopology','tripStructure','tripPace','destinationQuery','routeStyle','fuelRangeKm','vehicleMaxSpeedKmh','vehicleHeightM','vehicleLengthM','vehicleWeightKg','maxDrive','maxChanges','accommodationType','comfort','strictBudget','strictDrive','strictChanges','allowStretch','liveData','remoteTravel','privateMode','notes'];
 export function uniqueId(){return globalThis.crypto?.randomUUID?.()||`trip-${Date.now()}-${Math.random().toString(16).slice(2)}`}
 export function localDate(offsetDays=0,now=new Date()){const date=new Date(now.getFullYear(),now.getMonth(),now.getDate()+offsetDays,12);return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}

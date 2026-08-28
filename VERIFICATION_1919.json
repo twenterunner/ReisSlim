@@ -1,0 +1,24 @@
+{
+  "release": "1.10.9 / 1919",
+  "root_cause": "The 1918 code did call showPlanLoading() when Zoek mijn roadtrip was pressed, but #planLoadingOverlay was physically nested inside #itineraryView. ReisSlim CSS hides every inactive .app-view with display:none. While the user is on plannerView, itineraryView is inactive, so its child overlay cannot render even when the overlay's own hidden class is removed.",
+  "correction": "Moved #planLoadingOverlay out of itineraryView and made it a body-level global overlay. The same overlay can now be shown from Planner, itinerary calculation, routing, POI, accommodation, and other pending stages. Existing fixed-position overlay CSS and 1-second image rotation are retained.",
+  "verification": {
+    "overlay_precedes_itinerary_view_in_dom": true,
+    "overlay_not_nested_in_app_view": true,
+    "image_rotation_interval_ms": 1000,
+    "syntax": {
+      "app.js": true,
+      "overnight-accommodation.js": true,
+      "routing-provider-1914.js": true,
+      "planner-submit-guard.js": true,
+      "proposal-engine.js": true,
+      "config.js": true,
+      "service-worker.js": true,
+      "ui-feature-flags.js": true,
+      "trip-model.js": true,
+      "trip-model-1909.js": true,
+      "start-new-trip.js": true
+    },
+    "android_device_not_executed_here": true
+  }
+}
