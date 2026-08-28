@@ -1,12 +1,26 @@
 import { validCoordinate } from './config.js';
 import { transportId, vehicleProfile } from './vehicle-intelligence.js';
 
+function recommendationFitsVehicle(item,vehicle){
+  if(item?.genericFallback===true)return true;
+  const fit=item?.vehicleFit;
+  // Compatibility metadata has existed in several shapes across ReisSlim builds:
+  // ["motorcycle"], true/false, string, or absent for generic OSM POIs.
+  // Missing metadata is unknown, not incompatible. A positive boolean means the
+  // provider already accepted the item for the active vehicle.
+  if(fit===undefined||fit===null||fit===true)return true;
+  if(fit===false)return false;
+  if(Array.isArray(fit))return fit.includes(vehicle)||fit.includes('all');
+  if(typeof fit==='string')return fit===vehicle||fit==='all';
+  return true;
+}
+
 export function validatePlan(trip, destination, plan, budget) {
   const maxElapsed = Math.max(0, ...plan.days.map(day => Number(day.elapsedHours ?? day.driveHours ?? 0)));
   const originAsStay = plan.days.some(day => ['stay', 'flex', 'transfer'].includes(day.kind) && day.location === trip.origin);
   const invalidCoordinates = plan.days.filter(day => day.toPoint && !validCoordinate(day.toPoint)).length;
   const vehicle = transportId(trip.transport);
-  const incompatible = (plan.recommendations || []).filter(item => !item.vehicleFit?.includes(vehicle)).length;
+  const incompatible = (plan.recommendations || []).filter(item => !recommendationFitsVehicle(item,vehicle)).length;
   const dimensionsReady = !vehicleProfile(trip).supportsDimensions
     || [trip.vehicleHeightM, trip.vehicleLengthM, trip.vehicleWeightKg].every(value => Number.isFinite(value) && value > 0);
   const constraintStatus = plan.constraintStatus;

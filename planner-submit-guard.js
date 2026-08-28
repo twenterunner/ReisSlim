@@ -1,9 +1,14 @@
 (function(){
-  const RELEASE={version:'1.13.2',build:'1925'};
+  const RELEASE={version:'1.13.3',build:'1926'};
 
   function guard(event){
     if(event.target?.id!=='tripForm')return;
     event.preventDefault();
+    // Hide the mobile keyboard before the global pending overlay is positioned.
+    // The first pending screen is opened directly from the form; the later plan
+    // pending screen normally opens after focus has already left the form.
+    try{document.activeElement?.blur?.()}catch{}
+    requestAnimationFrame(syncPendingViewport);
     queueMicrotask(()=>{
       if(typeof window.reisslimAppReady!=='boolean'||!window.reisslimAppReady){
         const box=document.getElementById('formError');
@@ -70,17 +75,41 @@
     });
   }
 
+  function syncPendingViewport(){
+    const overlay=document.getElementById('planLoadingOverlay');
+    if(!overlay)return;
+    const viewport=window.visualViewport;
+    const top=Math.max(0,Number(viewport?.offsetTop||0));
+    const height=Math.max(320,Number(viewport?.height||window.innerHeight||720));
+    overlay.style.setProperty('--pending-visible-top',`${top}px`);
+    overlay.style.setProperty('--pending-visible-height',`${height}px`);
+  }
+
+  function installPendingPositioning(){
+    const overlay=document.getElementById('planLoadingOverlay');
+    if(!overlay||overlay.dataset.viewportPositioning==='1')return;
+    overlay.dataset.viewportPositioning='1';
+    syncPendingViewport();
+    // Observe only the overlay's own class. This cannot recreate the 1924
+    // runaway subtree-observer loop because the callback never changes class.
+    const observer=new MutationObserver(()=>{
+      if(!overlay.classList.contains('hidden'))requestAnimationFrame(syncPendingViewport);
+    });
+    observer.observe(overlay,{attributes:true,attributeFilter:['class']});
+    window.visualViewport?.addEventListener('resize',syncPendingViewport,{passive:true});
+    window.visualViewport?.addEventListener('scroll',syncPendingViewport,{passive:true});
+    window.addEventListener('orientationchange',()=>setTimeout(syncPendingViewport,80),{passive:true});
+  }
+
   function install(){
-    // 1924 installed a subtree MutationObserver whose callback rewrote the same
-    // header text it was observing. textContent creates a childList mutation, so
-    // that observer called itself indefinitely and starved the app's event loop.
-    // This recovery build deliberately performs only one-shot setup.
     pacePendingImage();
+    installPendingPositioning();
     smartenDashboardTile();
     syncVisibleRevision();
     requestAnimationFrame(()=>{
       smartenDashboardTile();
       syncVisibleRevision();
+      syncPendingViewport();
     });
   }
 

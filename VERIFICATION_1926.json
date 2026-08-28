@@ -1,0 +1,49 @@
+{
+  "release": "1.13.3 / 1926",
+  "baseline": "GitHub main 1.13.2 / 1925 inspected before changes",
+  "root_causes": {
+    "live_enrichment_crash": "itinerary-validator.js calls item.vehicleFit?.includes(vehicle), while 1924/1925 overnight-accommodation.js writes vehicleFit:true for named accommodation. Optional chaining protects null/undefined only; it still tries .includes on boolean true, producing the exact runtime error shown by the user.",
+    "missing_map_pois": "The crash occurs in derivePlanState/validatePlan after POI and accommodation enrichment but before the final renderRoadtripMap call. Therefore the map remains on the earlier route-only render and never receives the enriched recommendation markers.",
+    "base_route_straight_lines": "The live OSRM base-daytrip can exceed maxDrive. validateBaseTrip treated drive-limit as a roadtrip-structure violation. ensureMultiDayRoadtripProgression then rejected the otherwise valid live plan and rebuilt the base trip with canonical straight geometry. Max-drive is already independently enforced by constraint-engine, so it does not belong in structural roadtrip validation.",
+    "first_pending_position": "The first overlay is opened directly from the form while Android can still have a focused input/transitioning visual viewport. The later overlay normally opens after focus has gone. Positioning against 100dvh can therefore put the first card too high relative to the actually visible viewport."
+  },
+  "changes": {
+    "validator": "vehicleFit now supports array, string, boolean and absent metadata; generic external fallbacks are treated as unknown rather than incompatible.",
+    "accommodation": "named accommodation now writes vehicleFit as [trip.transport] instead of boolean true; generic search links use null.",
+    "poi_rendering": "removing the validator exception allows the existing final renderRoadtripMap step to render resolved POIs and accommodations.",
+    "base_route": "roadtrip-policy now validates topology/structure only. Drive-time excess remains a constraint violation, but does not cause live road geometry to be discarded/rebuilt.",
+    "pending": "submit blurs the active input and the overlay is positioned using window.visualViewport offset/height. A class-only observer repositions it when shown; it does not observe the whole document.",
+    "pending_images": "4-second image pacing retained.",
+    "cache": "service-worker epoch bumped to 1926."
+  },
+  "verification": {
+    "syntax": {
+      "itinerary-validator.js": true,
+      "roadtrip-policy.js": true,
+      "overnight-accommodation.js": true,
+      "service-worker.js": true,
+      "planner-submit-guard.js": true,
+      "config.js": true
+    },
+    "base_policy_test": {
+      "valid": true,
+      "code": "base-trip-ok",
+      "dayTrips": 3,
+      "overLimitLiveHours": 6.1,
+      "geometryPoints": [
+        5,
+        5,
+        5
+      ]
+    },
+    "validator_test": {
+      "boolean_vehicleFit_does_not_throw": true,
+      "missing_vehicleFit_is_unknown_not_incompatible": true,
+      "array_vehicleFit_supported": true,
+      "generic_fallback_supported": true
+    },
+    "map_render_path_source_verified": "current app calls derivePlanState then renderRoadtripMap after enrichment; removing the validator exception restores that path",
+    "android_device_not_executed_here": true,
+    "live_external_api_not_reexecuted_here": true
+  }
+}

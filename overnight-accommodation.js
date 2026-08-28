@@ -1,4 +1,4 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1923';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1926';
 
 const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const PHOTON='https://photon.komoot.io/api/';
@@ -115,12 +115,12 @@ function buildItem(best,trip){
     if(t.parking||t['parking:condition'])evidence.push('parking vermeld');
   }
   const source=best.place.source==='photon'?'OpenStreetMap Photon':best.place.source==='nominatim'?'OpenStreetMap Nominatim':'OpenStreetMap Overpass';
-  return{type:'accommodation',name:best.place.name,point:best.place.point,live:true,genericFallback:false,source,vehicleFit:true,vehicleFitScore:Math.round(best.score),vehicleFitEvidence:evidence,distanceFromOvernightKm:Number(best.distanceKm.toFixed(1)),reason:trip.transport==='motorcycle'?`Geselecteerd voor motorreis op verblijfstype, nabijheid en ${evidence.length?evidence.join(', '):'beschikbare voertuig-/parkeerinformatie'}.`:'Geselecteerd op verblijfstype en nabijheid.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(best.place.name+' '+best.place.point.lat+','+best.place.point.lon)}`};
+  return{type:'accommodation',name:best.place.name,point:best.place.point,live:true,genericFallback:false,source,vehicleFit:[trip.transport],vehicleFitScore:Math.round(best.score),vehicleFitEvidence:evidence,distanceFromOvernightKm:Number(best.distanceKm.toFixed(1)),reason:trip.transport==='motorcycle'?`Geselecteerd voor motorreis op verblijfstype, nabijheid en ${evidence.length?evidence.join(', '):'beschikbare voertuig-/parkeerinformatie'}.`:'Geselecteerd op verblijfstype en nabijheid.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(best.place.name+' '+best.place.point.lat+','+best.place.point.lon)}`};
 }
 function externalFallback(day,trip){
   const place=day.to||day.overnight||day.location||'de overnachtingsplaats',requested=requestedType(trip),term=requested==='camping'?'camping':requested==='hotel-bnb'?'hotel B&B':'accommodation hotel camping';
   const query=`${term} near ${place} ${day.toPoint.lat},${day.toPoint.lon}`,mapUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-  return{type:'accommodation',name:`Bekijk verblijven rond ${place}`,point:{...day.toPoint},live:false,genericFallback:true,lookupComplete:true,source:'Externe live zoeklink',vehicleFit:false,vehicleFitScore:null,vehicleFitEvidence:[],distanceFromOvernightKm:0,reason:'De gestructureerde OpenStreetMap-bronnen leverden hier geen betrouwbaar genoemd verblijf. ReisSlim toont daarom een bruikbare live kaartzoekopdracht in plaats van ten onrechte te zeggen dat er geen accommodatie bestaat.',mapUrl,url:mapUrl};
+  return{type:'accommodation',name:`Bekijk verblijven rond ${place}`,point:{...day.toPoint},live:false,genericFallback:true,lookupComplete:true,source:'Externe live zoeklink',vehicleFit:null,vehicleFitScore:null,vehicleFitEvidence:[],distanceFromOvernightKm:0,reason:'De gestructureerde OpenStreetMap-bronnen leverden hier geen betrouwbaar genoemd verblijf. ReisSlim toont daarom een bruikbare live kaartzoekopdracht in plaats van ten onrechte te zeggen dat er geen accommodatie bestaat.',mapUrl,url:mapUrl};
 }
 export async function enrichOvernightAccommodations(trip,plan,{fetchImpl=globalThis.fetch,timeoutMs=5200,onProgress}={}){
   if(typeof fetchImpl!=='function'||trip?.liveData===false)return plan;
