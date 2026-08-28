@@ -1,49 +1,9 @@
-const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
-const valid=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
-const esc=s=>String(s||'').replace(/[^\p{L}\p{N} .,'’&-]/gu,'').trim();
-function center(day){
- const g=(day.geometry||[]).filter(valid);
- return g.length?g[Math.floor(g.length/2)]:(valid(day.toPoint)?day.toPoint:day.fromPoint);
-}
-function query(point,need){
- const blocks=[];
- if(need.has('restaurant'))blocks.push(`nwr(around:8000,${point.lat},${point.lon})["amenity"~"restaurant|cafe"]["name"];`);
- if(need.has('fuel'))blocks.push(`nwr(around:12000,${point.lat},${point.lon})["amenity"="fuel"]["name"];`);
- if(need.has('activity'))blocks.push(`nwr(around:12000,${point.lat},${point.lon})["tourism"~"attraction|museum|viewpoint"]["name"];`);
- return `[out:json][timeout:6][maxsize:4194304];(${blocks.join('')});out center tags 60;`;
-}
-async function fetchOne(endpoint,q,fetchImpl,timeoutMs){
- const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);
- try{const res=await fetchImpl(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body:new URLSearchParams({data:q}),signal:c.signal});if(!res.ok)return[];const data=await res.json();return data?.elements||[]}catch{return[]}finally{clearTimeout(t)}
-}
-function itemFrom(e,day){
- const tags=e.tags||{},p={lat:Number(e.lat??e.center?.lat),lon:Number(e.lon??e.center?.lon)},name=esc(tags.name||tags['name:en']);
- if(!valid(p)||!name)return null;
- let type='activity',reason='Specifieke stop langs de route';
- if(['restaurant','cafe'].includes(tags.amenity)){type='restaurant';reason='Specifieke eetstop langs de dagroute'}
- else if(tags.amenity==='fuel'){type='fuel';reason='Specifiek tankpunt langs de dagroute'}
- return{type,name,lat:p.lat,lon:p.lon,point:p,day:day.day,live:true,source:'OpenStreetMap',reason,mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name+' '+p.lat+','+p.lon)}`};
-}
-export async function fillMissingDayPois(plan,{fetchImpl=globalThis.fetch,timeoutMs=4500}={}){
- if(typeof fetchImpl!=='function')return plan;
- await Promise.allSettled((plan.days||[]).map(async day=>{
-   const p=center(day);if(!valid(p))return;
-   const existing=day.recommendations||[];
-   const need=new Set();
-   if(!existing.some(x=>x.type==='restaurant'))need.add('restaurant');
-   if(!existing.some(x=>x.type==='fuel')&&['outward','transfer','return','daytrip'].includes(day.kind))need.add('fuel');
-   if(!existing.some(x=>x.type==='activity')&&!['return'].includes(day.kind))need.add('activity');
-   if(!need.size)return;
-   const q=query(p,need);
-   const results=(await Promise.all(ENDPOINTS.map(ep=>fetchOne(ep,q,fetchImpl,timeoutMs)))).flat();
-   const seen=new Set(existing.map(x=>`${x.type}:${String(x.name).toLowerCase()}`));
-   for(const raw of results){
-     const item=itemFrom(raw,day);if(!item||!need.has(item.type)||seen.has(`${item.type}:${item.name.toLowerCase()}`))continue;
-     existing.push(item);seen.add(`${item.type}:${item.name.toLowerCase()}`);need.delete(item.type);
-     if(!need.size)break;
-   }
-   day.recommendations=existing;
- }));
- plan.recommendations=(plan.days||[]).flatMap(d=>d.recommendations||[]);
- return plan;
-}
+import {mapConcurrent} from './roadtrip-runtime-engine.js?v=1923';const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'],valid=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)),esc=s=>String(s||'').replace(/[^\p{L}\p{N} .,'’&-]/gu,'').trim(),rad=x=>x*Math.PI/180;
+function km(a,b){if(!valid(a)||!valid(b))return Infinity;const R=6371,d1=rad(b.lat-a.lat),d2=rad(b.lon-a.lon),x=rad(a.lat),y=rad(b.lat),h=Math.sin(d1/2)**2+Math.cos(x)*Math.cos(y)*Math.sin(d2/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}function path(day){const g=(day.geometry||[]).filter(valid);return g.length>=2?g:[day.fromPoint,day.toPoint].filter(valid)}function pointAt(day,f=.5){const g=path(day);return g.length?g[Math.min(g.length-1,Math.max(0,Math.round(f*(g.length-1))))]:null}
+function block(p,type){const q=`${+p.lat},${+p.lon}`;if(type==='restaurant')return`nwr(around:9000,${q})["amenity"~"^(restaurant|cafe|fast_food)$"]["name"];`;if(type==='fuel')return`nwr(around:12000,${q})["amenity"~"^(fuel|charging_station)$"]["name"];`;if(type==='rest')return`nwr(around:10000,${q})["highway"~"^(rest_area|services)$"];nwr(around:7000,${q})["amenity"="parking"]["name"];nwr(around:7000,${q})["amenity"="cafe"]["name"];`;if(type==='activity')return`nwr(around:12000,${q})["tourism"~"^(attraction|museum|viewpoint|gallery)$"]["name"];nwr(around:12000,${q})["historic"]["name"];`;return''}
+async function fetchOne(ep,q,fetchImpl,timeoutMs){const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetchImpl(ep,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body:new URLSearchParams({data:q}),signal:c.signal});if(!r.ok)return[];return(await r.json())?.elements||[]}catch{return[]}finally{clearTimeout(t)}}
+function norm(e,type,target,day){const tags=e.tags||{},point={lat:Number(e.lat??e.center?.lat),lon:Number(e.lon??e.center?.lon)};let name=esc(tags.name||tags['name:nl']||tags['name:en']||tags.brand);if(!valid(point))return null;if(type==='rest'&&!name&&['rest_area','services'].includes(tags.highway))name=tags.highway==='services'?'Serviceplaats':'Rustplaats';if(!name)return null;const ok=type==='restaurant'?['restaurant','cafe','fast_food'].includes(tags.amenity):type==='fuel'?['fuel','charging_station'].includes(tags.amenity):type==='rest'?(['rest_area','services'].includes(tags.highway)||tags.amenity==='parking'||tags.amenity==='cafe'):type==='activity'?Boolean(tags.tourism||tags.historic):false;if(!ok)return null;const d=km(target,point);return{type,name,point,lat:point.lat,lon:point.lon,day:day.day,live:true,genericFallback:false,verified:false,source:'OpenStreetMap via Overpass',detourKm:Number(d.toFixed(1)),reason:`Specifieke ${type} voor dag ${day.day}, dicht bij de geplande route.`,mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name+' '+point.lat+','+point.lon)}`}}
+async function resolve(day,target,type,fetchImpl,timeoutMs,used){const q=`[out:json][timeout:6][maxsize:4194304];(${block(target,type)});out center tags 80;`,raw=(await Promise.all(ENDPOINTS.map(ep=>fetchOne(ep,q,fetchImpl,timeoutMs)))).flat(),rows=raw.map(e=>norm(e,type,target,day)).filter(Boolean).filter(x=>!used.has(`${type}:${x.name.toLowerCase()}`)).sort((a,b)=>a.detourKm-b.detourKm),best=rows[0];if(best)used.add(`${type}:${best.name.toLowerCase()}`);return best||null}
+const pending=(d,t)=>(d.recommendations||[]).filter(x=>x.type===t&&(!x.live||x.genericFallback===true)),resolved=(d,t)=>(d.recommendations||[]).filter(x=>x.type===t&&x.live&&x.genericFallback!==true&&valid(x.point));
+function jobsFor(day){const out=[],travel=['outward','transfer','return','daytrip'].includes(day.kind),distance=+day.distanceKm||0,hours=+day.roadHours||+day.driveHours||0;for(const type of ['restaurant','fuel','rest','activity']){const unresolved=pending(day,type);unresolved.forEach(item=>valid(item.point)&&out.push({type,point:item.point,replace:item}));if(resolved(day,type).length||unresolved.length)continue;if(type==='restaurant')out.push({type,point:pointAt(day,.52)});if(type==='rest'&&travel&&(distance>=70||hours>=1.4))out.push({type,point:pointAt(day,.42)});if(type==='fuel'&&travel&&distance>=90)out.push({type,point:pointAt(day,.62)});if(type==='activity'&&day.kind!=='return')out.push({type,point:day.destinationPoint||day.toPoint||pointAt(day,.65)})}return out.filter(x=>valid(x.point))}
+export async function fillMissingDayPois(plan,{trip={},fetchImpl=globalThis.fetch,timeoutMs=4500,onProgress}={}){if(typeof fetchImpl!=='function')return plan;const jobs=[];for(const day of plan.days||[])for(const job of jobsFor(day))jobs.push({day,...job});const used=new Set((plan.recommendations||[]).filter(x=>x.live&&x.genericFallback!==true).map(x=>`${x.type}:${String(x.name).toLowerCase()}`));let completed=0;await mapConcurrent(jobs,async job=>{const found=await resolve(job.day,job.point,job.type,fetchImpl,timeoutMs,used);if(found){const recs=job.day.recommendations||[],i=job.replace?recs.indexOf(job.replace):-1;if(i>=0)recs.splice(i,1,found);else recs.push(found);job.day.recommendations=recs}completed++;onProgress?.({completed,total:jobs.length,type:job.type,day:job.day.day,found:Boolean(found),name:found?.name||null})},{concurrency:Math.min(6,Math.max(1,jobs.length))});plan.recommendations=(plan.days||[]).flatMap(d=>d.recommendations||[]);return plan}

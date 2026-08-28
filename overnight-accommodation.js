@@ -1,4 +1,4 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1922';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1923';
 
 const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const NOMINATIM='https://nominatim.openstreetmap.org/search';
@@ -23,13 +23,13 @@ async function nominatimFallback(day,trip,fetchImpl,timeoutMs){
  const word=requested==='camping'?'camping':requested==='hotel-bnb'?'hotel':'hotel';
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
-   const u=new URL(NOMINATIM);u.search=new URLSearchParams({format:'jsonv2',q:`${word} ${place}`,limit:'8',addressdetails:'1'});
+   const u=new URL(NOMINATIM);u.search=new URLSearchParams({format:'jsonv2',q:`${word} ${place}`,limit:'12',addressdetails:'1',extratags:'1'});
    const r=await fetchImpl(u,{headers:{accept:'application/json'},signal:controller.signal});if(!r.ok)return[];
    const rows=await r.json();
-   return(rows||[]).map((row,i)=>({id:`nominatim-${row.osm_type||'place'}-${row.osm_id||row.place_id||i}`,name:row.display_name?.split(',')[0]||row.name||place,point:{lat:Number(row.lat),lon:Number(row.lon)},tags:{tourism:requested==='camping'?'camp_site':'hotel',source:'nominatim'}})).filter(x=>valid(x.point));
+   return(rows||[]).map((row,i)=>{const extra=row.extratags||{},rawType=String(extra.tourism||row.type||'').toLowerCase(),camping=['camp_site','caravan_site'].includes(rawType),lodging=['hotel','guest_house','hostel','motel','apartment','chalet','bed_and_breakfast'].includes(rawType);if(requested==='camping'&&!camping)return null;if(requested==='hotel-bnb'&&!lodging)return null;if(requested==='any'&&!camping&&!lodging)return null;return{id:`nominatim-${row.osm_type||'place'}-${row.osm_id||row.place_id||i}`,name:row.display_name?.split(',')[0]||row.name||place,point:{lat:Number(row.lat),lon:Number(row.lon)},tags:{...extra,tourism:rawType,source:'nominatim'}}}).filter(x=>x&&valid(x.point));
  }catch{return[]}finally{clearTimeout(timer)}
 }
-function buildItem(best,trip){const evidence=[],t=best.place.tags||{};if(trip.transport==='motorcycle'){if(['yes','designated','permissive'].includes(String(t.motorcycle||t['access:motorcycle']||'').toLowerCase()))evidence.push('motor-toegang bevestigd');if(String(t.garage||t['parking:garage']||'').toLowerCase()==='yes')evidence.push('garage');if(String(t.covered||t['parking:covered']||'').toLowerCase()==='yes')evidence.push('overdekte parking');if(t.parking||t['parking:condition'])evidence.push('parking vermeld')}return{type:'accommodation',name:best.place.name,point:best.place.point,live:true,source:t.source==='nominatim'?'OpenStreetMap Nominatim':'OpenStreetMap Overpass',vehicleFit:true,vehicleFitScore:Math.round(best.score),vehicleFitEvidence:evidence,distanceFromOvernightKm:Number(best.distanceKm.toFixed(1)),reason:trip.transport==='motorcycle'?`Geselecteerd voor motorreis op verblijfstype, nabijheid en ${evidence.length?evidence.join(', '):'beschikbare voertuig-/parkeerinformatie'}.`:'Geselecteerd op voertuigtype, verblijfstype en nabijheid.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(best.place.name+' '+best.place.point.lat+','+best.place.point.lon)}`}}
+function buildItem(best,trip){const evidence=[],t=best.place.tags||{};if(trip.transport==='motorcycle'){if(['yes','designated','permissive'].includes(String(t.motorcycle||t['access:motorcycle']||'').toLowerCase()))evidence.push('motor-toegang bevestigd');if(String(t.garage||t['parking:garage']||'').toLowerCase()==='yes')evidence.push('garage');if(String(t.covered||t['parking:covered']||'').toLowerCase()==='yes')evidence.push('overdekte parking');if(t.parking||t['parking:condition'])evidence.push('parking vermeld')}return{type:'accommodation',name:best.place.name,point:best.place.point,live:true,genericFallback:false,source:t.source==='nominatim'?'OpenStreetMap Nominatim':'OpenStreetMap Overpass',vehicleFit:true,vehicleFitScore:Math.round(best.score),vehicleFitEvidence:evidence,distanceFromOvernightKm:Number(best.distanceKm.toFixed(1)),reason:trip.transport==='motorcycle'?`Geselecteerd voor motorreis op verblijfstype, nabijheid en ${evidence.length?evidence.join(', '):'beschikbare voertuig-/parkeerinformatie'}.`:'Geselecteerd op voertuigtype, verblijfstype en nabijheid.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(best.place.name+' '+best.place.point.lat+','+best.place.point.lon)}`}}
 export async function enrichOvernightAccommodations(trip,plan,{fetchImpl=globalThis.fetch,timeoutMs=14000,onProgress}={}){
  if(typeof fetchImpl!=='function'||trip?.liveData===false)return plan;
  const days=(plan?.days||[]).filter(day=>day.kind!=='return'&&day.to!==trip.origin&&valid(day.toPoint));
@@ -37,7 +37,7 @@ export async function enrichOvernightAccommodations(trip,plan,{fetchImpl=globalT
  await mapConcurrent(days,async day=>{
    const placeName=day.to||day.overnight||day.location||'overnachtingsplaats';
    let ranked=[];
-   for(const radiusKm of [12,25,45]){
+   for(const radiusKm of [10,20,35,55]){
      onProgress?.({type:'accommodation-search-start',completed,total,day:day.day,placeName,radiusKm});
      const found=await overpassSearch(day.toPoint,trip,radiusKm,fetchImpl,timeoutMs);
      ranked=found.map(place=>({place,distanceKm:km(day.toPoint,place.point)})).filter(x=>x.distanceKm<=radiusKm+3).map(x=>({...x,score:accommodationSuitability(x.place.tags,trip,x.distanceKm)})).filter(x=>Number.isFinite(x.score)).sort((a,b)=>b.score-a.score||a.distanceKm-b.distanceKm);

@@ -1,0 +1,42 @@
+{
+  "release": "1.13.0 / 1923",
+  "baseline": "user-uploaded 1.12.0 / 1922",
+  "implemented": {
+    "pending": "30 realistic clean generated images; no embedded text; randomised each pending run; one image per second; image caption removed.",
+    "pois": "Pending placeholders no longer count as resolved. Restaurant, fuel, rest and activity are explicitly resolved to named OSM places; accommodation uses stricter typed lookup.",
+    "map": "Resolved POIs stay in plan.recommendations, so the existing map engine displays accommodation/food/fuel/rest/activity markers.",
+    "budget": "Actual routed day kilometres, country-aware fuel/lodging/food/parking assumptions, realistic room count, low/expected/high range and confidence.",
+    "base_trip": "5-day base-plan logic now searches alternative reachable bases if the initially best-scoring base lacks the required number of distinct day trips."
+  },
+  "verification": {
+    "syntax": {
+      "start-new-trip.js": true,
+      "app.js": true,
+      "trip-model.js": true,
+      "roadtrip-runtime-engine.js": true,
+      "ui-feature-flags.js": true,
+      "service-worker.js": true,
+      "poi-gap-filler.js": true,
+      "trip-model-1909.js": true,
+      "budget-engine.js": true,
+      "routing-provider-1914.js": true,
+      "config.js": true,
+      "proposal-engine.js": true,
+      "planner-submit-guard.js": true,
+      "overnight-accommodation.js": true,
+      "regional-overnight-provider.js": true
+    },
+    "pending_images": 30,
+    "pending_interval_ms": 1000,
+    "budget_5day_saasveld_germany": {
+      "total": 1218,
+      "low": 1121,
+      "high": 1315,
+      "distance": 720,
+      "fuel": 92,
+      "accommodation": 475,
+      "confidence": "hoog"
+    },
+    "android_live_network_not_executed_here": true
+  }
+}
