@@ -156,37 +156,83 @@ function balancedBlockSizes(nightCount,blockCount){
  * and dramatically cheaper. Once a block path is found, it is expanded into
  * deliberate multi-night stays.
  */
-function solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targetDistinct,blockCount}){
+function bearingFrom(origin,p){
+  if(!finitePoint(origin)||!finitePoint(p))return 0;
+  const r=x=>Number(x)*Math.PI/180,y=Math.sin(r(p.lon-origin.lon))*Math.cos(r(p.lat)),x=Math.cos(r(origin.lat))*Math.sin(r(p.lat))-Math.sin(r(origin.lat))*Math.cos(r(p.lat))*Math.cos(r(p.lon-origin.lon));
+  return(Math.atan2(y,x)*180/Math.PI+360)%360
+}
+
+/*
+ * Keep the combinatorial solver independent of catalogue size.
+ *
+ * ReisSlim may accumulate hundreds of live proposal/overnight candidates while
+ * the user reviews cards. Passing every one of those points into the beam search
+ * made selection time grow roughly linearly with catalogue size for every beam
+ * state and, when the real topology was impossible, repeated that work for many
+ * target/block combinations. On a phone this monopolised the UI thread before
+ * the first progress update, which is why the overlay appeared frozen at 4%.
+ *
+ * We therefore reduce the live pool to a bounded, geographically diverse set.
+ * This is not a geographic exception: buckets are derived only from the current
+ * origin, anchor and daily leg budget. If the bounded real pool still cannot form
+ * a route, the generic provisional resolver path remains the deterministic next
+ * stage and later resolves those coordinates to real named places.
+ */
+function preselectRoadtripPool(pool,origin,anchor,trip,maxRoadKm,limit=64){
+  if((pool||[]).length<=limit)return[...(pool||[])];
+  const rows=(pool||[]).map((p,index)=>{
+    const originRoad=estimatedRoadKm(origin,p),anchorRoad=finitePoint(anchor)?estimatedRoadKm(p,anchor):Infinity;
+    const bearing=bearingFrom(origin,p),sector=Math.floor(bearing/30)%12;
+    const radial=Math.max(0,Math.min(7,Math.floor(originRoad/Math.max(1,maxRoadKm)*1.35)));
+    const quality=Number(p.preferenceScore||0)*.55+Number(p.poiRichness||0)*.30+Number(p.vehicleScore||0)*5;
+    const anchorBonus=finitePoint(anchor)?Math.max(0,180-anchorRoad*.45):0;
+    const comfort=Math.max(0,80-Math.abs(originRoad-Math.min(maxRoadKm*.72,230))*.20);
+    return{p,index,originRoad,anchorRoad,sector,radial,merit:quality+anchorBonus+comfort}
+  });
+  const chosen=[],ids=new Set();
+  const add=row=>{if(!row||ids.has(row.p.catalogId))return;ids.add(row.p.catalogId);chosen.push(row.p)};
+
+  // Preserve the selected region / closest anchor neighbours first.
+  if(finitePoint(anchor))rows.slice().sort((a,b)=>a.anchorRoad-b.anchorRoad||b.merit-a.merit).slice(0,10).forEach(add);
+
+  // One strong point from every radial/azimuth bucket preserves connected chains
+  // and loop geometry even when the catalogue is very dense in one city cluster.
+  const buckets=new Map();
+  for(const row of rows){const key=`${row.radial}:${row.sector}`,old=buckets.get(key);if(!old||row.merit>old.merit)buckets.set(key,row)}
+  [...buckets.values()].sort((a,b)=>a.radial-b.radial||b.merit-a.merit).forEach(add);
+
+  // Preserve globally strong user/vehicle matches, then fill by solver merit.
+  rows.slice().sort((a,b)=>b.merit-a.merit||a.index-b.index).slice(0,16).forEach(add);
+  for(const row of rows.slice().sort((a,b)=>b.merit-a.merit||a.index-b.index)){if(chosen.length>=limit)break;add(row)}
+  return chosen.slice(0,limit)
+}
+
+function solveRoadtripBlockCount({origin,trip,destination,pool,maxRoadKm,blockCount}){
   const anchor=destination?.bases?.[0]||destination?.anchor||null;
   const destinationId=destination?.id||null;
   const targetLeg=Math.min(maxRoadKm*.62,trip?.transport==='motorcycle'?185:220);
-  const beamWidth=Math.min(180,Math.max(64,pool.length*7));
-  let beam=[{blocks:[],score:0}];
+  const beamWidth=Math.min(56,Math.max(28,pool.length));
+  let beam=[{blocks:[],used:new Set(),score:0}];
 
   for(let block=0;block<blockCount;block++){
     const remainingBlocks=blockCount-block-1,next=[];
     for(const row of beam){
       const current=row.blocks.at(-1)||origin;
       for(const p of pool){
-        if(row.blocks.length&&current.catalogId===p.catalogId)continue;
+        if(row.used.has(p.catalogId))continue;
         const road=estimatedRoadKm(current,p);
         if(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm)continue;
 
-        // A loop must still be geometrically capable of getting home using the
-        // remaining move blocks plus the final return leg.
         const home=estimatedRoadKm(p,origin);
         if(trip?.routeTopology!=='open-ended'&&home>maxRoadKm*Math.max(1,remainingBlocks+1))continue;
 
-        const blocks=[...row.blocks,p],distinct=new Set(blocks.map(x=>x.catalogId)).size;
-        if(distinct+remainingBlocks<targetDistinct)continue;
-
         const anchorRoad=finitePoint(anchor)?estimatedRoadKm(p,anchor):0;
-        const anchorBonus=(p.catalogId===destinationId?220:0)+(finitePoint(anchor)?Math.max(0,150-anchorRoad*.45):0);
+        const anchorBonus=(p.catalogId===destinationId?240:0)+(finitePoint(anchor)?Math.max(0,170-anchorRoad*.48):0);
         const legComfort=Math.abs(road-targetLeg);
-        const preferenceBonus=Number(p.preferenceScore||0)*.4+Number(p.poiRichness||0)*.24+Number(p.vehicleScore||0)*4;
-        const variety=distinct*165;
-        const returnBonus=trip?.routeTopology==='open-ended'?0:(remainingBlocks<=1?Math.max(0,120-home*.22):0);
-        next.push({blocks,score:row.score+anchorBonus+preferenceBonus+variety+returnBonus-legComfort*.16});
+        const preferenceBonus=Number(p.preferenceScore||0)*.45+Number(p.poiRichness||0)*.26+Number(p.vehicleScore||0)*4;
+        const returnBonus=trip?.routeTopology==='open-ended'?0:(remainingBlocks<=1?Math.max(0,130-home*.24):0);
+        const used=new Set(row.used);used.add(p.catalogId);
+        next.push({blocks:[...row.blocks,p],used,score:row.score+anchorBonus+preferenceBonus+returnBonus-legComfort*.17});
       }
     }
     next.sort((a,b)=>b.score-a.score);
@@ -195,17 +241,12 @@ function solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targ
   }
 
   const best=beam.filter(row=>{
-    const distinct=new Set(row.blocks.map(x=>x.catalogId)).size;
-    if(distinct<targetDistinct||!anchorVisited(row.blocks,anchor,destinationId,origin,trip))return false;
+    if(!anchorVisited(row.blocks,anchor,destinationId,origin,trip))return false;
     if(trip?.routeTopology==='open-ended')return true;
     const home=estimatedRoadKm(row.blocks.at(-1),origin);
     return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm
   }).sort((a,b)=>b.score-a.score)[0];
-  if(!best)return[];
-
-  const sizes=balancedBlockSizes(nights,blockCount),expanded=[];
-  best.blocks.forEach((p,i)=>{for(let n=0;n<sizes[i];n++)expanded.push(p)});
-  return expanded
+  return best?.blocks||[]
 }
 
 
@@ -315,27 +356,35 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
 
   if(!finitePoint(origin)||nights<1)return[];
 
-  const pool=(candidates||[])
+  let pool=(candidates||[])
     .filter(p=>finitePoint(p)&&p.catalogId)
     .filter(p=>estimatedRoadKm(origin,p)>=ROADTRIP_POLICY.minRoadMoveKm)
     .filter(p=>candidateRelevant(p,origin,anchor,trip));
 
   if(!pool.length)return buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,maxChanges});
 
-  // Preferred diversity is attempted first. Only if the real candidate topology
-  // cannot satisfy it do we fall back one level at a time, never below two real
-  // overnight regions for a multi-night moving roadtrip.
-  const maxBlocks=Math.max(1,Math.min(nights,maxChanges+1));
-  const comfortBlocks=Math.ceil(nights/ROADTRIP_POLICY.preferredMaxStayNights);
-  for(let target=preferred;target>=hardMinimum;target--){
-    const minimumBlocks=Math.min(maxBlocks,Math.max(target,comfortBlocks));
-    for(let blockCount=minimumBlocks;blockCount<=maxBlocks;blockCount++){
-      const path=solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targetDistinct:target,blockCount});
-      if(path.length===nights)return path
-    }
+  pool=preselectRoadtripPool(pool,origin,anchor,trip,maxRoadKm,64);
+  const maxBlocks=Math.max(1,Math.min(nights,maxChanges+1,pool.length));
+  const comfortBlocks=Math.min(maxBlocks,Math.ceil(nights/ROADTRIP_POLICY.preferredMaxStayNights));
+  const desired=Math.max(hardMinimum,Math.min(maxBlocks,Math.max(preferred,comfortBlocks)));
+
+  // Bounded attempt order. Older builds restarted an almost identical beam search
+  // for every (targetDistinct × blockCount) pair. The block solver never revisits
+  // a region, so blockCount already equals distinct accommodation regions and the
+  // second dimension was redundant. At most five searches are now needed.
+  const order=[];const add=n=>{n=Math.max(hardMinimum,Math.min(maxBlocks,Math.round(n)));if(n>=1&&!order.includes(n))order.push(n)};
+  add(desired);add(desired+1);add(desired-1);add(maxBlocks);add(hardMinimum);
+  for(const blockCount of order){
+    if(blockCount>pool.length)continue;
+    const blocks=solveRoadtripBlockCount({origin,trip,destination,pool,maxRoadKm,blockCount});
+    if(!blocks.length)continue;
+    const sizes=balancedBlockSizes(nights,blockCount),expanded=[];
+    blocks.forEach((p,i)=>{for(let n=0;n<sizes[i];n++)expanded.push(p)});
+    if(expanded.length===nights)return expanded
   }
   return buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,maxChanges})
 }
+
 
 function prefScore(p,trip){
   return Number(p.preferenceScore||0)+Number(p.poiRichness||0)*1.4+Number(p.vehicleScore||0)*8

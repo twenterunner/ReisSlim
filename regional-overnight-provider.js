@@ -1,5 +1,5 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1941';
-import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1941';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1942';
+import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1942';
 
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';

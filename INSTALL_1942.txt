@@ -1,0 +1,7 @@
+ReisSlim 1.15.2 / build 1942
+
+Upload every file from the runtime ZIP directly to the repository root.
+Overwrite files with the same name. release-sync-1942.js is new and must also be uploaded.
+The old release-sync-1941.js may remain; build 1942 removes older release-sync tags at runtime and injects 1942.
+
+After GitHub Pages deploys, close/reopen the page or refresh once. The footer/version label must show 1.15.2 / 1942 before testing.
