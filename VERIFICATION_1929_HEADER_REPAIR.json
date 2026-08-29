@@ -1,0 +1,34 @@
+{
+  "release": "ReisSlim 1.14.2 / 1929 header & activation repair",
+  "repo_evidence": {
+    "config_current": "1.14.2 / 1929",
+    "physical_ui_feature_flags_stale": "1.13.0 / 1923",
+    "physical_index_stale": "1.13.0-1923-data-engine",
+    "meaning": "Visible revision still depends on service-worker rewriting/injected release synchronizer."
+  },
+  "root_cause": "The functional 1929 files are on GitHub, but the repository still contains older physical bootstrap/UI release markers. If the 1929 worker has not activated, the header can be produced by an older controller. The 1929 worker also used atomic cache.addAll(ASSETS), so any failed precache request could abort worker installation.",
+  "correction": {
+    "1928_controller_bridge": "release-sync-1928.js now displays 1.14.2 / 1929.",
+    "worker_install": "Precache is per-asset Promise.allSettled; one failure cannot prevent activation.",
+    "functional_1929_logic_changed": false
+  },
+  "verification": {
+    "syntax": {
+      "config.js": true,
+      "service-worker.js": true,
+      "release-sync-1928.js": true,
+      "release-sync-1929.js": true
+    },
+    "checks": {
+      "release_remains_1_14_2_1929": true,
+      "new_cache_epoch": true,
+      "atomic_cache_addall_removed": true,
+      "tolerant_preload_present": true,
+      "skip_waiting_present": true,
+      "clients_claim_present": true,
+      "old_1928_bridge_reports_current_release": true,
+      "current_1929_sync_reports_current_release": true
+    },
+    "android_device_not_executed_here": true
+  }
+}

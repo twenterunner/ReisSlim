@@ -1,4 +1,4 @@
-const CACHE='reisslim-v1.14.2-build-1929-complete-stops';
+const CACHE='reisslim-v1.14.2-build-1929-header-repair';
 const IMAGE_CACHE='reisslim-runtime-images-v2';
 const RELEASE_VERSION='1.14.2';
 const RELEASE_BUILD='1929';
@@ -14,7 +14,22 @@ const ASSETS=[
 './weather-engine.js','./image-provider.js','./map-view.js','./gpx-generator.js','./ui-renderer.js','./ui-feature-flags.js','./poi-gap-filler.js','./pending-overlay-fix.css',
 './roadtrip-runtime-engine.js','./start-new-trip.js','./planner-submit-guard.js','./route-stop-provider-1929.js','./overnight-accommodation-1929.js','./release-sync-1929.js'
 ];
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting()});
+self.addEventListener('install',event=>{
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE);
+    // Do not let one stale/missing/transient asset abort the entire service-worker update.
+    // Code is network-first/no-store below, so precaching is convenience, not correctness.
+    await Promise.allSettled(ASSETS.map(async asset=>{
+      try{
+        const response=await fetch(asset,{cache:'no-store'});
+        if(response&&response.ok)await cache.put(asset,response.clone());
+      }catch(error){
+        console.warn('ReisSlim precache overgeslagen',asset,error);
+      }
+    }));
+  })());
+  self.skipWaiting();
+});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith('reisslim-')&&key!==CACHE&&key!==IMAGE_CACHE).map(key=>caches.delete(key)));await self.clients.claim()})())});
 function syncSourceText(text){return String(text)
 .replace(/1\.13\.0-1923-data-engine/g,'1.14.2-1929-complete-stops')
