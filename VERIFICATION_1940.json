@@ -1,0 +1,13 @@
+{
+  "version": "1.15.0",
+  "build": "1940",
+  "approach": "general-adaptive-no-location-patches",
+  "route_matrix": {"executed": 1200, "passed": 1200, "failed": 0},
+  "generic_origin_discovery": {"executed": 5, "passed": 5, "failed": 0},
+  "static_architecture_checks": "passed",
+  "syntax_checks": "passed",
+  "image_benchmark_10_cards_ms": {"20ms_source": 27.8, "100ms_source": 101.4, "400ms_source": 402.3},
+  "image_requests_for_10_cards": 10,
+  "android_device_end_to_end": false,
+  "live_site_verified": false
+}

@@ -1,17 +1,13 @@
-import { resolveOrigin } from './trip-model.js';
-import { haversineKm } from './route-engine.js';
+import { resolveOrigin } from './trip-model.js?v=1940';
+import { haversineKm } from './route-engine.js?v=1940';
 
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
 const OVERPASS_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const GOLDEN_ANGLE=137.507764,DEFAULT_BATCH_SEEDS=12,DEFAULT_RESULT_LIMIT=72,DISCOVERY_PASSES=3;
-const CACHE_PREFIX='reisslim.destination-resilient.v5';
+const CACHE_PREFIX='reisslim.destination-resilient.v6-generic';
 const FRESH_MS=30*24*60*60*1000,STALE_MS=180*24*60*60*1000;
 const countryCosts={CH:185,DK:155,NO:165,SE:145,AT:150,IT:150,FR:140,DE:125,BE:125,CZ:105,PL:100,SI:125,HR:120,ES:125,PT:115};
-const REGIONAL_MOTOR_ANCHORS=[
-{id:'region-sauerland',name:'Sauerland',country:'Duitsland',lat:51.192,lon:8.533,tags:['motor','natuur','bergen','wandelen']},
-{id:'region-eifel',name:'Eifel',country:'Duitsland',lat:50.407,lon:6.939,tags:['motor','natuur','bergen','wandelen']}
-];
 const finite=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
 const slug=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,55);
 const hash=v=>[...String(v)].reduce((s,c)=>((s*31)+c.charCodeAt(0))>>>0,2166136261);
@@ -27,7 +23,6 @@ function profileFromPoint(trip,p,tags={},source='multi-source'){const origin=res
  return{id:`live-${slug(name)}-${Math.round(p.lat*100)}-${Math.round(p.lon*100)}`,name:`${name} & omgeving`,country,distanceKm,driveHours:Number((distanceKm/(multimodal?780:88)).toFixed(1)),nightMid,activityDaily:38+seed%25,toll:multimodal?0:Math.round(distanceKm*.025),tags:[...new Set(['natuur','cultuur','eten',...extra,...(trip.transport==='motorcycle'?['motor']:[])])],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:6+seed%4,motorcycle:7+(seed>>3)%3,camper:6+(seed>>5)%4,weather:5+(seed>>7)%4,crowds:6+(seed>>9)%4,summary:`Live ontdekt reisgebied rond ${name}; meerdere kaartbronnen en een lokale cache voorkomen afhankelijkheid van één server.`,pros:['Live ontdekt via meerdere kaartbronnen','Herbruikbaar uit lokale cache','Route, verblijf en POI’s worden na selectie apart gecontroleerd'],cons:['Prijzen en actuele openingstijden worden later gecontroleerd'],routeStops:[],bases:[base],activities:[{type:'natuur',title:`Verken natuur en uitzicht rond ${name}.`,rainAlternative:`Kies een compacte binnenactiviteit in ${name}.`,tags:['natuur']},{type:trip.transport==='motorcycle'?'motor':'cultuur',title:trip.transport==='motorcycle'?`Rijd een landschappelijke lus rond ${name}.`:`Verken ${name} en omgeving.`,rainAlternative:`Kies een kortere lokale route.`,tags:trip.transport==='motorcycle'?['motor','natuur']:['cultuur']}],poiRichness:45,dynamic:true,roadtripCandidate:true,discoverySource:`OpenStreetMap ${source}`,discoveredAt:new Date().toISOString()}}
 function pointOf(el){return finite(el)?{lat:Number(el.lat),lon:Number(el.lon)}:finite(el?.center)?{lat:Number(el.center.lat),lon:Number(el.center.lon)}:null}
 export function normalizeDiscoveredDestinations(trip,payload,{excludedIds=[],limit=DEFAULT_RESULT_LIMIT}={}){const ex=new Set(excludedIds),seen=[];for(const el of payload?.elements||[]){const p=pointOf(el),tags=el.tags||{},name=tags['name:nl']||tags.name||tags['name:en'];if(!p||!name)continue;const item=profileFromPoint(trip,{...p,name,country:tags['is_in:country']||tags['addr:country'],countryCode:tags['is_in:country_code']||tags['addr:country']},tags,'Overpass');if(!item||ex.has(item.id)||seen.some(x=>haversineKm(x.bases[0],item.bases[0])<14))continue;seen.push(item);if(seen.length>=limit)break}return seen}
-function regionalMotorAnchors(trip,excludedIds=[]){if(trip.transport!=='motorcycle'||Number(trip.days||0)<1||Number(trip.days||0)>5)return[];const origin=resolveOrigin(trip);if(!origin)return[];const ex=new Set(excludedIds);return REGIONAL_MOTOR_ANCHORS.map(a=>{if(ex.has(a.id)||haversineKm(origin,a)>650)return null;const distanceKm=Math.round(haversineKm(origin,a)*1.18);return{id:a.id,name:`${a.name} & omgeving`,country:a.country,distanceKm,driveHours:Number((distanceKm/88).toFixed(1)),nightMid:120,activityDaily:42,toll:0,tags:a.tags,season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:10,camper:7,weather:7,crowds:7,summary:`Sterke motorregio rond ${a.name}.`,pros:['Sterke motorregio op korte afstand','Veel bochtige daglussen mogelijk'],cons:['Weer kan wisselen'],routeStops:[],bases:[{name:a.name,lat:a.lat,lon:a.lon}],activities:[],poiRichness:60,dynamic:false,discoverySource:'ReisSlim regional anchor'}}).filter(Boolean)}
 function cacheKey(trip,cursor){return`${CACHE_PREFIX}:${String(trip.origin).toLowerCase()}:${trip.destinationQuery||''}:${trip.travelMode||''}:${trip.days||0}:${trip.maxDrive||0}:${cursor}`}
 function cacheRead(storage,k,maxAge){try{const r=JSON.parse(storage?.getItem(k)||'null');if(!r?.savedAt||!Array.isArray(r.value)||Date.now()-r.savedAt>maxAge)return null;return r.value}catch{return null}}
 function cacheWrite(storage,k,value){try{storage?.setItem(k,JSON.stringify({savedAt:Date.now(),value}))}catch{}}
@@ -41,7 +36,7 @@ async function overpass(trip,cursor,fetchImpl,timeoutMs,onProgress){const q=buil
 function dedupe(items,excludedIds){const ex=new Set(excludedIds),out=[];for(const item of items||[]){if(!item||ex.has(item.id)||out.some(x=>haversineKm(x.bases?.[0],item.bases?.[0])<14))continue;out.push(item)}return out}
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fetchImpl=globalThis.fetch,storage=globalThis.localStorage,timeoutMs=5200,bypassCache=false,onProgress,onBatch}={}){
- const origin=resolveOrigin(trip);if(!origin)return{destinations:regionalMotorAnchors(trip,excludedIds),live:false,reason:'Vertrekcoördinaten ontbreken.'};
+ const origin=resolveOrigin(trip);if(!origin)return{destinations:[],live:false,reason:'Vertrekcoördinaten ontbreken.'};
  onProgress?.({type:'discovery-start',origin:trip.origin,reachKm:reachFor(trip),totalPasses:DISCOVERY_PASSES});
  const all=[];let cacheHits=0,successful=0;
  for(let pass=0;pass<DISCOVERY_PASSES;pass++){
@@ -55,28 +50,14 @@ export async function discoverDestinationBatch(trip,{cursor=0,excludedIds=[],fet
      onProgress?.({type:'provider-stage',message:'Snelle plaatsendienst en OpenStreetMap-detailservers parallel raadplegen…'});
      const photon=await mapConcurrent(seeds,s=>photonReverse(s,fetchImpl,Math.min(3200,timeoutMs)),6);
      rows=dedupe(photon.map(p=>p?profileFromPoint(trip,p,{},'Photon'):null).filter(Boolean),excludedIds);
-     if(rows.length<6){
-       const op=await overpass(trip,current,fetchImpl,Math.min(4200,timeoutMs),onProgress);
-       rows=dedupe([...rows,...op],excludedIds);
-     }
-     if(rows.length<3){
-       for(let i=0;i<Math.min(2,seeds.length);i++){
-         if(i)await wait(1050);
-         const p=await nominatimReverse(seeds[i],fetchImpl,Math.min(3000,timeoutMs));
-         const item=p&&profileFromPoint(trip,p,{},'Nominatim');
-         if(item)rows=dedupe([...rows,item],excludedIds);
-       }
-     }
-     if(rows.length)cacheWrite(storage,k,rows);
-     else{
-       const stale=cacheRead(storage,k,STALE_MS);
-       if(stale?.length)rows=stale.map(x=>({...x,cacheStale:true,discoverySource:'ReisSlim resilient cache'}));
-     }
+     if(rows.length<6){const op=await overpass(trip,current,fetchImpl,Math.min(4200,timeoutMs),onProgress);rows=dedupe([...rows,...op],excludedIds)}
+     if(rows.length<3){for(let i=0;i<Math.min(2,seeds.length);i++){if(i)await wait(1050);const p=await nominatimReverse(seeds[i],fetchImpl,Math.min(3000,timeoutMs));const item=p&&profileFromPoint(trip,p,{},'Nominatim');if(item)rows=dedupe([...rows,item],excludedIds)}}
+     if(rows.length)cacheWrite(storage,k,rows);else{const stale=cacheRead(storage,k,STALE_MS);if(stale?.length)rows=stale.map(x=>({...x,cacheStale:true,discoverySource:'ReisSlim resilient cache'}))}
    }
    if(rows?.length){successful++;all.push(...rows);onBatch?.({destinations:rows,pass:pass+1});onProgress?.({type:'pass-success',pass:pass+1,totalPasses:DISCOVERY_PASSES,newDestinations:rows.length,totalDestinations:all.length,totalCandidateElements:all.length})}
    else onProgress?.({type:'pass-empty',pass:pass+1,totalPasses:DISCOVERY_PASSES,reason:'Geen bruikbare regio uit deze zoekzone.'});
  }
- const anchors=regionalMotorAnchors(trip,excludedIds),destinations=dedupe([...anchors,...all],excludedIds).slice(0,DEFAULT_RESULT_LIMIT);
+ const destinations=dedupe(all,excludedIds).slice(0,DEFAULT_RESULT_LIMIT);
  if(destinations.length){onProgress?.({type:'discovery-complete',totalDestinations:destinations.length,candidateElements:all.length,successfulPasses:successful,totalPasses:DISCOVERY_PASSES});return{destinations,live:successful>0,cached:cacheHits===DISCOVERY_PASSES,source:'OpenStreetMap multi-source + resilient cache',passes:DISCOVERY_PASSES,candidateElements:all.length}}
  onProgress?.({type:'discovery-failure',reason:'Geen nieuwe regio gevonden via de beschikbare kaartbronnen.'});return{destinations:[],live:false,reason:'Geen nieuwe regio gevonden via de beschikbare kaartbronnen.'}
 }
