@@ -1,0 +1,17 @@
+{
+  "release": "ReisSlim 1.14.1 build 1928 startup recovery",
+  "root_cause": "release-sync-1928.js installed a MutationObserver on document.documentElement with childList:true,subtree:true. Its callback called sync(), and sync() assigned textContent to #headerRevision and #versionLabel. Those assignments themselves create child-list mutations, scheduling the same observer again. The observer could therefore continuously call itself until its 10-second disconnect timer, starving normal startup work.",
+  "current_repo_evidence": {
+    "service_worker": "Current 1.14.1 service worker injects release-sync-1928.js into navigation HTML.",
+    "release_sync": "Current release-sync-1928.js uses MutationObserver(()=>sync()) and sync() rewrites textContent."
+  },
+  "correction": "Removed the MutationObserver. Revision text is updated idempotently at DOMContentLoaded plus five bounded retries. No callback can trigger itself.",
+  "verification": {
+    "javascript_syntax": true,
+    "self_triggering_mutation_observer_removed": true,
+    "bounded_retry_count": 5,
+    "same_version_and_build_preserved": "1.14.1 / 1928",
+    "full_android_device_execution_not_available_here": true
+  },
+  "deployment": "Overwrite only release-sync-1928.js in the repository root. Because the 1.14.1 service worker fetches JS with cache:'no-store', the corrected script should be used on the next reload/close-reopen without replacing the rest of the release."
+}
