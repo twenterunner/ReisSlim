@@ -1,7 +1,7 @@
-const CACHE='reisslim-v1.14.2-build-1929-header-repair';
+const CACHE='reisslim-v1.14.3-build-1930-roadtrip-policy';
 const IMAGE_CACHE='reisslim-runtime-images-v2';
-const RELEASE_VERSION='1.14.2';
-const RELEASE_BUILD='1929';
+const RELEASE_VERSION='1.14.3';
+const RELEASE_BUILD='1930';
 const ASSETS=[
 './pending-01.webp','./pending-02.webp','./pending-03.webp','./pending-04.webp','./pending-05.webp','./pending-06.webp','./pending-07.webp','./pending-08.webp','./pending-09.webp','./pending-10.webp',
 './pending-11.webp','./pending-12.webp','./pending-13.webp','./pending-14.webp','./pending-15.webp','./pending-16.webp','./pending-17.webp','./pending-18.webp','./pending-19.webp','./pending-20.webp',
@@ -12,34 +12,32 @@ const ASSETS=[
 './destination-engine.js','./proposal-engine.js','./constraint-engine.js','./plan-solver.js','./itinerary-engine.js','./itinerary-variants.js','./itinerary-validator.js','./budget-engine.js',
 './trip-quality-engine.js','./trip-optimizer.js','./vehicle-intelligence.js','./recommendation-engine.js','./routing-provider.js','./place-provider.js','./preference-engine.js','./assistant-engine.js',
 './weather-engine.js','./image-provider.js','./map-view.js','./gpx-generator.js','./ui-renderer.js','./ui-feature-flags.js','./poi-gap-filler.js','./pending-overlay-fix.css',
-'./roadtrip-runtime-engine.js','./start-new-trip.js','./planner-submit-guard.js','./route-stop-provider-1929.js','./overnight-accommodation-1929.js','./release-sync-1929.js'
+'./roadtrip-runtime-engine.js','./start-new-trip.js','./planner-submit-guard.js','./route-stop-provider-1929.js','./overnight-accommodation-1929.js','./release-sync-1930.js'
 ];
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE);
-    // Do not let one stale/missing/transient asset abort the entire service-worker update.
-    // Code is network-first/no-store below, so precaching is convenience, not correctness.
     await Promise.allSettled(ASSETS.map(async asset=>{
       try{
         const response=await fetch(asset,{cache:'no-store'});
         if(response&&response.ok)await cache.put(asset,response.clone());
-      }catch(error){
-        console.warn('ReisSlim precache overgeslagen',asset,error);
-      }
+      }catch(error){console.warn('ReisSlim precache overgeslagen',asset,error)}
     }));
   })());
   self.skipWaiting();
 });
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith('reisslim-')&&key!==CACHE&&key!==IMAGE_CACHE).map(key=>caches.delete(key)));await self.clients.claim()})())});
 function syncSourceText(text){return String(text)
-.replace(/1\.13\.0-1923-data-engine/g,'1.14.2-1929-complete-stops')
-.replace(/1\.14\.1-1928-synchronized/g,'1.14.2-1929-complete-stops')
-.replace(/\?v=(?:1923|1928)\b/g,'?v=1929')
-.replace(/version:'1\.13\.0',build:'1923'/g,"version:'1.14.2',build:'1929'")
-.replace(/version:'1\.14\.1',build:'1928'/g,"version:'1.14.2',build:'1929'")
-.replace(/\.\/poi-gap-filler\.js\?v=1929/g,'./route-stop-provider-1929.js?v=1929')
-.replace(/\.\/overnight-accommodation\.js\?v=1929/g,'./overnight-accommodation-1929.js?v=1929')}
-function injectReleaseScript(html){let text=syncSourceText(html).replace(/<script[^>]*release-sync-1928\.js[^>]*><\/script>/gi,'').replace(/<script[^>]*release-sync-1929\.js[^>]*><\/script>/gi,'');return text.replace(/<\/body>/i,'<script src="./release-sync-1929.js?v=1929"></script></body>')}
+.replace(/1\.13\.0-1923-data-engine/g,'1.14.3-1930-roadtrip-policy')
+.replace(/1\.14\.1-1928-synchronized/g,'1.14.3-1930-roadtrip-policy')
+.replace(/1\.14\.2-1929-(?:complete-stops|header-repair)/g,'1.14.3-1930-roadtrip-policy')
+.replace(/\?v=(?:1923|1928|1929)\b/g,'?v=1930')
+.replace(/version:'1\.13\.0',build:'1923'/g,"version:'1.14.3',build:'1930'")
+.replace(/version:'1\.14\.1',build:'1928'/g,"version:'1.14.3',build:'1930'")
+.replace(/version:'1\.14\.2',build:'1929'/g,"version:'1.14.3',build:'1930'")
+.replace(/\.\/poi-gap-filler\.js\?v=1930/g,'./route-stop-provider-1929.js?v=1930')
+.replace(/\.\/overnight-accommodation\.js\?v=1930/g,'./overnight-accommodation-1929.js?v=1930')}
+function injectReleaseScript(html){let text=syncSourceText(html).replace(/<script[^>]*release-sync-1928\.js[^>]*><\/script>/gi,'').replace(/<script[^>]*release-sync-1929\.js[^>]*><\/script>/gi,'').replace(/<script[^>]*release-sync-1930\.js[^>]*><\/script>/gi,'');return text.replace(/<\/body>/i,'<script src="./release-sync-1930.js?v=1930"></script></body>')}
 async function networkHtml(request){try{const fresh=await fetch(request,{cache:'no-store'});if(!fresh||!fresh.ok)return fresh;const html=injectReleaseScript(await fresh.text()),headers=new Headers(fresh.headers);headers.set('content-type','text/html; charset=utf-8');headers.set('cache-control','no-store, max-age=0');return new Response(html,{status:fresh.status,statusText:fresh.statusText,headers})}catch(error){const cached=await caches.match('./index.html');if(!cached)throw error;return new Response(injectReleaseScript(await cached.text()),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store, max-age=0'}})}}
 async function freshCode(request){const response=await fetch(request,{cache:'no-store'});if(!response||!response.ok)return response;const url=new URL(request.url);if(!/\.js$/i.test(url.pathname))return response;const text=syncSourceText(await response.text()),headers=new Headers(response.headers);headers.set('content-type','text/javascript; charset=utf-8');headers.set('cache-control','no-store, max-age=0');return new Response(text,{status:response.status,statusText:response.statusText,headers})}
 function cacheableImageHost(host){return/(?:wikimedia\.org|wikimedia\.com|prismic\.io|squarespace-cdn\.com|cloudinary\.com|unsplash\.com|pexels\.com|pixabay\.com)$/i.test(host)||/(?:^|\.)upload\.wikimedia\.org$/i.test(host)}

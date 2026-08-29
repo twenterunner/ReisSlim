@@ -1,0 +1,62 @@
+{
+  "release": "1.14.3 / 1930",
+  "root_cause": {
+    "max_changes_semantics": "Build 1929 treated maxChanges as both a maximum and, indirectly, a minimum diversity target. Default 10 days + maxChanges=5 forced six distinct real overnight regions.",
+    "repeat_slot_math": "When repeats were necessary, the old repeatSlots formula could cluster mandatory repeat nights. In some valid cases it demanded more consecutive nights at one base than maxConsecutive allowed, making the solver impossible even with enough real places.",
+    "ui_contradiction": "The UI said 'Roadtrip — elke nacht verder' while a 10-day trip could simultaneously allow only five accommodation changes. Those settings cannot both be true."
+  },
+  "correction": {
+    "max_changes_ceiling_only": "maxChanges now only limits changes. Default 10-day balanced trips require four real overnight bases, not six.",
+    "balanced_repeat_blocks": "Intentional stay nights are distributed in balanced contiguous blocks, so repeat requirements cannot contradict maxConsecutive.",
+    "repeat_from_4_days": "Intentional multi-night stays are supported from 4-day roadtrips.",
+    "ui_semantics": "The runtime label becomes 'Roadtrip — meerdere verblijfplaatsen'. The maxChanges field is explicitly marked 'Maximum, geen doelwaarde'.",
+    "zero_changes": "For moving multi-night roadtrips, zero is normalized to a minimum of one move; users wanting zero changes should choose the base-trip mode."
+  },
+  "verification": {
+    "syntax": {
+      "roadtrip-policy.js": true,
+      "config.js": true,
+      "release-sync-1930.js": true,
+      "service-worker.js": true
+    },
+    "default_10_day_balanced": {
+      "path": [
+        "C",
+        "C",
+        "C",
+        "D",
+        "D",
+        "A",
+        "A",
+        "B",
+        "B"
+      ],
+      "distinct": 4,
+      "changes": 3,
+      "maxRun": 3,
+      "required": 4
+    },
+    "10_day_max_2_changes": {
+      "path": [
+        "B",
+        "B",
+        "B",
+        "A",
+        "A",
+        "A",
+        "C",
+        "C",
+        "C"
+      ],
+      "distinct": 3,
+      "changes": 2,
+      "maxRun": 3,
+      "required": 3
+    },
+    "active_10_day_required": 5,
+    "relaxed_10_day_required": 4,
+    "moving_zero_change_required": 2,
+    "no_synthetic_stops_created": true,
+    "android_device_not_executed_here": true
+  }
+}

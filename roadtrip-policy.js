@@ -4,7 +4,7 @@ export const ROADTRIP_POLICY=Object.freeze({
   motorcycleScenicAverageKmh:55,
   motorcycleComfortableDayKm:350,
   vehicleAverageKmh:Object.freeze({motorcycle:55,car:65,motorhome:55,caravan:50}),
-  repeatStayMinDays:6,
+  repeatStayMinDays:4,
   repeatPoiThreshold:85,
   maxRepeatNights:1,
   shortTripRegionRadiusKm:190,
@@ -38,36 +38,47 @@ export function maximumRoadLegKm(trip){
 
 function configuredMaxChanges(trip,nights){
   const value=Number(trip?.maxChanges);
-  return Number.isFinite(value)?Math.max(0,Math.floor(value)):Math.max(0,nights-1)
+  const requested=Number.isFinite(value)?Math.max(0,Math.floor(value)):Math.max(0,nights-1);
+  const movingMinimum=trip?.tripStructure==='moving'&&nights>1?1:0;
+  return Math.max(movingMinimum,requested)
 }
 
 /*
- * Distinct overnight locations must respect the user's accommodation-change
- * limit. Builds <=1927 required eight distinct overnight regions on the default
- * 10-day / max-5-changes trip, which mathematically contradicts that setting:
- * five changes can produce at most six distinct overnight bases.
+ * maxChanges is a ceiling, never a diversity target.
  *
- * We still require a genuine moving roadtrip (at least two distinct overnight
- * bases when there is more than one night), but deliberate multi-night stays are
- * allowed instead of being rejected as a failure to discover enough regions.
+ * Builds <=1929 accidentally used maxChanges+1 as the REQUIRED number of
+ * different overnight bases. With the normal 10-day / max-5 input this forced
+ * six real regions before any itinerary was accepted, even though a coherent
+ * 10-day roadtrip can deliberately spend more than one night in a strong region.
+ *
+ * The minimum now scales with duration and pace. The solver may still use more
+ * bases when that improves the route, up to the user's change limit.
  */
 export function requiredDistinctOvernights(trip){
   const nights=Math.max(0,Number(trip?.days||0)-1);
   if(nights<=1)return nights;
   const maxDistinctByChanges=Math.min(nights,configuredMaxChanges(trip,nights)+1);
-  // Preserve the existing moving-roadtrip character: for longer trips we
-  // normally want all but one night to be at a distinct base. The user's
-  // maxChanges setting is the hard ceiling.
-  const desired=nights<=4?nights:Math.max(3,nights-1);
-  return Math.max(2,Math.min(desired,maxDistinctByChanges))
+  const nightsPerBase=trip?.tripPace==='active'?2.25:trip?.tripPace==='relaxed'?3.75:3;
+  const sensibleMinimum=Math.min(nights,Math.max(2,Math.ceil(nights/nightsPerBase)+1));
+  return Math.min(sensibleMinimum,maxDistinctByChanges)
 }
 
+/*
+ * Spread intentional stay nights into contiguous, balanced blocks.
+ * The old round(i*n/(r+1)) formula could cluster mandatory repeat slots.
+ * Example: 9 nights / 3 bases produced four consecutive repeat slots, while
+ * maxConsecutive was 3, making the solver mathematically impossible.
+ */
 function repeatSlots(nightCount,repeatsNeeded){
   if(repeatsNeeded<=0)return new Set();
+  const groups=Math.max(1,nightCount-repeatsNeeded);
+  const baseSize=Math.floor(nightCount/groups),extra=nightCount%groups;
   const slots=new Set();
-  for(let i=1;i<=repeatsNeeded;i++){
-    const slot=Math.max(1,Math.min(nightCount-1,Math.round(i*nightCount/(repeatsNeeded+1))));
-    slots.add(slot);
+  let cursor=0;
+  for(let group=0;group<groups;group++){
+    const size=baseSize+(group<extra?1:0);
+    for(let offset=1;offset<size;offset++)slots.add(cursor+offset);
+    cursor+=size;
   }
   return slots
 }
@@ -75,18 +86,13 @@ function repeatSlots(nightCount,repeatsNeeded){
 export function repeatStayAllowed(point,trip,nightIndex,nightCount){
   const days=Number(trip?.days||0);
   if(days<ROADTRIP_POLICY.repeatStayMinDays)return false;
-
   const required=requiredDistinctOvernights(trip);
   const repeatsNeeded=Math.max(0,Number(nightCount||0)-required);
   if(repeatsNeeded<=0)return false;
-
   const scheduled=repeatSlots(Number(nightCount||0),repeatsNeeded).has(Number(nightIndex));
   const highPoi=Number(point?.poiRichness||0)>=ROADTRIP_POLICY.repeatPoiThreshold;
   const preferenceFit=Number(point?.preferenceScore||0)>=12;
   const relaxed=trip?.tripPace==='relaxed';
-
-  // A repeat must have a reason: planned recovery/spacing, a strong POI base,
-  // a strong preference match, or an explicitly relaxed trip pace.
   return Boolean(scheduled||highPoi||preferenceFit||relaxed)
 }
 
@@ -151,9 +157,6 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
         const road=same?0:estimatedRoadKm(current,p);
         const scheduledRepeat=row.path.length>0&&plannedRepeatSlots.has(night);
 
-        // Deliberate multi-night stays are placed at deterministic, well-spaced
-        // slots. This prevents the beam scorer from postponing every necessary
-        // repeat until the change budget is already exhausted.
         if(scheduledRepeat&&!same)continue;
         if(!same&&(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm))continue;
         if(same&&!repeatStayAllowed(p,trip,night,nights))continue;
@@ -161,8 +164,6 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
         const consecutive=same?row.consecutive+1:1;
         if(consecutive>maxConsecutive)continue;
 
-        // First overnight does not count as an accommodation change. Every
-        // subsequent move to a different overnight base does.
         const changes=row.changes+(!same&&row.path.length>0?1:0);
         if(changes>maxChanges)continue;
 
