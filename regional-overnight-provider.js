@@ -1,5 +1,5 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1940';
-import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1940';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1941';
+import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1941';
 
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
@@ -63,7 +63,7 @@ export function buildAdaptiveRegionalSeeds(trip,origin,anchor,{round=0,maxReques
 
  // Build reachable rings around origin and around the chosen region. The radii
  // are expressed as fractions of the actual per-day leg budget, so the same
- // logic works in dense Europe, Southern Africa, North America or anywhere else.
+ // Search geometry is derived only from trip constraints and coordinates.
  const originFractions=base?[.35,.62,.86]:[.30,.55,.78,.96];
  const centreFractions=base?[.18,.32,.46]:[.22,.42,.62,.82];
  const bearings=[0,45,90,135,180,225,270,315];
@@ -99,7 +99,10 @@ export function regionalSupplySupportsTrip(trip,origin,anchor,rowsOrProfiles){
    return selectBaseDayTrips({base,trip,candidates,count:Math.max(0,Number(trip.days||0)-2)}).length===Math.max(0,Number(trip.days||0)-2)
  }
  const path=selectRoadtripOvernights({origin:{...origin,name:trip.origin||'Vertrek'},trip,destination:{id:'regional-anchor',bases:finite(anchor)?[{...anchor}]:[]},candidates});
- return path.length===Math.max(0,Number(trip.days||0)-1)
+ // This function answers whether the LIVE/CACHED supply is sufficient. The route
+ // policy may return a provisional topology skeleton as a separate resilience
+ // mechanism; that must not be mistaken for discovered real regional supply.
+ return path.length===Math.max(0,Number(trip.days||0)-1)&&path.every(point=>point?.generatedExploration!==true&&point?.provisionalRoutePoint!==true)
 }
 
 function uncoveredSeeds(seeds,found,max=14){return seeds.filter(s=>!found.some(x=>geoKm(x,s)<30)).slice(0,max)}

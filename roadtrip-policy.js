@@ -26,15 +26,44 @@ export function geoKm(a,b){
 
 export const estimatedRoadKm=(a,b)=>geoKm(a,b)*ROADTRIP_POLICY.estimatedRoadFactor;
 
-export function planningSpeedKmh(trip){
-  return ROADTRIP_POLICY.vehicleAverageKmh[trip?.transport]||60
+const FEASIBILITY_PROFILES=Object.freeze({
+  car:Object.freeze({productiveKmh:78,roadTimeFactor:1,breakEveryHours:2.25,breakMinutes:15,fuelStopMinutes:12,defaultFuelRangeKm:650,arrivalBufferMinutes:10,weatherReserveMinutesPerHour:0}),
+  motorcycle:Object.freeze({productiveKmh:72,roadTimeFactor:1.05,breakEveryHours:1.5,breakMinutes:20,fuelStopMinutes:12,defaultFuelRangeKm:350,arrivalBufferMinutes:15,weatherReserveMinutesPerHour:5}),
+  motorhome:Object.freeze({productiveKmh:66,roadTimeFactor:1.12,breakEveryHours:2,breakMinutes:20,fuelStopMinutes:18,defaultFuelRangeKm:520,arrivalBufferMinutes:35,weatherReserveMinutesPerHour:0}),
+  caravan:Object.freeze({productiveKmh:62,roadTimeFactor:1.18,breakEveryHours:1.75,breakMinutes:20,fuelStopMinutes:20,defaultFuelRangeKm:460,arrivalBufferMinutes:45,weatherReserveMinutesPerHour:0})
+});
+function feasibilityProfile(trip){return FEASIBILITY_PROFILES[trip?.transport]||FEASIBILITY_PROFILES.car}
+function policyElapsedHours(trip,distanceKm){
+  const profile=feasibilityProfile(trip),distance=Math.max(0,Number(distanceKm)||0);
+  const movingHours=distance/profile.productiveKmh*profile.roadTimeFactor;
+  const restStops=movingHours<=.25?0:Math.floor(Math.max(0,movingHours-.05)/profile.breakEveryHours);
+  const fuelRange=Math.max(100,Number(trip?.fuelRangeKm)||profile.defaultFuelRangeKm);
+  const fuelStops=Math.max(0,Math.ceil(distance/Math.max(80,fuelRange*.86))-1);
+  const restMinutes=restStops*profile.breakMinutes;
+  const extraFuelMinutes=Math.max(0,fuelStops-restStops)*profile.fuelStopMinutes;
+  const weatherMinutes=Math.round(movingHours*profile.weatherReserveMinutesPerHour);
+  return movingHours+(restMinutes+extraFuelMinutes+weatherMinutes+profile.arrivalBufferMinutes)/60
 }
 
+/*
+ * This is the same hard daily-time model used by destination feasibility.
+ * Older builds ranked a destination with one speed model and then tried to
+ * construct the selected trip with a different 50/55/65 km/h hard limit. That
+ * allowed a portfolio card to say "passend" while the route solver rejected it.
+ */
 export function maximumRoadLegKm(trip){
-  const hours=Math.max(2,Number(trip?.maxDrive||5)),timeBased=hours*planningSpeedKmh(trip);
-  return trip?.transport==='motorcycle'
-    ?Math.max(120,Math.min(ROADTRIP_POLICY.motorcycleComfortableDayKm,timeBased))
-    :Math.max(120,timeBased)
+  const hours=Math.max(2,Number(trip?.maxDrive||5));
+  let low=0,high=1500;
+  for(let i=0;i<34;i++){const mid=(low+high)/2;if(policyElapsedHours(trip,mid)<=hours+.05)low=mid;else high=mid}
+  return Math.max(50,low)
+}
+
+/* app.js uses this to turn an estimated distance back into a displayed time.
+ * Use the effective all-in average implied by the same maximum-leg model so a
+ * solver-legal leg cannot be reclassified as over the user's time limit later. */
+export function planningSpeedKmh(trip){
+  const hours=Math.max(2,Number(trip?.maxDrive||5));
+  return Math.max(30,maximumRoadLegKm(trip)/hours)
 }
 
 function configuredMaxChanges(trip,nights){
@@ -90,23 +119,25 @@ function pointSegmentDistanceKm(p,a,b){
 }
 
 function regionRadiusKm(trip){
-  const days=Number(trip?.days||0);
-  return days<=5?ROADTRIP_POLICY.shortTripRegionRadiusKm:Math.min(650,ROADTRIP_POLICY.shortTripRegionRadiusKm+(days-5)*55)
+  const days=Number(trip?.days||0),leg=maximumRoadLegKm(trip);
+  return Math.min(900,Math.max(ROADTRIP_POLICY.shortTripRegionRadiusKm,leg*1.25,ROADTRIP_POLICY.shortTripRegionRadiusKm+Math.max(0,days-5)*45))
 }
 
 function candidateRelevant(point,origin,anchor,trip){
   if(!finitePoint(anchor))return true;
+  const leg=maximumRoadLegKm(trip),corridorRadius=Math.max(ROADTRIP_POLICY.corridorRadiusKm,leg*.55);
   const nearAnchor=estimatedRoadKm(point,anchor)<=regionRadiusKm(trip);
-  const corridor=pointSegmentDistanceKm(point,origin,anchor)<=ROADTRIP_POLICY.corridorRadiusKm;
-  const notFarPastAnchor=geoKm(origin,point)<=geoKm(origin,anchor)+ROADTRIP_POLICY.corridorRadiusKm*1.5;
-  const nearOrigin=estimatedRoadKm(origin,point)<=maximumRoadLegKm(trip)*1.08;
+  const corridor=pointSegmentDistanceKm(point,origin,anchor)<=corridorRadius;
+  const notFarPastAnchor=geoKm(origin,point)<=geoKm(origin,anchor)+corridorRadius*1.5;
+  const nearOrigin=estimatedRoadKm(origin,point)<=leg*1.08;
   return nearAnchor||(corridor&&notFarPastAnchor)||nearOrigin
 }
 
-function anchorVisited(path,anchor,destinationId,origin){
+function anchorVisited(path,anchor,destinationId,origin,trip=null){
   if(!finitePoint(anchor))return true;
   if(finitePoint(origin)&&geoKm(origin,anchor)<=12)return true;
-  return path.some(p=>p.catalogId===destinationId||estimatedRoadKm(p,anchor)<=ROADTRIP_POLICY.anchorVisitRadiusKm)
+  const radius=trip?Math.max(ROADTRIP_POLICY.anchorVisitRadiusKm,Math.min(160,maximumRoadLegKm(trip)*.38)):ROADTRIP_POLICY.anchorVisitRadiusKm;
+  return path.some(p=>p.catalogId===destinationId||estimatedRoadKm(p,anchor)<=radius)
 }
 
 function balancedBlockSizes(nightCount,blockCount){
@@ -165,7 +196,7 @@ function solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targ
 
   const best=beam.filter(row=>{
     const distinct=new Set(row.blocks.map(x=>x.catalogId)).size;
-    if(distinct<targetDistinct||!anchorVisited(row.blocks,anchor,destinationId,origin))return false;
+    if(distinct<targetDistinct||!anchorVisited(row.blocks,anchor,destinationId,origin,trip))return false;
     if(trip?.routeTopology==='open-ended')return true;
     const home=estimatedRoadKm(row.blocks.at(-1),origin);
     return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm
@@ -175,6 +206,103 @@ function solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targ
   const sizes=balancedBlockSizes(nights,blockCount),expanded=[];
   best.blocks.forEach((p,i)=>{for(let n=0;n<sizes[i];n++)expanded.push(p)});
   return expanded
+}
+
+
+function destinationPoint(origin,distanceKm,bearingDegrees){
+  const R=6371,b=bearingDegrees*Math.PI/180,lat1=Number(origin.lat)*Math.PI/180,lon1=Number(origin.lon)*Math.PI/180,a=distanceKm/R;
+  const lat2=Math.asin(Math.sin(lat1)*Math.cos(a)+Math.cos(lat1)*Math.sin(a)*Math.cos(b));
+  const lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(a)*Math.cos(lat1),Math.cos(a)-Math.sin(lat1)*Math.sin(lat2));
+  return{lat:lat2*180/Math.PI,lon:((lon2*180/Math.PI+540)%360)-180}
+}
+function initialBearing(a,b){
+  if(!finitePoint(a)||!finitePoint(b))return 0;
+  const r=x=>Number(x)*Math.PI/180,y=Math.sin(r(b.lon-a.lon))*Math.cos(r(b.lat)),x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lon-a.lon));
+  return(Math.atan2(y,x)*180/Math.PI+360)%360
+}
+function interpolateGreatCircle(a,b,t){
+  // For roadtrip-scale legs a linear lat/lon interpolation is stable and keeps
+  // the point on the origin/anchor corridor; longitude is normalized afterward.
+  let dLon=Number(b.lon)-Number(a.lon);if(dLon>180)dLon-=360;if(dLon<-180)dLon+=360;
+  return{lat:Number(a.lat)+(Number(b.lat)-Number(a.lat))*t,lon:((Number(a.lon)+dLon*t+540)%360)-180}
+}
+function provisionalCandidate(point,id,name){return{...point,name,catalogId:id,generatedExploration:true,landValidated:null,provisionalRoutePoint:true,poiRichness:70,preferenceScore:18,vehicleScore:8}}
+
+/*
+ * Last-resort topology skeleton, not a fake-city fallback.
+ *
+ * If live locality discovery has not supplied enough named towns yet, selection
+ * must not fail merely because the network providers are incomplete. We build
+ * constraint-valid geometric route points, label them explicitly as pending and
+ * let prepareGeneratedRouteStops() resolve them to real named localities in the
+ * next live stage. No country/city tables or origin-specific exceptions exist.
+ */
+function buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,maxChanges}){
+  const anchor=destination?.bases?.[0]||destination?.anchor||null;
+  if(!finitePoint(origin)||!finitePoint(anchor)||nights<1)return[];
+  const maxBlocks=Math.max(1,Math.min(nights,maxChanges+1)),directRoad=estimatedRoadKm(origin,anchor);
+  const validMove=(a,b)=>{const d=estimatedRoadKm(a,b);return d>=ROADTRIP_POLICY.minRoadMoveKm&&d<=maxRoadKm*.985};
+  const makePending=(point,id,label)=>provisionalCandidate(point,id,label);
+  const anchorPoint={...anchor,name:anchor.name||destination?.name||'Gekozen reisregio',catalogId:destination?.id||'selected-anchor',generatedExploration:false,landValidated:true,poiRichness:90,preferenceScore:30,vehicleScore:9};
+  const blocks=[];
+
+  if(directRoad>=ROADTRIP_POLICY.minRoadMoveKm){
+    const legs=Math.max(1,Math.ceil(directRoad/Math.max(1,maxRoadKm*.94)));
+    const minimumRoundTripBlocks=trip?.routeTopology==='open-ended'?legs:legs*2-1;
+    if(minimumRoundTripBlocks>maxBlocks)return[];
+    for(let i=1;i<legs;i++)blocks.push(makePending(interpolateGreatCircle(origin,anchor,i/legs),`provisional-out-${i}`,`Routepunt ${i} · plaats live bepalen`));
+    blocks.push(anchorPoint);
+    if(trip?.routeTopology!=='open-ended'){
+      const bearing=initialBearing(origin,anchor);
+      for(let i=legs-1;i>=1;i--){
+        const base=interpolateGreatCircle(origin,anchor,i/legs);
+        if(trip?.routeTopology==='loop'){
+          const side=Math.min(42,Math.max(12,maxRoadKm/ROADTRIP_POLICY.estimatedRoadFactor*.10));
+          const offset=destinationPoint(base,side,bearing+92);
+          const prev=blocks.at(-1)||origin;
+          if(validMove(prev,offset)&&validMove(offset,i===1?origin:interpolateGreatCircle(origin,anchor,(i-1)/legs))){blocks.push(makePending(offset,`provisional-return-${i}`,`Routepunt terug ${i} · plaats live bepalen`));continue}
+        }
+        blocks.push(makePending(base,`provisional-return-${i}`,`Routepunt terug ${i} · plaats live bepalen`))
+      }
+    }
+  }
+
+  // A nearby selected region can be a visit without being a legal >=50 km
+  // overnight move. Likewise, a one-leg destination needs a second real future
+  // locality for a multi-night moving trip. Find generic geometry that is legal
+  // from both the current block and home; it is resolved to an actual locality
+  // immediately after selection.
+  const requiredDistinct=hardMinimumDistinctOvernights(trip);
+  const distinctCount=()=>new Set(blocks.map(x=>x.catalogId)).size;
+  const needExploration=blocks.length===0||distinctCount()<requiredDistinct;
+  if(needExploration){
+    const from=blocks.at(-1)||origin,bearing=initialBearing(origin,anchor),radii=[.42,.58,.72,.84].map(f=>maxRoadKm*f/ROADTRIP_POLICY.estimatedRoadFactor),offsets=[65,-65,115,-115,155,-155,205];
+    let picked=null;
+    outer:for(const radius of radii)for(const offset of offsets){
+      const p=destinationPoint(anchor,radius,bearing+offset);
+      if(validMove(from,p)&&(trip?.routeTopology==='open-ended'||validMove(p,origin))){picked=p;break outer}
+    }
+    if(!picked){
+      outer:for(const radius of radii)for(const offset of offsets){const p=destinationPoint(origin,radius,offset);if(validMove(from,p)&&(trip?.routeTopology==='open-ended'||validMove(p,origin))){picked=p;break outer}}
+    }
+    if(!picked)return[];
+    blocks.push(makePending(picked,'provisional-explore-1','Routepunt · plaats live bepalen'))
+  }
+
+  if(blocks.length>maxBlocks)return[];
+  if(trip?.routeTopology!=='open-ended'&&!validMove(blocks.at(-1),origin))return[];
+  for(let i=0;i<blocks.length;i++){
+    const from=i?blocks[i-1]:origin;if(!validMove(from,blocks[i]))return[]
+  }
+
+  // Extra accommodation changes are a maximum, never a target. Keep provisional
+  // geometry to one night per generated block and put surplus nights on the real
+  // selected anchor where possible. That avoids reverse-geocoding the same pending
+  // waypoint four or five times on longer trips.
+  const sizes=Array(blocks.length).fill(1),anchorIndex=blocks.findIndex(p=>p.generatedExploration!==true);
+  sizes[anchorIndex>=0?anchorIndex:0]+=Math.max(0,nights-blocks.length);
+  const expanded=[];blocks.forEach((point,i)=>{for(let n=0;n<sizes[i];n++)expanded.push(point)});
+  return expanded.length===nights?expanded:[]
 }
 
 export function selectRoadtripOvernights({origin,trip,destination,candidates}){
@@ -192,7 +320,7 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
     .filter(p=>estimatedRoadKm(origin,p)>=ROADTRIP_POLICY.minRoadMoveKm)
     .filter(p=>candidateRelevant(p,origin,anchor,trip));
 
-  if(!pool.length)return[];
+  if(!pool.length)return buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,maxChanges});
 
   // Preferred diversity is attempted first. Only if the real candidate topology
   // cannot satisfy it do we fall back one level at a time, never below two real
@@ -206,7 +334,7 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
       if(path.length===nights)return path
     }
   }
-  return[]
+  return buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,maxChanges})
 }
 
 function prefScore(p,trip){
@@ -216,14 +344,21 @@ function prefScore(p,trip){
 export function selectRoadtripBase({origin,trip,destination,candidates}){
   const anchor=destination?.bases?.[0]||destination?.anchor||null,maxLeg=maximumRoadLegKm(trip);
   const anchorIsOrigin=finitePoint(anchor)&&geoKm(origin,anchor)<=12;
-  const baseRadius=anchorIsOrigin?Math.min(180,maxLeg*.55):ROADTRIP_POLICY.baseRadiusKm;
+  const baseRadius=anchorIsOrigin?Math.min(180,maxLeg*.55):Math.max(ROADTRIP_POLICY.baseRadiusKm,Math.min(180,maxLeg*.55));
   if(!finitePoint(origin))return null;
 
-  const rows=(candidates||[])
+  let rows=(candidates||[])
     .filter(p=>finitePoint(p)&&p.catalogId)
     .filter(p=>estimatedRoadKm(origin,p)<=maxLeg)
     .filter(p=>!finitePoint(anchor)||estimatedRoadKm(p,anchor)<=baseRadius);
 
+  // A base trip needs a reachable real base, not a mandatory inventory of
+  // surrounding towns. If discovery around the selected destination is sparse,
+  // the selected destination itself is a legitimate base and local activity
+  // days can be enriched later from POIs around it.
+  if(!rows.length&&finitePoint(anchor)&&estimatedRoadKm(origin,anchor)<=maxLeg){
+    rows=[{...anchor,name:anchor.name||destination?.name||'Uitvalsbasis',catalogId:destination?.id||'selected-base',landValidated:true,generatedExploration:false,poiRichness:80,preferenceScore:20,vehicleScore:8,selectedDestinationBase:true}]
+  }
   if(!rows.length)return null;
 
   const scored=rows.map(p=>{
@@ -231,7 +366,7 @@ export function selectRoadtripBase({origin,trip,destination,candidates}){
     const anchorKm=finitePoint(anchor)?estimatedRoadKm(p,anchor):0,homeKm=estimatedRoadKm(origin,p),centrality=near*18;
     const score=prefScore(p,trip)+centrality-Math.max(0,anchorKm-20)*.9-Math.abs(homeKm-Math.min(maxLeg*.65,210))*.08;
     return{...p,baseScore:Number(score.toFixed(1)),baseWhy:{poiRichness:Number(p.poiRichness||0),preferenceScore:Number(p.preferenceScore||0),reachableDayTrips:near,anchorKm:Math.round(anchorKm)}}
-  }).filter(p=>p.baseWhy.reachableDayTrips>=Math.min(2,Math.max(1,Number(trip.days||3)-2))).sort((a,b)=>b.baseScore-a.baseScore);
+  }).sort((a,b)=>b.baseScore-a.baseScore);
 
   return scored[0]||null
 }
@@ -251,7 +386,7 @@ export function selectBaseDayTrips({base,trip,candidates,count}){
     unique.push(p);
     if(unique.length>=count)break
   }
-  if(!unique.length)return[];
+  if(!unique.length)return Array.from({length:count},(_,i)=>({...base,name:`Lokale dag rond ${base.name||'uitvalsbasis'}`,localBaseDay:true,reusedDayTrip:i>0}));
   if(unique.length>=count)return unique.slice(0,count);
 
   // A long base holiday does not require a different town every single day.
@@ -285,10 +420,13 @@ function validateBaseTrip(trip,plan){
       targets.push(String(d.destinationPoint.catalogId||`${d.destinationPoint.lat.toFixed(3)},${d.destinationPoint.lon.toFixed(3)}`))
     }else violations.push(`missing-daytrip-target:${i+2}`)
   }
-  if(new Set(targets).size<Math.min(middle.length,2))violations.push(`insufficient-daytrip-variety:${new Set(targets).size}`);
+  // Variety is a quality preference, not a validity gate. A base holiday may
+  // deliberately spend several days in the same real area while live POIs fill
+  // different local activities.
+  const distinctDayTrips=new Set(targets).size;
   const last=rows.at(-1);
   if(rows.length>1&&(!finitePoint(last?.toPoint)||!finitePoint(origin)||geoKm(last.toPoint,origin)>12))violations.push('does-not-return-origin');
-  return{valid:violations.length===0,code:violations.length?'base-trip-invalid':'base-trip-ok',violations,base:base?.name||null,dayTrips:targets.length}
+  return{valid:violations.length===0,code:violations.length?'base-trip-invalid':'base-trip-ok',violations,base:base?.name||null,dayTrips:targets.length,distinctDayTrips}
 }
 
 export function validateRoadtrip(trip,plan){
@@ -305,7 +443,7 @@ export function validateRoadtrip(trip,plan){
   // night. Counting it as an overnight added a phantom accommodation change.
   const overnightRows=rows.slice(0,-1);
   const ids=[],moves=[];
-  let repeatedNights=0;
+  let repeatedNights=0,provisionalStops=0;
 
   for(let i=0;i<overnightRows.length;i++){
     const d=overnightRows[i],a=d.fromPoint,b=d.toPoint;
@@ -317,7 +455,8 @@ export function validateRoadtrip(trip,plan){
     }else if(road<ROADTRIP_POLICY.minRoadMoveKm)violations.push(`short-move:${i+1}:${Math.round(road)}`);
     moves.push(road);
     ids.push(String(d.toPoint?.catalogId||d.overnight||`${Number(b.lat).toFixed(3)},${Number(b.lon).toFixed(3)}`));
-    if(d.toPoint?.generatedExploration===true||d.toPoint?.landValidated===false)violations.push(`synthetic-stop:${i+1}`)
+    if(d.toPoint?.landValidated===false)violations.push(`unresolved-stop:${i+1}`);
+    else if(d.toPoint?.generatedExploration===true&&d.toPoint?.landValidated!==true)provisionalStops++
   }
 
   const distinct=new Set(ids).size,recommendedDistinct=requiredDistinctOvernights(trip),required=hardMinimumDistinctOvernights(trip);
@@ -347,6 +486,8 @@ export function validateRoadtrip(trip,plan){
     diversityShortfall:Math.max(0,recommendedDistinct-distinct),
     moves,
     repeatedNights,
-    changes
+    changes,
+    provisionalStops,
+    pendingResolution:provisionalStops>0
   }
 }

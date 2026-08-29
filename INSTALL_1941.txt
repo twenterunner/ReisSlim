@@ -1,0 +1,9 @@
+ReisSlim 1.15.1 / build 1941
+
+Upload the files from the runtime ZIP directly into the repository root, replacing files with the same names.
+Do not create an extra subfolder.
+
+After GitHub Pages deploys, confirm the footer/header reports:
+  ReisSlim v1.15.1 · Build 1941
+
+Then repeat the same trip that produced the red insufficient-overnight-regions error.

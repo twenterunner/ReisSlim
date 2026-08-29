@@ -1,5 +1,5 @@
-import { resolveOrigin } from './trip-model.js?v=1940';
-import { haversineKm } from './route-engine.js?v=1940';
+import { resolveOrigin } from './trip-model.js?v=1941';
+import { haversineKm } from './route-engine.js?v=1941';
 
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
