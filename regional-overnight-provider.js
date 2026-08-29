@@ -1,10 +1,10 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1932';
-import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1932';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1933';
+import { maximumRoadLegKm, selectRoadtripOvernights, selectRoadtripBase, selectBaseDayTrips } from './roadtrip-policy.js?v=1933';
 
 const PHOTON_REVERSE='https://photon.komoot.io/reverse';
 const NOMINATIM_REVERSE='https://nominatim.openstreetmap.org/reverse';
 const OVERPASS_ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
-const CACHE_PREFIX='reisslim.regional-resilient.v5-topology';
+const CACHE_PREFIX='reisslim.regional-resilient.v6-global-topology';
 const FRESH_MS=30*24*60*60*1000;
 const STALE_MS=180*24*60*60*1000;
 const finite=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon));
@@ -47,6 +47,25 @@ const OFFLINE_EUROPE_REGIONS=[
 ].map(([name,lat,lon,country],index)=>({name,lat,lon,country,countryCode:'',osmType:'offline',osmId:`eu-${index+1}`,source:'ReisSlim offline region grid'}));
 
 function europeOrigin(origin){return finite(origin)&&Number(origin.lat)>=39&&Number(origin.lat)<=61&&Number(origin.lon)>=-8&&Number(origin.lon)<=18}
+
+
+// Real named Southern-African roadtrip regions. These are a deterministic
+// topology safety net only: live OpenStreetMap discovery still wins whenever it
+// supplies a connected route. The coordinates are town/city centres, not
+// synthetic corridor points.
+const OFFLINE_SOUTHERN_AFRICA_REGIONS=[
+ ['Cape Town',-33.9249,18.4241,'South Africa'],['Stellenbosch',-33.9321,18.8602,'South Africa'],['Paarl',-33.7342,18.9621,'South Africa'],['Franschhoek',-33.9100,19.1190,'South Africa'],['Somerset West',-34.0757,18.8433,'South Africa'],
+ ['Malmesbury',-33.4608,18.7271,'South Africa'],['Darling',-33.3782,18.3862,'South Africa'],['Langebaan',-33.0913,18.0315,'South Africa'],['Vredenburg',-32.9072,17.9896,'South Africa'],['Piketberg',-32.9032,18.7570,'South Africa'],['Clanwilliam',-32.1817,18.8911,'South Africa'],
+ ['Worcester',-33.6465,19.4485,'South Africa'],['Ceres',-33.3689,19.3109,'South Africa'],['Tulbagh',-33.2853,19.1380,'South Africa'],['Robertson',-33.8034,19.8854,'South Africa'],['Montagu',-33.7866,20.1211,'South Africa'],['Caledon',-34.2306,19.4260,'South Africa'],['Hermanus',-34.4187,19.2345,'South Africa'],
+ ['Bredasdorp',-34.5322,20.0403,'South Africa'],['Swellendam',-34.0226,20.4417,'South Africa'],['Barrydale',-33.9049,20.7247,'South Africa'],['Laingsburg',-33.1949,20.8582,'South Africa'],['Ladismith',-33.4933,21.2676,'South Africa'],['Calitzdorp',-33.5348,21.6886,'South Africa'],['Prince Albert',-33.2248,22.0261,'South Africa'],
+ ['Oudtshoorn',-33.5907,22.2014,'South Africa'],['Mossel Bay',-34.1831,22.1460,'South Africa'],['George',-33.9649,22.4617,'South Africa'],['Wilderness',-33.9932,22.5833,'South Africa'],['Knysna',-34.0351,23.0465,'South Africa'],['Plettenberg Bay',-34.0527,23.3716,'South Africa'],
+ ['Beaufort West',-32.3567,22.5830,'South Africa'],['Graaff-Reinet',-32.2522,24.5308,'South Africa'],['Gqeberha',-33.9608,25.6022,'South Africa'],['Cradock',-32.1642,25.6192,'South Africa'],['Colesberg',-30.7200,25.1000,'South Africa'],
+ ['Springbok',-29.6643,17.8865,'South Africa'],['Upington',-28.4478,21.2561,'South Africa'],['Kimberley',-28.7282,24.7499,'South Africa'],['Bloemfontein',-29.0852,26.1596,'South Africa'],
+ ['Windhoek',-22.5609,17.0658,'Namibia'],['Keetmanshoop',-26.5833,18.1333,'Namibia'],['Lüderitz',-26.6481,15.1594,'Namibia'],['Mariental',-24.6333,17.9667,'Namibia'],['Swakopmund',-22.6784,14.5266,'Namibia']
+].map(([name,lat,lon,country],index)=>({name,lat,lon,country,countryCode:country==='Namibia'?'NA':'ZA',osmType:'offline',osmId:`sa-${index+1}`,source:'ReisSlim offline Southern Africa grid'}));
+
+function southernAfricaOrigin(origin){return finite(origin)&&Number(origin.lat)>=-36&&Number(origin.lat)<=-20&&Number(origin.lon)>=13&&Number(origin.lon)<=33}
+function offlineCoverage(origin){if(europeOrigin(origin))return OFFLINE_EUROPE_REGIONS;if(southernAfricaOrigin(origin))return OFFLINE_SOUTHERN_AFRICA_REGIONS;return[]}
 function profilePoints(profiles){return(profiles||[]).map(item=>{const b=item?.bases?.[0];return finite(b)?{name:b.name||String(item.name||'').replace(/\s*&\s*omgeving$/i,''),lat:Number(b.lat),lon:Number(b.lon),country:item.country||'Live regio',source:item.cacheStale?'cache':'cache',osmType:'cache',osmId:item.id}:null}).filter(Boolean)}
 function toPolicyCandidates(rows,trip){return(rows||[]).filter(finite).map((p,index)=>({name:p.name||`Regio ${index+1}`,lat:Number(p.lat),lon:Number(p.lon),catalogId:String(p.osmId||`${p.name||'region'}-${Number(p.lat).toFixed(3)}-${Number(p.lon).toFixed(3)}`),landValidated:true,generatedExploration:false,poiRichness:78,preferenceScore:(trip?.preferences||[]).length?24:0,vehicleScore:8}))}
 export function regionalSupplySupportsTrip(trip,origin,anchor,rowsOrProfiles){
@@ -81,7 +100,8 @@ function dedupe(rows,origin){const out=[];for(const r of rows||[]){if(!r||!finit
 function richness(point,all){const neighbours=all.filter(x=>x!==point&&geoKm(x,point)<=110).length;return Math.min(94,42+neighbours*7)}
 function profile(p,i,origin,all,trip,stale=false){const poi=richness(p,all),idBase=p.osmId?`${p.osmType||'place'}-${p.osmId}`:`${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${Number(p.lat).toFixed(3)}-${Number(p.lon).toFixed(3)}`;const offline=p.source==='ReisSlim offline region grid';return{id:`regional-resilient-${idBase}`,name:`${p.name} & omgeving`,country:p.country||'Live regio',distanceKm:Math.round(geoKm(origin,p)*1.18),driveHours:null,nightMid:125,activityDaily:45,toll:0,tags:['natuur','cultuur','eten',...(trip?.transport==='motorcycle'?['motor']:[])],season:[1,2,3,4,5,6,7,8,9,10,11,12],family:7,motorcycle:8,camper:7,weather:7,crowds:7,summary:`Echte benoemde overnachtingsregio rond ${p.name}.`,pros:['Echte benoemde plaats',offline?'Offline beschikbaar bij provideruitval':'Meerdere kaartbronnen en lokale cache','Bruikbaar voor route én slimme uitvalsbasis'],cons:offline?['Live verblijf en POI’s worden na selectie apart gecontroleerd']:stale?['Live bron tijdelijk niet beschikbaar; recente gecachte plaats gebruikt']:['Verblijf en POI’s worden na selectie apart gecontroleerd'],routeStops:[],bases:[{name:p.name,lat:Number(p.lat),lon:Number(p.lon),landValidated:true}],activities:[],poiRichness:poi,dynamic:true,roadtripCandidate:true,discoverySource:offline?'ReisSlim offline region grid':stale?'ReisSlim resilient cache':`OpenStreetMap ${p.source||'multi-source'}`}}
 function wait(ms){return new Promise(r=>setTimeout(r,ms))}
-function offlineFallback(origin,anchor,trip){if(!europeOrigin(origin))return[];const rows=OFFLINE_EUROPE_REGIONS.filter(p=>geoKm(origin,p)>32);if(!finite(anchor))return rows;const direct=geoKm(origin,anchor),corridorAllowance=Math.max(150,maximumRoadLegKm(trip)*.9);return rows.filter(p=>geoKm(p,anchor)<=Math.max(220,direct*.48)||Math.abs((geoKm(origin,p)+geoKm(p,anchor))-direct)<=corridorAllowance)}
+function offlineFallback(origin,anchor,trip){const coverage=offlineCoverage(origin);if(!coverage.length)return[];const rows=coverage.filter(p=>geoKm(origin,p)>32);if(!finite(anchor))return rows;const direct=geoKm(origin,anchor),corridorAllowance=Math.max(150,maximumRoadLegKm(trip)*.95);return rows.filter(p=>geoKm(p,anchor)<=Math.max(220,direct*.52)||Math.abs((geoKm(origin,p)+geoKm(p,anchor))-direct)<=corridorAllowance)}
+export function offlineRegionalFallback(origin,anchor,trip){return offlineFallback(origin,anchor,trip).map(p=>({...p}))}
 export function buildRegionalSeeds(trip,origin,anchor){return strategicSeeds(trip,origin,anchor,32)}
 
 export async function discoverRegionalOvernightCandidates(trip,origin,anchor,{fetchImpl=globalThis.fetch,timeoutMs=5000,maxRequests=28,concurrency=8,onProgress,storage=globalThis.localStorage}={}){
@@ -113,7 +133,7 @@ export async function discoverRegionalOvernightCandidates(trip,origin,anchor,{fe
  // requires serial requests. It is only needed outside the offline safety net or
  // when the real named offline regions still cannot form the requested topology.
  if(!regionalSupplySupportsTrip(trip,origin,anchor,found)){
-   const missing=seeds.filter(s=>!found.some(x=>geoKm(x,s)<35)).slice(0,europeOrigin(origin)?1:4);
+   const missing=seeds.filter(s=>!found.some(x=>geoKm(x,s)<35)).slice(0,offlineCoverage(origin).length?1:4);
    for(let i=0;i<missing.length;i++){
      if(i)await wait(1050);
      const row=await nominatimReverse(missing[i],fetchImpl,Math.min(2400,timeoutMs));

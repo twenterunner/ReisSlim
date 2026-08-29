@@ -1,0 +1,19 @@
+ReisSlim v1.14.6 · Build 1933
+
+Upload/replace these runtime files in the repository root:
+- config.js
+- roadtrip-policy.js
+- regional-overnight-provider.js
+- image-provider.js
+- service-worker.js
+- release-sync-1933.js
+- roadtrip-runtime-engine.js
+- manifest.webmanifest
+
+IMPORTANT:
+- Delete release-sync-1932.js after release-sync-1933.js is uploaded.
+- Hard-refresh once after GitHub Pages deploys so the new service worker takes control.
+- The footer/header should show v1.14.6 · Build 1933 before acceptance testing.
+
+Acceptance case:
+Cape Town, 5 days, moving roadtrip, 5 h/day, max 5 accommodation changes must produce a roadtrip even when the live regional discovery providers return no usable regions, using real named Southern African fallback regions.

@@ -1,6 +1,6 @@
-export const VERSION = '1.14.5';
-export const BUILD = '1932';
-export const ENGINE_VERSION = 70;
+export const VERSION = '1.14.6';
+export const BUILD = '1933';
+export const ENGINE_VERSION = 71;
 export const STORAGE_SCHEMA_VERSION = 7;
 export const preferenceDefinitions=[['natuur','Natuur'],['bergen','Bergen'],['zwemmen','Zwemmen'],['wandelen','Wandelen'],['kinderen','Kindvriendelijk'],['motor','Mooie wegen'],['cultuur','Cultuur'],['eten','Eten'],['kust','Kust'],['budget','Budget']];
 export const transportProfiles={
@@ -11,5 +11,5 @@ caravan:{label:'Auto met caravan',routeMode:'truck',consumption:12.5,roadTimeFac
 export const routeStyles={balanced:{label:'Gebalanceerd',description:'Een praktische route met ruimte voor prettige stops.'},fastest:{label:'Snelste',description:'Minimaliseer reistijd en omwegen.'},scenic:{label:'Toeristisch',description:'Geef mooie wegen en uitzichtpunten extra gewicht.'}};
 export const routingConfig={apiUrl:'',requestTimeoutMs:7000,providerLabel:'OSRM live routing'};
 export const budgetAssumptions={fuelPricePerLitre:1.88,childEquivalent:.6,peoplePerRoom:3.5,groceriesPerEquivalentDay:16,restaurantPerEquivalentDay:42,restaurantShare:{budget:.25,mid:.5,comfort:.72},comfortFactor:{budget:.8,mid:1,comfort:1.35},contingencyRate:.07,minimumContingency:50};
-export const originCatalog={saasveld:{name:'Saasveld',lat:52.33,lon:6.81},amsterdam:{name:'Amsterdam',lat:52.3676,lon:4.9041},rotterdam:{name:'Rotterdam',lat:51.9244,lon:4.4777},utrecht:{name:'Utrecht',lat:52.0907,lon:5.1214},eindhoven:{name:'Eindhoven',lat:51.4416,lon:5.4697},groningen:{name:'Groningen',lat:53.2194,lon:6.5665},maastricht:{name:'Maastricht',lat:50.8514,lon:5.691},zwolle:{name:'Zwolle',lat:52.5168,lon:6.083},enschede:{name:'Enschede',lat:52.2215,lon:6.8937},hengelo:{name:'Hengelo',lat:52.2574,lon:6.7928},almelo:{name:'Almelo',lat:52.3566,lon:6.6625},arnhem:{name:'Arnhem',lat:51.9851,lon:5.8987},nijmegen:{name:'Nijmegen',lat:51.8426,lon:5.8546}};
+export const originCatalog={saasveld:{name:'Saasveld',lat:52.33,lon:6.81},'cape town':{name:'Cape Town',lat:-33.9249,lon:18.4241},capetown:{name:'Cape Town',lat:-33.9249,lon:18.4241},kaapstad:{name:'Cape Town',lat:-33.9249,lon:18.4241},amsterdam:{name:'Amsterdam',lat:52.3676,lon:4.9041},rotterdam:{name:'Rotterdam',lat:51.9244,lon:4.4777},utrecht:{name:'Utrecht',lat:52.0907,lon:5.1214},eindhoven:{name:'Eindhoven',lat:51.4416,lon:5.4697},groningen:{name:'Groningen',lat:53.2194,lon:6.5665},maastricht:{name:'Maastricht',lat:50.8514,lon:5.691},zwolle:{name:'Zwolle',lat:52.5168,lon:6.083},enschede:{name:'Enschede',lat:52.2215,lon:6.8937},hengelo:{name:'Hengelo',lat:52.2574,lon:6.7928},almelo:{name:'Almelo',lat:52.3566,lon:6.6625},arnhem:{name:'Arnhem',lat:51.9851,lon:5.8987},nijmegen:{name:'Nijmegen',lat:51.8426,lon:5.8546}};
 export const clamp=(value,min=0,max=100)=>Math.max(min,Math.min(max,value));export const roundScore=value=>Math.round(clamp(value)/5)*5;export const roundMoney=value=>Math.round(Number(value)||0);export const validCoordinate=point=>Boolean(point)&&Number.isFinite(point.lat)&&Number.isFinite(point.lon)&&Math.abs(point.lat)<=90&&Math.abs(point.lon)<=180;
