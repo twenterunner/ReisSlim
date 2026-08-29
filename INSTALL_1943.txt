@@ -1,0 +1,18 @@
+ReisSlim 1.15.3 / build 1943
+
+Upload the files from the runtime ZIP directly into the repository root, replacing files with the same names.
+Do NOT delete app.js: build 1943's service worker repairs the current app-source contract when serving app.js.
+
+Required new files:
+- runtime-source-repair-1943.js
+- release-sync-1943.js
+
+Required replacements:
+- service-worker.js
+- storage.js
+- config.js
+- manifest.webmanifest
+
+The remaining runtime files in the ZIP are the tested 1942 route/image modules carried forward unchanged.
+
+After deployment, the new service worker activates and reloads an open ReisSlim page once with `runtime=1943` so the repaired source is used immediately. Confirm the UI reports v1.15.3 / 1943 before judging the result.

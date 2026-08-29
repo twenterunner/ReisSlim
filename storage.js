@@ -14,6 +14,8 @@ function safeParse(value, fallback) {
 export function migrateState(input) {
   if (!input || typeof input !== 'object' || !input.trip) return null;
   const trip = normalizeTrip(input.trip);
+  const plan = input.plan && typeof input.plan === 'object' ? input.plan : null;
+  const sameEngine = Number(input.engineVersion) === ENGINE_VERSION;
   return {
     schemaVersion: STORAGE_SCHEMA_VERSION,
     engineVersion: ENGINE_VERSION,
@@ -25,7 +27,8 @@ export function migrateState(input) {
     dismissedIds: Array.isArray(input.dismissedIds) ? input.dismissedIds : [],
     selectedVariantId: input.selectedVariantId || null,
     optimized: Boolean(input.optimized),
-    needsRebuild: Number(input.engineVersion) !== ENGINE_VERSION || !input.plan,
+    plan,
+    needsRebuild: !sameEngine || !plan,
     savedAt: input.savedAt || new Date().toISOString()
   };
 }
