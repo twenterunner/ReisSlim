@@ -7,9 +7,10 @@ export const ROADTRIP_POLICY=Object.freeze({
   repeatStayMinDays:4,
   repeatPoiThreshold:85,
   maxRepeatNights:1,
-  shortTripRegionRadiusKm:190,
-  anchorVisitRadiusKm:75,
-  corridorRadiusKm:95,
+  preferredMaxStayNights:3,
+  shortTripRegionRadiusKm:220,
+  anchorVisitRadiusKm:85,
+  corridorRadiusKm:135,
   baseRadiusKm:95,
   baseDayTripMinKm:30
 });
@@ -44,15 +45,11 @@ function configuredMaxChanges(trip,nights){
 }
 
 /*
- * maxChanges is a ceiling, never a diversity target.
- *
- * Builds <=1929 accidentally used maxChanges+1 as the REQUIRED number of
- * different overnight bases. With the normal 10-day / max-5 input this forced
- * six real regions before any itinerary was accepted, even though a coherent
- * 10-day roadtrip can deliberately spend more than one night in a strong region.
- *
- * The minimum now scales with duration and pace. The solver may still use more
- * bases when that improves the route, up to the user's change limit.
+ * This is the preferred diversity target, not a hard validity gate. A roadtrip
+ * should normally reach this many real overnight regions, but temporary live
+ * provider gaps must not make an otherwise coherent trip impossible. The solver
+ * therefore tries this target first and only degrades to fewer real regions when
+ * no feasible path exists.
  */
 export function requiredDistinctOvernights(trip){
   const nights=Math.max(0,Number(trip?.days||0)-1);
@@ -63,37 +60,24 @@ export function requiredDistinctOvernights(trip){
   return Math.min(sensibleMinimum,maxDistinctByChanges)
 }
 
-/*
- * Spread intentional stay nights into contiguous, balanced blocks.
- * The old round(i*n/(r+1)) formula could cluster mandatory repeat slots.
- * Example: 9 nights / 3 bases produced four consecutive repeat slots, while
- * maxConsecutive was 3, making the solver mathematically impossible.
- */
-function repeatSlots(nightCount,repeatsNeeded){
-  if(repeatsNeeded<=0)return new Set();
-  const groups=Math.max(1,nightCount-repeatsNeeded);
-  const baseSize=Math.floor(nightCount/groups),extra=nightCount%groups;
-  const slots=new Set();
-  let cursor=0;
-  for(let group=0;group<groups;group++){
-    const size=baseSize+(group<extra?1:0);
-    for(let offset=1;offset<size;offset++)slots.add(cursor+offset);
-    cursor+=size;
-  }
-  return slots
+function hardMinimumDistinctOvernights(trip){
+  const nights=Math.max(0,Number(trip?.days||0)-1);
+  if(nights<=1)return nights;
+  return Math.min(nights,2)
 }
 
+/*
+ * A repeat is an intentional multi-night stay. The exact cadence and maximum
+ * consecutive stay length are enforced by selectRoadtripOvernights(); this
+ * predicate only determines whether repeats are conceptually allowed.
+ */
 export function repeatStayAllowed(point,trip,nightIndex,nightCount){
   const days=Number(trip?.days||0);
-  if(days<ROADTRIP_POLICY.repeatStayMinDays)return false;
-  const required=requiredDistinctOvernights(trip);
-  const repeatsNeeded=Math.max(0,Number(nightCount||0)-required);
-  if(repeatsNeeded<=0)return false;
-  const scheduled=repeatSlots(Number(nightCount||0),repeatsNeeded).has(Number(nightIndex));
+  if(days<ROADTRIP_POLICY.repeatStayMinDays||Number(nightIndex)<=0||Number(nightCount)<=1)return false;
   const highPoi=Number(point?.poiRichness||0)>=ROADTRIP_POLICY.repeatPoiThreshold;
   const preferenceFit=Number(point?.preferenceScore||0)>=12;
   const relaxed=trip?.tripPace==='relaxed';
-  return Boolean(scheduled||highPoi||preferenceFit||relaxed)
+  return Boolean(days>=6||highPoi||preferenceFit||relaxed)
 }
 
 function pointSegmentDistanceKm(p,a,b){
@@ -106,15 +90,16 @@ function pointSegmentDistanceKm(p,a,b){
 
 function regionRadiusKm(trip){
   const days=Number(trip?.days||0);
-  return days<=5?ROADTRIP_POLICY.shortTripRegionRadiusKm:Math.min(420,ROADTRIP_POLICY.shortTripRegionRadiusKm+(days-5)*35)
+  return days<=5?ROADTRIP_POLICY.shortTripRegionRadiusKm:Math.min(650,ROADTRIP_POLICY.shortTripRegionRadiusKm+(days-5)*55)
 }
 
 function candidateRelevant(point,origin,anchor,trip){
   if(!finitePoint(anchor))return true;
   const nearAnchor=estimatedRoadKm(point,anchor)<=regionRadiusKm(trip);
   const corridor=pointSegmentDistanceKm(point,origin,anchor)<=ROADTRIP_POLICY.corridorRadiusKm;
-  const notPastAnchor=geoKm(origin,point)<=geoKm(origin,anchor)+ROADTRIP_POLICY.corridorRadiusKm;
-  return nearAnchor||(corridor&&notPastAnchor)
+  const notFarPastAnchor=geoKm(origin,point)<=geoKm(origin,anchor)+ROADTRIP_POLICY.corridorRadiusKm*1.5;
+  const nearOrigin=estimatedRoadKm(origin,point)<=maximumRoadLegKm(trip)*1.08;
+  return nearAnchor||(corridor&&notFarPastAnchor)||nearOrigin
 }
 
 function anchorVisited(path,anchor,destinationId,origin){
@@ -123,31 +108,30 @@ function anchorVisited(path,anchor,destinationId,origin){
   return path.some(p=>p.catalogId===destinationId||estimatedRoadKm(p,anchor)<=ROADTRIP_POLICY.anchorVisitRadiusKm)
 }
 
-export function selectRoadtripOvernights({origin,trip,destination,candidates}){
-  const nights=Math.max(0,Number(trip?.days||0)-1);
-  const maxRoadKm=maximumRoadLegKm(trip);
-  const maxChanges=configuredMaxChanges(trip,nights);
-  const required=requiredDistinctOvernights(trip);
-  const repeatsNeeded=Math.max(0,nights-required);
-  const plannedRepeatSlots=repeatSlots(nights,repeatsNeeded);
-  const maxConsecutive=Math.max(2,Math.ceil(nights/Math.max(1,required)));
+function repeatSlotsForBlocks(nightCount,blockCount){
+  if(nightCount<=1)return new Set();
+  const baseSize=Math.floor(nightCount/blockCount),extra=nightCount%blockCount;
+  const slots=new Set();
+  let cursor=0;
+  for(let group=0;group<blockCount;group++){
+    const size=baseSize+(group<extra?1:0);
+    for(let offset=1;offset<size;offset++)slots.add(cursor+offset);
+    cursor+=size;
+  }
+  return slots
+}
+
+function solveRoadtripPath({origin,trip,destination,pool,nights,maxRoadKm,maxChanges,targetDistinct,blockCount}){
+  const plannedRepeatSlots=repeatSlotsForBlocks(nights,blockCount);
+  const maxConsecutive=Math.max(2,Math.ceil(nights/Math.max(1,blockCount)));
   const anchor=destination?.bases?.[0]||destination?.anchor||null;
   const destinationId=destination?.id||null;
-
-  if(!finitePoint(origin)||nights<1)return[];
-
-  const pool=(candidates||[])
-    .filter(p=>finitePoint(p)&&p.catalogId)
-    .filter(p=>estimatedRoadKm(origin,p)>=ROADTRIP_POLICY.minRoadMoveKm)
-    .filter(p=>candidateRelevant(p,origin,anchor,trip));
-
-  if(!pool.length)return[];
-
-  let beam=[{path:[],score:0,consecutive:0,changes:0}],beamWidth=320;
+  let beam=[{path:[],score:0,consecutive:0,changes:0}],beamWidth=480;
   const targetLeg=Math.min(maxRoadKm*.58,trip?.transport==='motorcycle'?185:215);
 
   for(let night=0;night<nights;night++){
     const remaining=nights-night-1,next=[];
+    const scheduledRepeat=night>0&&plannedRepeatSlots.has(night);
 
     for(const row of beam){
       const current=row.path.at(-1)||origin;
@@ -155,9 +139,11 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
       for(const p of pool){
         const same=row.path.length>0&&current.catalogId===p.catalogId;
         const road=same?0:estimatedRoadKm(current,p);
-        const scheduledRepeat=row.path.length>0&&plannedRepeatSlots.has(night);
 
+        // Repeat nights are deliberate contiguous stays. Block boundaries must
+        // move to another real region so a long trip cannot collapse into one base.
         if(scheduledRepeat&&!same)continue;
+        if(!scheduledRepeat&&night>0&&same)continue;
         if(!same&&(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm))continue;
         if(same&&!repeatStayAllowed(p,trip,night,nights))continue;
 
@@ -171,16 +157,24 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
         if(trip?.routeTopology!=='open-ended'&&home>maxRoadKm*Math.max(1,remaining+1))continue;
 
         const path=[...row.path,p],distinct=new Set(path.map(x=>x.catalogId)).size;
+        const remainingBoundaries=[...Array(remaining).keys()].reduce((sum,offset)=>{
+          const futureNight=night+1+offset;
+          return sum+(!plannedRepeatSlots.has(futureNight)?1:0)
+        },0);
+        if(distinct+remainingBoundaries<targetDistinct)continue;
+
         const anchorRoad=finitePoint(anchor)?estimatedRoadKm(p,anchor):0;
         const legComfort=same?0:Math.abs(road-targetLeg);
-        const anchorBonus=(p.catalogId===destinationId?180:0)+(finitePoint(anchor)?Math.max(0,130-anchorRoad*.45):0);
-        const variety=distinct*145;
-        const repeatPenalty=same?120:0;
-        const comfortPenalty=legComfort*.20;
+        const anchorBonus=(p.catalogId===destinationId?180:0)+(finitePoint(anchor)?Math.max(0,135-anchorRoad*.42):0);
+        const variety=distinct*155;
+        const repeatPenalty=same?45:0;
+        const comfortPenalty=legComfort*.18;
+        const preferenceBonus=Number(p.preferenceScore||0)*.4+Number(p.poiRichness||0)*.24+Number(p.vehicleScore||0)*4;
+        const returnBonus=trip?.routeTopology==='open-ended'?0:(remaining<=2?Math.max(0,100-home*.18):0);
 
         next.push({
           path,
-          score:row.score+variety+anchorBonus-comfortPenalty-repeatPenalty,
+          score:row.score+variety+anchorBonus+preferenceBonus+returnBonus-comfortPenalty-repeatPenalty,
           consecutive,
           changes
         })
@@ -195,12 +189,44 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
   return beam
     .filter(row=>{
       const distinct=new Set(row.path.map(x=>x.catalogId)).size;
-      if(distinct<required||row.changes>maxChanges||!anchorVisited(row.path,anchor,destinationId,origin))return false;
+      if(distinct<targetDistinct||row.changes>maxChanges||!anchorVisited(row.path,anchor,destinationId,origin))return false;
       if(trip?.routeTopology==='open-ended')return true;
       const home=estimatedRoadKm(row.path.at(-1),origin);
       return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm
     })
     .sort((a,b)=>b.score-a.score)[0]?.path||[]
+}
+
+export function selectRoadtripOvernights({origin,trip,destination,candidates}){
+  const nights=Math.max(0,Number(trip?.days||0)-1);
+  const maxRoadKm=maximumRoadLegKm(trip);
+  const maxChanges=configuredMaxChanges(trip,nights);
+  const preferred=requiredDistinctOvernights(trip);
+  const hardMinimum=hardMinimumDistinctOvernights(trip);
+  const anchor=destination?.bases?.[0]||destination?.anchor||null;
+
+  if(!finitePoint(origin)||nights<1)return[];
+
+  const pool=(candidates||[])
+    .filter(p=>finitePoint(p)&&p.catalogId)
+    .filter(p=>estimatedRoadKm(origin,p)>=ROADTRIP_POLICY.minRoadMoveKm)
+    .filter(p=>candidateRelevant(p,origin,anchor,trip));
+
+  if(!pool.length)return[];
+
+  // Preferred diversity is attempted first. Only if the real candidate topology
+  // cannot satisfy it do we fall back one level at a time, never below two real
+  // overnight regions for a multi-night moving roadtrip.
+  const maxBlocks=Math.max(1,Math.min(nights,maxChanges+1));
+  const comfortBlocks=Math.ceil(nights/ROADTRIP_POLICY.preferredMaxStayNights);
+  for(let target=preferred;target>=hardMinimum;target--){
+    const minimumBlocks=Math.min(maxBlocks,Math.max(target,comfortBlocks));
+    for(let blockCount=minimumBlocks;blockCount<=maxBlocks;blockCount++){
+      const path=solveRoadtripPath({origin,trip,destination,pool,nights,maxRoadKm,maxChanges,targetDistinct:target,blockCount});
+      if(path.length===nights)return path
+    }
+  }
+  return[]
 }
 
 function prefScore(p,trip){
@@ -278,7 +304,7 @@ function validateBaseTrip(trip,plan){
 export function validateRoadtrip(trip,plan){
   if(trip?.tripStructure==='base')return validateBaseTrip(trip,plan);
   const days=Number(trip?.days||0);
-  if(days<=1)return{valid:true,code:'single-day',violations:[],distinct:0,required:0,moves:[]};
+  if(days<=1)return{valid:true,code:'single-day',violations:[],distinct:0,required:0,recommendedDistinct:0,moves:[]};
 
   const rows=plan?.days||[],violations=[];
   if(rows.length!==days)violations.push(`day-count:${rows.length}/${days}`);
@@ -301,10 +327,15 @@ export function validateRoadtrip(trip,plan){
     if(d.toPoint?.generatedExploration===true||d.toPoint?.landValidated===false)violations.push(`synthetic-stop:${i+1}`)
   }
 
-  const distinct=new Set(ids).size,required=requiredDistinctOvernights(trip);
+  const distinct=new Set(ids).size,recommendedDistinct=requiredDistinctOvernights(trip),required=hardMinimumDistinctOvernights(trip);
   const allowedRepeatNights=Math.max(0,overnightRows.length-required);
   if(repeatedNights>allowedRepeatNights)violations.push(`too-many-repeat-nights:${repeatedNights}/${allowedRepeatNights}`);
   if(distinct<required)violations.push(`distinct-overnights:${distinct}/${required}`);
+
+  const maxChanges=configuredMaxChanges(trip,Math.max(0,days-1));
+  let changes=0,previousId=null;
+  for(const id of ids){if(previousId!==null&&id!==previousId)changes++;previousId=id}
+  if(changes>maxChanges)violations.push(`too-many-changes:${changes}/${maxChanges}`);
 
   const last=rows.at(-1);
   if(trip?.routeTopology!=='open-ended'){
@@ -313,5 +344,16 @@ export function validateRoadtrip(trip,plan){
     violations.push('open-ended-no-progression')
   }
 
-  return{valid:violations.length===0,code:violations.length?'roadtrip-invalid':'roadtrip-ok',violations,distinct,required,moves,repeatedNights}
+  return{
+    valid:violations.length===0,
+    code:violations.length?'roadtrip-invalid':'roadtrip-ok',
+    violations,
+    distinct,
+    required,
+    recommendedDistinct,
+    diversityShortfall:Math.max(0,recommendedDistinct-distinct),
+    moves,
+    repeatedNights,
+    changes
+  }
 }

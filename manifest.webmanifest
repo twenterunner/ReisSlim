@@ -2,30 +2,16 @@
   "id": "./",
   "name": "ReisSlim – slimme roadtripplanner",
   "short_name": "ReisSlim",
-  "start_url": "./?build=1731",
+  "start_url": "./?build=1931",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f4f6f5",
   "theme_color": "#123f3a",
   "description": "Roadtripplanner vanaf het door de gebruiker gekozen vertrekpunt, met live route, specifieke stops, kaart en GPX.",
-  "categories": [
-    "travel",
-    "navigation",
-    "lifestyle"
-  ],
+  "categories": ["travel","navigation","lifestyle"],
   "icons": [
-    {
-      "src": "reisslim-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "reisslim-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    {"src":"reisslim-icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"reisslim-icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }
