@@ -74,10 +74,11 @@ function hardMinimumDistinctOvernights(trip){
 export function repeatStayAllowed(point,trip,nightIndex,nightCount){
   const days=Number(trip?.days||0);
   if(days<ROADTRIP_POLICY.repeatStayMinDays||Number(nightIndex)<=0||Number(nightCount)<=1)return false;
-  const highPoi=Number(point?.poiRichness||0)>=ROADTRIP_POLICY.repeatPoiThreshold;
-  const preferenceFit=Number(point?.preferenceScore||0)>=12;
-  const relaxed=trip?.tripPace==='relaxed';
-  return Boolean(days>=6||highPoi||preferenceFit||relaxed)
+  // Once the solver has deliberately allocated a repeat block, the repeat is
+  // intentional by construction. Requiring high POI/preference scores here made
+  // 4- and 5-day trips mathematically impossible when only two real regions were
+  // available, despite the hard diversity floor explicitly allowing two.
+  return true
 }
 
 function pointSegmentDistanceKm(p,a,b){
@@ -108,93 +109,72 @@ function anchorVisited(path,anchor,destinationId,origin){
   return path.some(p=>p.catalogId===destinationId||estimatedRoadKm(p,anchor)<=ROADTRIP_POLICY.anchorVisitRadiusKm)
 }
 
-function repeatSlotsForBlocks(nightCount,blockCount){
-  if(nightCount<=1)return new Set();
-  const baseSize=Math.floor(nightCount/blockCount),extra=nightCount%blockCount;
-  const slots=new Set();
-  let cursor=0;
-  for(let group=0;group<blockCount;group++){
-    const size=baseSize+(group<extra?1:0);
-    for(let offset=1;offset<size;offset++)slots.add(cursor+offset);
-    cursor+=size;
-  }
-  return slots
+function balancedBlockSizes(nightCount,blockCount){
+  if(blockCount<=0||nightCount<=0)return[];
+  const base=Math.floor(nightCount/blockCount),extra=nightCount%blockCount;
+  return Array.from({length:blockCount},(_,i)=>base+(i<extra?1:0))
 }
 
-function solveRoadtripPath({origin,trip,destination,pool,nights,maxRoadKm,maxChanges,targetDistinct,blockCount}){
-  const plannedRepeatSlots=repeatSlotsForBlocks(nights,blockCount);
-  const maxConsecutive=Math.max(2,Math.ceil(nights/Math.max(1,blockCount)));
+/*
+ * Solve the route at accommodation-block level, not one night at a time.
+ *
+ * A 60-day roadtrip with five accommodation changes has at most six actual
+ * move blocks. Builds <=1931 expanded every repeated night inside the beam
+ * search, multiplying identical states and making long trips extremely slow.
+ * Searching only the real moves is both equivalent for the hard constraints
+ * and dramatically cheaper. Once a block path is found, it is expanded into
+ * deliberate multi-night stays.
+ */
+function solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targetDistinct,blockCount}){
   const anchor=destination?.bases?.[0]||destination?.anchor||null;
   const destinationId=destination?.id||null;
-  let beam=[{path:[],score:0,consecutive:0,changes:0}],beamWidth=480;
-  const targetLeg=Math.min(maxRoadKm*.58,trip?.transport==='motorcycle'?185:215);
+  const targetLeg=Math.min(maxRoadKm*.62,trip?.transport==='motorcycle'?185:220);
+  const beamWidth=Math.min(180,Math.max(64,pool.length*7));
+  let beam=[{blocks:[],score:0}];
 
-  for(let night=0;night<nights;night++){
-    const remaining=nights-night-1,next=[];
-    const scheduledRepeat=night>0&&plannedRepeatSlots.has(night);
-
+  for(let block=0;block<blockCount;block++){
+    const remainingBlocks=blockCount-block-1,next=[];
     for(const row of beam){
-      const current=row.path.at(-1)||origin;
-
+      const current=row.blocks.at(-1)||origin;
       for(const p of pool){
-        const same=row.path.length>0&&current.catalogId===p.catalogId;
-        const road=same?0:estimatedRoadKm(current,p);
+        if(row.blocks.length&&current.catalogId===p.catalogId)continue;
+        const road=estimatedRoadKm(current,p);
+        if(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm)continue;
 
-        // Repeat nights are deliberate contiguous stays. Block boundaries must
-        // move to another real region so a long trip cannot collapse into one base.
-        if(scheduledRepeat&&!same)continue;
-        if(!scheduledRepeat&&night>0&&same)continue;
-        if(!same&&(road<ROADTRIP_POLICY.minRoadMoveKm||road>maxRoadKm))continue;
-        if(same&&!repeatStayAllowed(p,trip,night,nights))continue;
-
-        const consecutive=same?row.consecutive+1:1;
-        if(consecutive>maxConsecutive)continue;
-
-        const changes=row.changes+(!same&&row.path.length>0?1:0);
-        if(changes>maxChanges)continue;
-
+        // A loop must still be geometrically capable of getting home using the
+        // remaining move blocks plus the final return leg.
         const home=estimatedRoadKm(p,origin);
-        if(trip?.routeTopology!=='open-ended'&&home>maxRoadKm*Math.max(1,remaining+1))continue;
+        if(trip?.routeTopology!=='open-ended'&&home>maxRoadKm*Math.max(1,remainingBlocks+1))continue;
 
-        const path=[...row.path,p],distinct=new Set(path.map(x=>x.catalogId)).size;
-        const remainingBoundaries=[...Array(remaining).keys()].reduce((sum,offset)=>{
-          const futureNight=night+1+offset;
-          return sum+(!plannedRepeatSlots.has(futureNight)?1:0)
-        },0);
-        if(distinct+remainingBoundaries<targetDistinct)continue;
+        const blocks=[...row.blocks,p],distinct=new Set(blocks.map(x=>x.catalogId)).size;
+        if(distinct+remainingBlocks<targetDistinct)continue;
 
         const anchorRoad=finitePoint(anchor)?estimatedRoadKm(p,anchor):0;
-        const legComfort=same?0:Math.abs(road-targetLeg);
-        const anchorBonus=(p.catalogId===destinationId?180:0)+(finitePoint(anchor)?Math.max(0,135-anchorRoad*.42):0);
-        const variety=distinct*155;
-        const repeatPenalty=same?45:0;
-        const comfortPenalty=legComfort*.18;
+        const anchorBonus=(p.catalogId===destinationId?220:0)+(finitePoint(anchor)?Math.max(0,150-anchorRoad*.45):0);
+        const legComfort=Math.abs(road-targetLeg);
         const preferenceBonus=Number(p.preferenceScore||0)*.4+Number(p.poiRichness||0)*.24+Number(p.vehicleScore||0)*4;
-        const returnBonus=trip?.routeTopology==='open-ended'?0:(remaining<=2?Math.max(0,100-home*.18):0);
-
-        next.push({
-          path,
-          score:row.score+variety+anchorBonus+preferenceBonus+returnBonus-comfortPenalty-repeatPenalty,
-          consecutive,
-          changes
-        })
+        const variety=distinct*165;
+        const returnBonus=trip?.routeTopology==='open-ended'?0:(remainingBlocks<=1?Math.max(0,120-home*.22):0);
+        next.push({blocks,score:row.score+anchorBonus+preferenceBonus+variety+returnBonus-legComfort*.16});
       }
     }
-
     next.sort((a,b)=>b.score-a.score);
     beam=next.slice(0,beamWidth);
     if(!beam.length)return[]
   }
 
-  return beam
-    .filter(row=>{
-      const distinct=new Set(row.path.map(x=>x.catalogId)).size;
-      if(distinct<targetDistinct||row.changes>maxChanges||!anchorVisited(row.path,anchor,destinationId,origin))return false;
-      if(trip?.routeTopology==='open-ended')return true;
-      const home=estimatedRoadKm(row.path.at(-1),origin);
-      return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm
-    })
-    .sort((a,b)=>b.score-a.score)[0]?.path||[]
+  const best=beam.filter(row=>{
+    const distinct=new Set(row.blocks.map(x=>x.catalogId)).size;
+    if(distinct<targetDistinct||!anchorVisited(row.blocks,anchor,destinationId,origin))return false;
+    if(trip?.routeTopology==='open-ended')return true;
+    const home=estimatedRoadKm(row.blocks.at(-1),origin);
+    return home>=ROADTRIP_POLICY.minRoadMoveKm&&home<=maxRoadKm
+  }).sort((a,b)=>b.score-a.score)[0];
+  if(!best)return[];
+
+  const sizes=balancedBlockSizes(nights,blockCount),expanded=[];
+  best.blocks.forEach((p,i)=>{for(let n=0;n<sizes[i];n++)expanded.push(p)});
+  return expanded
 }
 
 export function selectRoadtripOvernights({origin,trip,destination,candidates}){
@@ -222,7 +202,7 @@ export function selectRoadtripOvernights({origin,trip,destination,candidates}){
   for(let target=preferred;target>=hardMinimum;target--){
     const minimumBlocks=Math.min(maxBlocks,Math.max(target,comfortBlocks));
     for(let blockCount=minimumBlocks;blockCount<=maxBlocks;blockCount++){
-      const path=solveRoadtripPath({origin,trip,destination,pool,nights,maxRoadKm,maxChanges,targetDistinct:target,blockCount});
+      const path=solveRoadtripBlocks({origin,trip,destination,pool,nights,maxRoadKm,targetDistinct:target,blockCount});
       if(path.length===nights)return path
     }
   }
@@ -265,12 +245,22 @@ export function selectBaseDayTrips({base,trip,candidates,count}){
     .filter(p=>p.oneWay>=ROADTRIP_POLICY.baseDayTripMinKm&&p.oneWay*2<=maxTotal)
     .sort((a,b)=>(prefScore(b,trip)-Math.abs(b.oneWay-90)*.12)-(prefScore(a,trip)-Math.abs(a.oneWay-90)*.12));
 
-  const picked=[];
+  const unique=[];
   for(const p of pool){
-    if(picked.some(x=>geoKm(x,p)<18))continue;
-    picked.push(p);
-    if(picked.length>=count)break
+    if(unique.some(x=>geoKm(x,p)<18))continue;
+    unique.push(p);
+    if(unique.length>=count)break
   }
+  if(!unique.length)return[];
+  if(unique.length>=count)return unique.slice(0,count);
+
+  // A long base holiday does not require a different town every single day.
+  // Builds <=1931 returned fewer rows than requested once the finite nearby-town
+  // pool was exhausted, and app.js interpreted that as a fatal planning error.
+  // Reuse the strongest genuine day-trip targets only after every unique target
+  // has been used once. validateBaseTrip still requires variety when possible.
+  const picked=[...unique];
+  for(let i=unique.length;i<count;i++)picked.push({...unique[(i-unique.length)%unique.length],reusedDayTrip:true});
   return picked
 }
 
@@ -310,7 +300,10 @@ export function validateRoadtrip(trip,plan){
   if(rows.length!==days)violations.push(`day-count:${rows.length}/${days}`);
 
   const origin=plan?.routeMetrics?.origin||plan?.origin||rows[0]?.fromPoint;
-  const overnightRows=trip?.routeTopology==='open-ended'?rows:rows.slice(0,-1);
+  // `days` counts calendar days, so every trip has days-1 overnight nights.
+  // The final open-ended transfer is an endpoint, not an extra accommodation
+  // night. Counting it as an overnight added a phantom accommodation change.
+  const overnightRows=rows.slice(0,-1);
   const ids=[],moves=[];
   let repeatedNights=0;
 

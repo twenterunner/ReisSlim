@@ -1,0 +1,22 @@
+ReisSlim v1.14.5 / build 1932
+
+Replace the files in the repository root with the files from the runtime ZIP. Do not create a subfolder.
+
+Changed runtime files:
+- config.js
+- roadtrip-policy.js
+- regional-overnight-provider.js
+- image-provider.js
+- service-worker.js
+- release-sync-1932.js
+- manifest.webmanifest
+- package.json
+- roadtrip-runtime-engine.js (unchanged helper included for a complete tested import set)
+
+After GitHub Pages deploys:
+1. Reload ReisSlim once.
+2. Confirm footer/version reports v1.14.5 / build 1932.
+3. Repeat the exact 10-day Saasveld search from the screenshot.
+4. If an installed PWA remains on an older worker, fully close/reopen once; build 1932 calls skipWaiting + clients.claim and network-first code loading.
+
+Test evidence is in VERIFICATION_1932.json and ROOT_CAUSE_TEST_REPORT_1932.md in the full package.
