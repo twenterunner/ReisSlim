@@ -1,0 +1,76 @@
+{
+  "release": "ReisSlim 1.14.2 build 1929",
+  "baseline": "Current GitHub main 1.14.1 / 1928. app.js and index.html intentionally preserved.",
+  "root_causes_corrected": {
+    "accommodation": "1928 limited Nominatim fallback to at most two unresolved nights. 1929 runs Photon and Nominatim for every unresolved overnight after 25/60 km Overpass searches.",
+    "fuel_lunch": "1928 used a single approximate route target and could end at a generic link. 1929 computes targets by cumulative route distance, scales fuel-stop count by range, and widens the actual route corridor 5 -> 10 -> 18 km before independent fallbacks."
+  },
+  "verification": {
+    "javascript_syntax": {
+      "config.js": true,
+      "route-stop-provider-1929.js": true,
+      "overnight-accommodation-1929.js": true,
+      "release-sync-1929.js": true,
+      "service-worker.js": true
+    },
+    "300km_route_mock": {
+      "fuel": [
+        "Route Fuel"
+      ],
+      "lunch": [
+        "Route Lunch"
+      ],
+      "coverage": {
+        "specific": 3,
+        "fallbackLinks": 2,
+        "source": "Progressive route-corridor Overpass + Photon + Nominatim + resilient cache",
+        "fuelCoverage": [
+          {
+            "day": 1,
+            "needed": 1,
+            "specific": 1
+          }
+        ],
+        "lunchCoverage": [
+          {
+            "day": 1,
+            "needed": 1,
+            "specific": 1
+          }
+        ],
+        "lastChecked": "2026-08-29T04:37:15.774Z"
+      }
+    },
+    "650km_route_mock": {
+      "fuels": [
+        "Fuel West",
+        "Fuel East"
+      ],
+      "coverage": [
+        {
+          "day": 1,
+          "needed": 2,
+          "specific": 2
+        }
+      ]
+    },
+    "four_night_fallback_mock": {
+      "nominatimCalls": 4,
+      "specific": 4,
+      "names": [
+        "Hotel Night 3",
+        "Hotel Night 3",
+        "Hotel Night 3",
+        "Hotel Night 4"
+      ]
+    },
+    "service_worker": {
+      "new_cache_epoch": true,
+      "poi_import_rerouted": true,
+      "accommodation_import_rerouted": true,
+      "release_sync_1929_injected": true
+    },
+    "full_android_device_not_executed_here": true,
+    "live_external_provider_test_not_available_in_runtime": true
+  }
+}

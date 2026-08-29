@@ -1,6 +1,6 @@
-export const VERSION = '1.14.1';
-export const BUILD = '1928';
-export const ENGINE_VERSION = 66;
+export const VERSION = '1.14.2';
+export const BUILD = '1929';
+export const ENGINE_VERSION = 67;
 export const STORAGE_SCHEMA_VERSION = 7;
 export const preferenceDefinitions=[['natuur','Natuur'],['bergen','Bergen'],['zwemmen','Zwemmen'],['wandelen','Wandelen'],['kinderen','Kindvriendelijk'],['motor','Mooie wegen'],['cultuur','Cultuur'],['eten','Eten'],['kust','Kust'],['budget','Budget']];
 export const transportProfiles={
