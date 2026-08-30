@@ -262,10 +262,20 @@ function initialBearing(a,b){
   return(Math.atan2(y,x)*180/Math.PI+360)%360
 }
 function interpolateGreatCircle(a,b,t){
-  // For roadtrip-scale legs a linear lat/lon interpolation is stable and keeps
-  // the point on the origin/anchor corridor; longitude is normalized afterward.
-  let dLon=Number(b.lon)-Number(a.lon);if(dLon>180)dLon-=360;if(dLon<-180)dLon+=360;
-  return{lat:Number(a.lat)+(Number(b.lat)-Number(a.lat))*t,lon:((Number(a.lon)+dLon*t+540)%360)-180}
+  // True spherical interpolation keeps equal route fractions equal in geodesic
+  // distance. The old linear lat/lon interpolation could make a nominally legal
+  // boundary leg slightly longer than maximumRoadLegKm(), so a destination that
+  // passed feasibility was rejected only after selection.
+  if(!finitePoint(a)||!finitePoint(b))return null;
+  const rad=x=>Number(x)*Math.PI/180,deg=x=>x*180/Math.PI;
+  const lat1=rad(a.lat),lon1=rad(a.lon),lat2=rad(b.lat),lon2=rad(b.lon);
+  const x1=Math.cos(lat1)*Math.cos(lon1),y1=Math.cos(lat1)*Math.sin(lon1),z1=Math.sin(lat1);
+  const x2=Math.cos(lat2)*Math.cos(lon2),y2=Math.cos(lat2)*Math.sin(lon2),z2=Math.sin(lat2);
+  const dot=Math.max(-1,Math.min(1,x1*x2+y1*y2+z1*z2)),omega=Math.acos(dot);
+  if(omega<1e-10)return{lat:Number(a.lat),lon:Number(a.lon)};
+  const so=Math.sin(omega),u=Math.sin((1-t)*omega)/so,v=Math.sin(t*omega)/so;
+  const x=u*x1+v*x2,y=u*y1+v*y2,z=u*z1+v*z2;
+  return{lat:deg(Math.atan2(z,Math.hypot(x,y))),lon:((deg(Math.atan2(y,x))+540)%360)-180}
 }
 function provisionalCandidate(point,id,name){return{...point,name,catalogId:id,generatedExploration:true,landValidated:null,provisionalRoutePoint:true,poiRichness:70,preferenceScore:18,vehicleScore:8}}
 
@@ -282,13 +292,13 @@ function buildProvisionalRoadtripPath({origin,trip,destination,nights,maxRoadKm,
   const anchor=destination?.bases?.[0]||destination?.anchor||null;
   if(!finitePoint(origin)||!finitePoint(anchor)||nights<1)return[];
   const maxBlocks=Math.max(1,Math.min(nights,maxChanges+1)),directRoad=estimatedRoadKm(origin,anchor);
-  const validMove=(a,b)=>{const d=estimatedRoadKm(a,b);return d>=ROADTRIP_POLICY.minRoadMoveKm&&d<=maxRoadKm*.985};
+  const validMove=(a,b)=>{const d=estimatedRoadKm(a,b);return d>=ROADTRIP_POLICY.minRoadMoveKm&&d<=maxRoadKm};
   const makePending=(point,id,label)=>provisionalCandidate(point,id,label);
   const anchorPoint={...anchor,name:anchor.name||destination?.name||'Gekozen reisregio',catalogId:destination?.id||'selected-anchor',generatedExploration:false,landValidated:true,poiRichness:90,preferenceScore:30,vehicleScore:9};
   const blocks=[];
 
   if(directRoad>=ROADTRIP_POLICY.minRoadMoveKm){
-    const legs=Math.max(1,Math.ceil(directRoad/Math.max(1,maxRoadKm*.94)));
+    const legs=Math.max(1,Math.ceil(directRoad/Math.max(1,maxRoadKm)));
     const minimumRoundTripBlocks=trip?.routeTopology==='open-ended'?legs:legs*2-1;
     if(minimumRoundTripBlocks>maxBlocks)return[];
     for(let i=1;i<legs;i++)blocks.push(makePending(interpolateGreatCircle(origin,anchor,i/legs),`provisional-out-${i}`,`Routepunt ${i} · plaats live bepalen`));

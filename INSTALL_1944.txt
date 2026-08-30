@@ -1,0 +1,10 @@
+ReisSlim 1.15.4 / build 1944
+
+Upload the files from the runtime ZIP directly into the repository root, replacing files with the same names.
+
+This release fixes the roadtrip-boundary contract that could reject a destination after it had already been accepted.
+Required replacements: roadtrip-policy.js, service-worker.js, config.js, manifest.webmanifest.
+Required new file: release-sync-1944.js.
+Existing runtime-source-repair-1943.js remains in use by the service worker and must stay in the repository.
+
+After deployment, confirm the UI reports v1.15.4 / 1944.

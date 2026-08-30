@@ -1,6 +1,6 @@
 {
   "name": "reisslim",
-  "version": "1.15.3",
+  "version": "1.15.4",
   "private": true,
   "type": "module",
   "description": "Voertuigbewuste, transparante roadtripplanner voor Nederlandse reizigers.",
@@ -10,5 +10,7 @@
     "check:pwa": "node scripts/check-pwa.mjs",
     "check": "node scripts/check-syntax.mjs && node --test --test-reporter=spec && node scripts/check-pwa.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
