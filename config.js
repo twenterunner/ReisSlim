@@ -1,7 +1,24 @@
-export const VERSION = '1.15.4';
-export const BUILD = '1944';
-export const ENGINE_VERSION = 75;
+export const VERSION = '1.15.6';
+export const BUILD = '1946';
+export const ENGINE_VERSION = 77;
 export const STORAGE_SCHEMA_VERSION = 7;
+
+export const inputLimits=Object.freeze({
+  days:Object.freeze({min:1,max:60,step:1}),
+  budget:Object.freeze({min:500,max:null,step:100}),
+  adults:Object.freeze({min:1,max:8,step:1}),
+  children:Object.freeze({min:0,max:8,step:1}),
+  maxDrive:Object.freeze({min:2,max:10,step:.5}),
+  maxChanges:Object.freeze({min:0,max:20,step:1,movingMin:1}),
+  fuelRangeKm:Object.freeze({min:100,max:1500,step:10}),
+  vehicleMaxSpeedKmh:Object.freeze({min:60,max:130,step:5}),
+  vehicleHeightM:Object.freeze({min:1.8,max:4.5,step:.05}),
+  vehicleLengthM:Object.freeze({min:4,max:20,step:.1}),
+  vehicleWeightKg:Object.freeze({min:1500,max:20000,step:50}),
+  tripName:Object.freeze({maxLength:60}),
+  destinationQuery:Object.freeze({maxLength:100}),
+  notes:Object.freeze({maxLength:500})
+});
 export const preferenceDefinitions=[['natuur','Natuur'],['bergen','Bergen'],['zwemmen','Zwemmen'],['wandelen','Wandelen'],['kinderen','Kindvriendelijk'],['motor','Mooie wegen'],['cultuur','Cultuur'],['eten','Eten'],['kust','Kust'],['budget','Budget']];
 export const transportProfiles={
 car:{label:'Auto',routeMode:'car',consumption:7.2,roadTimeFactor:1,breakEveryHours:2.25,breakMinutes:15,fuelStopMinutes:12,defaultFuelRangeKm:650,arrivalBufferMinutes:10,parkingDaily:10,tollFactor:1,accommodationFactor:1,supportsDimensions:false,accommodationLabel:'hotel of appartement met passende parking'},

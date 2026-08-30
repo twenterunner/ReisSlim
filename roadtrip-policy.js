@@ -68,9 +68,10 @@ export function planningSpeedKmh(trip){
 
 function configuredMaxChanges(trip,nights){
   const value=Number(trip?.maxChanges);
-  const requested=Number.isFinite(value)?Math.max(0,Math.floor(value)):Math.max(0,nights-1);
-  const movingMinimum=trip?.tripStructure==='moving'&&nights>1?1:0;
-  return Math.max(movingMinimum,requested)
+  // Respect the user's hard maximum exactly. UI/model validation prevents an
+  // invalid moving-roadtrip value below 1; the solver must never silently raise
+  // a hard limit on its own.
+  return Number.isFinite(value)?Math.max(0,Math.floor(value)):Math.max(0,nights-1)
 }
 
 /*

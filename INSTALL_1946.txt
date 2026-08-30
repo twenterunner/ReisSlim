@@ -1,0 +1,10 @@
+ReisSlim 1.15.6 · build 1946
+
+Copy the files in the runtime ZIP into the repository root, replacing files with the same names.
+The new service worker forces one reload to runtime=1946 and deletes the old runtime image cache.
+
+Acceptance contract for proposal images:
+- only location-verified images from the selected destination/region are shown;
+- nature is preferred, then city/architecture, then other real POIs;
+- no generic photographic fallback is ever used for a destination card;
+- if no verified image is available, a neutral placeholder remains visible.
