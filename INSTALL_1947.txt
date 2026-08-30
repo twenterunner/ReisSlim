@@ -1,0 +1,4 @@
+ReisSlim 1.15.7 build 1947
+
+Replace the files in the repository root with the files from the runtime ZIP.
+This release makes accommodation coverage a hard per-night invariant: every overnight night has a bed entry on itinerary/map/GPX; live named lodging is preferred and planned search fallback remains visible if public providers fail.
