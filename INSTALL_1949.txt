@@ -1,0 +1,11 @@
+ReisSlim 1.15.9 · build 1949
+
+Upload ALL files from the runtime ZIP to the repository root, replacing files with the same names.
+New file: runtime-source-repair-1949.js
+
+Primary correction:
+- Base trips no longer require the selected central base to be reachable in one day.
+- Transit nights are allocated automatically from the same daily-drive and accommodation-change limits used elsewhere.
+- Example: a 5-day motorcycle trip from Saasveld to the Harz may use two travel days out, one Harz base/daytrip day, and two days back.
+
+After upload, wait for GitHub Pages and confirm the footer shows v1.15.9 · Build 1949.

@@ -401,22 +401,35 @@ function prefScore(p,trip){
   return Number(p.preferenceScore||0)+Number(p.poiRichness||0)*1.4+Number(p.vehicleScore||0)*8
 }
 
+function baseTransitLegBudget(trip){
+  const days=Math.max(1,Math.floor(Number(trip?.days||1)));
+  const byDays=Math.max(1,Math.floor(days/2));
+  if(trip?.strictChanges===false)return byDays;
+  const changes=Math.max(0,Math.floor(Number(trip?.maxChanges)||0));
+  const byChanges=Math.max(1,Math.floor(changes/2)+1);
+  return Math.min(byDays,byChanges)
+}
+
 export function selectRoadtripBase({origin,trip,destination,candidates}){
   const anchor=destination?.bases?.[0]||destination?.anchor||null,maxLeg=maximumRoadLegKm(trip);
   const anchorIsOrigin=finitePoint(anchor)&&geoKm(origin,anchor)<=12;
   const baseRadius=anchorIsOrigin?Math.min(180,maxLeg*.55):Math.max(ROADTRIP_POLICY.baseRadiusKm,Math.min(180,maxLeg*.55));
   if(!finitePoint(origin))return null;
 
+  // A base holiday may legitimately need transit nights. Builds <=1948 required
+  // the central base itself to be reachable in ONE day, so a 5-day Harz trip from
+  // Saasveld was rejected even though two legal travel days out + two back fit.
+  // Reach is therefore constrained by the actual duration and accommodation-change
+  // budget, not by one daily leg.
+  const transitLegBudget=baseTransitLegBudget(trip),maximumReach=maxLeg*transitLegBudget;
   let rows=(candidates||[])
     .filter(p=>finitePoint(p)&&p.catalogId)
-    .filter(p=>estimatedRoadKm(origin,p)<=maxLeg)
+    .filter(p=>estimatedRoadKm(origin,p)<=maximumReach+.05)
     .filter(p=>!finitePoint(anchor)||estimatedRoadKm(p,anchor)<=baseRadius);
 
-  // A base trip needs a reachable real base, not a mandatory inventory of
-  // surrounding towns. If discovery around the selected destination is sparse,
-  // the selected destination itself is a legitimate base and local activity
-  // days can be enriched later from POIs around it.
-  if(!rows.length&&finitePoint(anchor)&&estimatedRoadKm(origin,anchor)<=maxLeg){
+  // The selected destination itself is always a legitimate central-base candidate
+  // when it fits the same general duration/change envelope. No geographic special case.
+  if(!rows.length&&finitePoint(anchor)&&estimatedRoadKm(origin,anchor)<=maximumReach+.05){
     rows=[{...anchor,name:anchor.name||destination?.name||'Uitvalsbasis',catalogId:destination?.id||'selected-base',landValidated:true,generatedExploration:false,poiRichness:80,preferenceScore:20,vehicleScore:8,selectedDestinationBase:true}]
   }
   if(!rows.length)return null;
@@ -424,8 +437,10 @@ export function selectRoadtripBase({origin,trip,destination,candidates}){
   const scored=rows.map(p=>{
     const near=(candidates||[]).filter(q=>q.catalogId!==p.catalogId&&finitePoint(q)&&estimatedRoadKm(p,q)>=ROADTRIP_POLICY.baseDayTripMinKm&&estimatedRoadKm(p,q)*2<=maxLeg).length;
     const anchorKm=finitePoint(anchor)?estimatedRoadKm(p,anchor):0,homeKm=estimatedRoadKm(origin,p),centrality=near*18;
-    const score=prefScore(p,trip)+centrality-Math.max(0,anchorKm-20)*.9-Math.abs(homeKm-Math.min(maxLeg*.65,210))*.08;
-    return{...p,baseScore:Number(score.toFixed(1)),baseWhy:{poiRichness:Number(p.poiRichness||0),preferenceScore:Number(p.preferenceScore||0),reachableDayTrips:near,anchorKm:Math.round(anchorKm)}}
+    const transitLegs=Math.max(1,Math.ceil(homeKm/Math.max(1,maxLeg)));
+    const transitPenalty=Math.max(0,transitLegs-1)*32;
+    const score=prefScore(p,trip)+centrality-Math.max(0,anchorKm-20)*.9-Math.abs(Math.min(homeKm,maxLeg)-Math.min(maxLeg*.65,210))*.08-transitPenalty;
+    return{...p,baseScore:Number(score.toFixed(1)),baseTransitLegs:transitLegs,baseWhy:{poiRichness:Number(p.poiRichness||0),preferenceScore:Number(p.preferenceScore||0),reachableDayTrips:near,anchorKm:Math.round(anchorKm),transitLegs}}
   }).sort((a,b)=>b.baseScore-a.baseScore);
 
   return scored[0]||null
@@ -459,6 +474,61 @@ export function selectBaseDayTrips({base,trip,candidates,count}){
   return picked
 }
 
+
+function chooseBaseTransitCandidate({origin,base,previous,target,trip,candidates,used,remainingLegs,maxLeg,index}){
+  const directPerLeg=estimatedRoadKm(origin,base)/Math.max(1,index+remainingLegs);
+  const rows=(candidates||[])
+    .filter(p=>finitePoint(p)&&p.catalogId&&!used.has(p.catalogId)&&p.catalogId!==base.catalogId)
+    .filter(p=>estimatedRoadKm(previous,p)>=ROADTRIP_POLICY.minRoadMoveKm&&estimatedRoadKm(previous,p)<=maxLeg+.05)
+    .filter(p=>estimatedRoadKm(p,base)<=maxLeg*Math.max(1,remainingLegs)+.05)
+    .map(p=>{
+      const targetKm=geoKm(p,target),legKm=estimatedRoadKm(previous,p);
+      const quality=prefScore(p,trip)*.035;
+      const score=targetKm+Math.abs(legKm-directPerLeg)*.12-quality;
+      return{p,score}
+    }).sort((a,b)=>a.score-b.score);
+  return rows[0]?.p||null
+}
+
+function buildBaseTransitChain({origin,base,trip,candidates,legs}){
+  if(legs<=1)return[base];
+  const maxLeg=maximumRoadLegKm(trip),used=new Set([base.catalogId]),stops=[];
+  let previous=origin;
+  for(let i=1;i<legs;i++){
+    const target=interpolateGreatCircle(origin,base,i/legs),remainingLegs=legs-i;
+    let picked=chooseBaseTransitCandidate({origin,base,previous,target,trip,candidates,used,remainingLegs,maxLeg,index:i});
+    if(!picked){
+      picked=provisionalCandidate(target,`base-transit-${i}`,`Transitnacht ${i} · plaats live bepalen`)
+    }
+    const road=estimatedRoadKm(previous,picked),remaining=estimatedRoadKm(picked,base);
+    if(road>maxLeg+.05||remaining>maxLeg*remainingLegs+.05)return[];
+    stops.push(picked);if(picked.catalogId)used.add(picked.catalogId);previous=picked
+  }
+  if(estimatedRoadKm(previous,base)>maxLeg+.05)return[];
+  stops.push(base);return stops
+}
+
+export function buildBaseTripSkeleton({origin,trip,destination,candidates}){
+  const days=Math.max(1,Math.floor(Number(trip?.days||1)));
+  if(!finitePoint(origin)||days<2)return{valid:false,reason:'missing-origin-or-duration'};
+  const base=selectRoadtripBase({origin,trip,destination,candidates});
+  if(!base)return{valid:false,reason:'no-suitable-base'};
+  const maxLeg=maximumRoadLegKm(trip),directRoad=estimatedRoadKm(origin,base);
+  const transitLegs=Math.max(1,Math.ceil(directRoad/Math.max(1,maxLeg)));
+  if(transitLegs*2>days)return{valid:false,reason:'base-too-far-for-duration',base,transitLegs};
+  const minimumChanges=transitLegs<=1?0:2*(transitLegs-1);
+  if(trip?.strictChanges!==false&&minimumChanges>Math.max(0,Math.floor(Number(trip?.maxChanges)||0)))return{valid:false,reason:'base-transit-exceeds-changes',base,transitLegs,minimumChanges};
+  const outboundStops=buildBaseTransitChain({origin,base,trip,candidates,legs:transitLegs});
+  if(outboundStops.length!==transitLegs)return{valid:false,reason:'base-transit-chain-failed',base,transitLegs};
+  const localDays=Math.max(0,days-transitLegs*2),dayTripTargets=selectBaseDayTrips({base,trip,candidates,count:localDays});
+  if(dayTripTargets.length!==localDays)return{valid:false,reason:'insufficient-base-daytrips',base,transitLegs,localDays};
+  // Mirror transit overnight regions on the way home. This minimises mandatory
+  // accommodation changes and is valid for both base-loop and out-and-back modes;
+  // live road routing may still choose different roads between the same waypoints.
+  const inboundStops=outboundStops.slice(0,-1).reverse();
+  return{valid:true,reason:'base-trip-ok',base,transitLegs,minimumChanges,localDays,outboundStops,inboundStops,dayTripTargets,maxLeg}
+}
+
 function logicalSamePlace(day){
   const a=day?.fromPoint,b=day?.toPoint;
   if(!finitePoint(a)||!finitePoint(b))return false;
@@ -468,25 +538,39 @@ function logicalSamePlace(day){
 function validateBaseTrip(trip,plan){
   const rows=plan?.days||[],violations=[];
   if(rows.length!==Number(trip.days||0))violations.push(`day-count:${rows.length}/${trip.days}`);
-  const origin=plan?.routeMetrics?.origin||plan?.origin||rows[0]?.fromPoint,base=plan?.baseSelection?.point||rows[0]?.toPoint;
+  const origin=plan?.routeMetrics?.origin||plan?.origin||rows[0]?.fromPoint,base=plan?.baseSelection?.point||null,maxLeg=maximumRoadLegKm(trip);
+  if(!finitePoint(origin))violations.push('missing-origin');
   if(!finitePoint(base))violations.push('missing-base');
-  if(rows.length&&finitePoint(origin)&&finitePoint(rows[0]?.toPoint)&&geoKm(origin,rows[0].toPoint)>12&&Number(rows[0].distanceKm||estimatedRoadKm(origin,rows[0].toPoint))<ROADTRIP_POLICY.minRoadMoveKm)violations.push('short-outbound-to-base');
-  const middle=rows.slice(1,-1),targets=[];
-  for(let i=0;i<middle.length;i++){
-    const d=middle[i];
-    if(d.kind!=='daytrip')violations.push(`expected-daytrip:${i+2}`);
-    if(!logicalSamePlace(d))violations.push(`base-changed:${i+2}`);
-    if(finitePoint(d.destinationPoint)){
-      targets.push(String(d.destinationPoint.catalogId||`${d.destinationPoint.lat.toFixed(3)},${d.destinationPoint.lon.toFixed(3)}`))
-    }else violations.push(`missing-daytrip-target:${i+2}`)
+  const targets=[],overnightIds=[];let baseVisited=false,transitDays=0;
+  for(let i=0;i<rows.length;i++){
+    const d=rows[i],a=d?.fromPoint,b=d?.toPoint;
+    if(!finitePoint(a)||!finitePoint(b)){violations.push(`missing-coordinate:${i+1}`);continue}
+    if(i>0&&finitePoint(rows[i-1]?.toPoint)&&geoKm(rows[i-1].toPoint,a)>12)violations.push(`disconnected-day:${i+1}`);
+    const same=logicalSamePlace(d),road=Number(d.distanceKm)>0?Number(d.distanceKm):estimatedRoadKm(a,b);
+    if(d.kind==='daytrip'){
+      if(!finitePoint(base)||geoKm(a,base)>12||geoKm(b,base)>12)violations.push(`base-changed:${i+1}`);
+      if(finitePoint(d.destinationPoint))targets.push(String(d.destinationPoint.catalogId||`${d.destinationPoint.lat.toFixed(3)},${d.destinationPoint.lon.toFixed(3)}`));
+      else violations.push(`missing-daytrip-target:${i+1}`);
+      baseVisited=true
+    }else if(!same){
+      transitDays++;
+      if(road<ROADTRIP_POLICY.minRoadMoveKm&&geoKm(a,b)>12)violations.push(`short-transit:${i+1}:${Math.round(road)}`);
+      if(road>maxLeg+.5)violations.push(`over-daily-leg:${i+1}:${Math.round(road)}/${Math.round(maxLeg)}`)
+    }
+    if(finitePoint(base)&&(geoKm(a,base)<=12||geoKm(b,base)<=12))baseVisited=true;
+    if(i<rows.length-1){
+      overnightIds.push(String(b.catalogId||d.overnight||`${Number(b.lat).toFixed(3)},${Number(b.lon).toFixed(3)}`));
+      if(b.landValidated===false)violations.push(`unresolved-stop:${i+1}`)
+    }
   }
-  // Variety is a quality preference, not a validity gate. A base holiday may
-  // deliberately spend several days in the same real area while live POIs fill
-  // different local activities.
-  const distinctDayTrips=new Set(targets).size;
+  if(!baseVisited)violations.push('base-not-visited');
   const last=rows.at(-1);
   if(rows.length>1&&(!finitePoint(last?.toPoint)||!finitePoint(origin)||geoKm(last.toPoint,origin)>12))violations.push('does-not-return-origin');
-  return{valid:violations.length===0,code:violations.length?'base-trip-invalid':'base-trip-ok',violations,base:base?.name||null,dayTrips:targets.length,distinctDayTrips}
+  let changes=0,prev=null;for(const id of overnightIds){if(prev!==null&&id!==prev)changes++;prev=id}
+  const maxChanges=configuredMaxChanges(trip,Math.max(0,rows.length-1));
+  if(trip?.strictChanges!==false&&changes>maxChanges)violations.push(`too-many-changes:${changes}/${maxChanges}`);
+  const distinctDayTrips=new Set(targets).size;
+  return{valid:violations.length===0,code:violations.length?'base-trip-invalid':'base-trip-ok',violations,base:base?.name||null,dayTrips:targets.length,distinctDayTrips,transitDays,changes,pendingResolution:rows.some(d=>d?.toPoint?.generatedExploration===true&&d?.toPoint?.landValidated!==true)}
 }
 
 export function validateRoadtrip(trip,plan){

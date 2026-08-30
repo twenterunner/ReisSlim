@@ -1,9 +1,9 @@
-importScripts('./runtime-source-repair-1943.js');
+importScripts('./runtime-source-repair-1949.js');
 
-const CACHE='reisslim-v1.15.7-build-1947-night-complete-accommodations';
-const IMAGE_CACHE='reisslim-runtime-images-v4-location-grounded';
-const RELEASE_VERSION='1.15.7';
-const RELEASE_BUILD='1947';
+const CACHE='reisslim-v1.15.9-build-1949-multileg-base-transit';
+const IMAGE_CACHE='reisslim-runtime-images-v5-grounded-delivery';
+const RELEASE_VERSION='1.15.9';
+const RELEASE_BUILD='1949';
 const ASSETS=[
 './pending-01.webp','./pending-02.webp','./pending-03.webp','./pending-04.webp','./pending-05.webp','./pending-06.webp','./pending-07.webp','./pending-08.webp','./pending-09.webp','./pending-10.webp',
 './pending-11.webp','./pending-12.webp','./pending-13.webp','./pending-14.webp','./pending-15.webp','./pending-16.webp','./pending-17.webp','./pending-18.webp','./pending-19.webp','./pending-20.webp',
@@ -14,7 +14,7 @@ const ASSETS=[
 './destination-engine.js','./proposal-engine.js','./constraint-engine.js','./plan-solver.js','./itinerary-engine.js','./itinerary-variants.js','./itinerary-validator.js','./budget-engine.js',
 './trip-quality-engine.js','./trip-optimizer.js','./vehicle-intelligence.js','./recommendation-engine.js','./routing-provider.js','./place-provider.js','./preference-engine.js','./assistant-engine.js','./multimodal-engine.js','./travel-readiness.js',
 './weather-engine.js','./image-provider.js','./map-view.js','./gpx-generator.js','./ui-renderer.js','./ui-feature-flags.js','./poi-gap-filler.js','./pending-overlay-fix.css',
-'./roadtrip-runtime-engine.js','./start-new-trip.js','./planner-submit-guard.js','./route-stop-provider-1929.js','./overnight-accommodation-1929.js','./runtime-source-repair-1943.js','./release-sync-1947.js'
+'./roadtrip-runtime-engine.js','./start-new-trip.js','./planner-submit-guard.js','./route-stop-provider-1929.js','./overnight-accommodation-1929.js','./runtime-source-repair-1949.js','./release-sync-1949.js'
 ];
 
 self.addEventListener('install',event=>{
@@ -36,14 +36,14 @@ self.addEventListener('activate',event=>{
     await Promise.all(keys.filter(key=>key.startsWith('reisslim-')&&key!==CACHE&&key!==IMAGE_CACHE).map(key=>cacheDeleteSafe(key)));
     await self.clients.claim();
     // A new service worker cannot repair the already-running old app module.
-    // Reload every open ReisSlim window exactly once so 1947 takes control of
+    // Reload every open ReisSlim window exactly once so 1949 takes control of
     // app.js immediately instead of requiring a second manual refresh/restart.
     const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
     await Promise.allSettled(clients.map(async client=>{
       try{
         const url=new URL(client.url);
-        if(url.origin!==self.location.origin||url.searchParams.get('runtime')==='1947')return;
-        url.searchParams.set('runtime','1947');
+        if(url.origin!==self.location.origin||url.searchParams.get('runtime')==='1949')return;
+        url.searchParams.set('runtime','1949');
         await client.navigate(url.href);
       }catch{}
     }));
@@ -54,47 +54,56 @@ async function cacheDeleteSafe(key){try{return await caches.delete(key)}catch{re
 
 function syncSourceText(text,pathname=''){
   let out=String(text)
-  .replace(/1\.13\.0-1923-data-engine/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.1-1928-synchronized/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.2-1929-(?:complete-stops|header-repair)/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.3-1930-roadtrip-policy/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.4-1931-roadtrip-resilience/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.5-1932-topology-supply/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.14\.6-1933-(?:cape-global-images|global-images)/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.0-1940-global-adaptive/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.1-1941-selected-trip-contract/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.2-1942-bounded-solver/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.3-1943-runtime-contract/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.4-1944-roadtrip-boundary/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.5-1945-input-limit-contract/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/1\.15\.6-1946-location-grounded-images/g,'1.15.7-1947-night-complete-accommodations')
-  .replace(/\?v=(?:1923|1928|1929|1930|1931|1932|1933|1940|1941|1942|1943|1944|1945|1946)\b/g,'?v=1947')
-  .replace(/version:'1\.13\.0',build:'1923'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.14\.1',build:'1928'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.14\.2',build:'1929'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.14\.3',build:'1930'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.14\.4',build:'1931'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.14\.5',build:'1932'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.0',build:'1940'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.1',build:'1941'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.2',build:'1942'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.3',build:'1943'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.4',build:'1944'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.5',build:'1945'/g,"version:'1.15.7',build:'1947'")
-  .replace(/version:'1\.15\.6',build:'1946'/g,"version:'1.15.7',build:'1947'")
-  .replace(/\.\/poi-gap-filler\.js\?v=1943/g,'./route-stop-provider-1929.js?v=1947')
-  .replace(/\.\/overnight-accommodation\.js\?v=1943/g,'./overnight-accommodation-1929.js?v=1947');
-  if(/(?:^|\/)app\.js$/i.test(pathname)&&self.ReisSlimRuntimeRepair1943?.repairAppContract){
-    out=self.ReisSlimRuntimeRepair1943.repairAppContract(out);
+  .replace(/1\.13\.0-1923-data-engine/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.1-1928-synchronized/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.2-1929-(?:complete-stops|header-repair)/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.3-1930-roadtrip-policy/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.4-1931-roadtrip-resilience/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.5-1932-topology-supply/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.14\.6-1933-(?:cape-global-images|global-images)/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.0-1940-global-adaptive/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.1-1941-selected-trip-contract/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.2-1942-bounded-solver/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.3-1943-runtime-contract/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.4-1944-roadtrip-boundary/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.5-1945-input-limit-contract/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.6-1946-location-grounded-images/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.7-1947-night-complete-accommodations/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/1\.15\.8-1948-grounded-image-delivery/g,'1.15.9-1949-multileg-base-transit')
+  .replace(/\?v=(?:1923|1928|1929|1930|1931|1932|1933|1940|1941|1942|1943|1944|1945|1946|1947|1948)\b/g,'?v=1949')
+  .replace(/version:'1\.13\.0',build:'1923'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.14\.1',build:'1928'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.14\.2',build:'1929'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.14\.3',build:'1930'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.14\.4',build:'1931'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.14\.5',build:'1932'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.0',build:'1940'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.1',build:'1941'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.2',build:'1942'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.3',build:'1943'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.4',build:'1944'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.5',build:'1945'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.6',build:'1946'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.7',build:'1947'/g,"version:'1.15.9',build:'1949'")
+  .replace(/version:'1\.15\.8',build:'1948'/g,"version:'1.15.9',build:'1949'")
+  .replace(/\.\/poi-gap-filler\.js\?v=1943/g,'./route-stop-provider-1929.js?v=1949')
+  .replace(/\.\/overnight-accommodation\.js\?v=1943/g,'./overnight-accommodation-1929.js?v=1949');
+  if(/(?:^|\/)app\.js$/i.test(pathname)){
+    if(self.ReisSlimRuntimeRepair1949?.repairAppContract)out=self.ReisSlimRuntimeRepair1949.repairAppContract(out);
+    // 1948 image contract: app-level hydration must not treat old semantic-only
+    // image metadata as ready. Only location-grounded metadata is considered ready.
+    const oldHasProposalImage="function hasProposalImage(item){return /^https:\\/\\//i.test(String(item?.image?.url||''))&&item?.image?.validatedPhoto===true&&item?.image?.relevance==='destination-specific'}";
+    const groundedHasProposalImage="function hasProposalImage(item){return /^https:\\/\\//i.test(String(item?.image?.url||''))&&item?.image?.validatedPhoto===true&&item?.image?.relevance==='destination-specific'&&item?.image?.locationVerified===true&&Boolean(item?.image?.destinationKey)}";
+    out=out.replace(oldHasProposalImage,groundedHasProposalImage);
   }
   return out;
 }
 
 function injectReleaseScript(html){
   let text=syncSourceText(html)
-    .replace(/<script[^>]*release-sync-(?:1928|1929|1930|1931|1932|1933|1940|1941|1942|1943|1944|1945|1946|1947)\.js[^>]*><\/script>/gi,'');
+    .replace(/<script[^>]*release-sync-(?:1928|1929|1930|1931|1932|1933|1940|1941|1942|1943|1944|1945|1946|1947|1948|1949)\.js[^>]*><\/script>/gi,'');
   if(!/commons\.wikimedia\.org[^>]*rel=["']preconnect/i.test(text))text=text.replace(/<\/head>/i,'<link rel="preconnect" href="https://en.wikipedia.org" crossorigin><link rel="preconnect" href="https://commons.wikimedia.org" crossorigin><link rel="preconnect" href="https://upload.wikimedia.org" crossorigin></head>');
-  return text.replace(/<\/body>/i,'<script src="./release-sync-1947.js?v=1947"></script></body>')
+  return text.replace(/<\/body>/i,'<script src="./release-sync-1949.js?v=1949"></script></body>')
 }
 
 async function networkHtml(request){

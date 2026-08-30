@@ -1,16 +1,16 @@
 const COMMONS_ENDPOINT='https://commons.wikimedia.org/w/api.php';
 const WIKI_ENDPOINTS=['https://en.wikipedia.org/w/api.php'];
-const CACHE_PREFIX='reisslim.image.v10-location-grounded.';
-const NEGATIVE_PREFIX='reisslim.image-miss.v6-location-grounded.';
-const META_TTL=180*24*60*60*1000,NEGATIVE_TTL=6*60*60*1000;
-const FAST_TIMEOUT_MS=450,BACKGROUND_TIMEOUT_MS=2200;
+const CACHE_PREFIX='reisslim.image.v11-grounded-resilient.';
+const NEGATIVE_PREFIX='reisslim.image-miss.v7-grounded-resilient.';
+const META_TTL=180*24*60*60*1000,NEGATIVE_TTL=60*60*1000;
+const VISIBLE_TIMEOUT_MS=1600,BACKGROUND_TIMEOUT_MS=4200;
 const inFlight=new Map(),backgroundInFlight=new Map();
-const backgroundQueue=[];let backgroundActive=0;const BACKGROUND_CONCURRENCY=2;
+const backgroundQueue=[];let backgroundActive=0;const BACKGROUND_CONCURRENCY=4;
 
 const stripHtml=v=>String(v||'').replace(/<[^>]+>/g,'').trim();
 const usableLicense=m=>/CC BY|public domain|CC0/i.test(m?.LicenseShortName?.value||'');
 const badVisual=/\b(map|kaart|flag|vlag|coat of arms|wapen|logo|diagram|schematic|schema|locator|symbol|icon|pictogram|brochure|leaflet|flyer|poster|paper|document|scan|manuscript|certificate|ticket|menu|book|page|pagina|text|sign|signage|plaque|stamp|postcard|drawing|illustration|painting|engraving|etching|seal|chart|graph|screenshot|satellite|aerial map)\b/i;
-const natureVisual=/\b(landscape|landschap|mountain|mountains|berg|bergen|forest|woods|woodland|bos|valley|dal|river|rivier|lake|meer|waterfall|waterval|canyon|gorge|national park|nature reserve|natuur|nature|moor|heath|heide|cliff|klif|trail|hiking|coast|kust|beach|strand|dune|duin|water|fjord)\b/i;
+const natureVisual=/\b(landscape|landschap|mountain|mountains|berg|bergen|forest|woods|woodland|bos|valley|dal|river|rivier|lake|meer|waterfall|waterval|canyon|gorge|national park|nature reserve|natuur|nature|moor|heath|heide|cliff|klif|trail|hiking|coast|kust|beach|strand|dune|duin|water|fjord|meuse|maas)\b/i;
 const architectureVisual=/\b(city|town|stad|village|dorp|street|straat|old town|altstadt|historic|historical|church|kerk|cathedral|castle|kasteel|schloss|fort|fortress|citadel|bridge|brug|architecture|building|gebouw|square|plein|harbour|haven|waterfront|museum|abbey|monastery)\b/i;
 const poiVisual=/\b(road|straße|strasse|weg|route|pass|view|panorama|viewpoint|lookout|monument|landmark|attraction|park|garden|markt|market|station|railway|tower|molen|mill)\b/i;
 
@@ -27,7 +27,7 @@ function visualCategory(text){const value=String(text||'');if(natureVisual.test(
 function categoryRank(category){return category==='nature'?4:category==='city-architecture'?3:category==='poi'?2:1}
 function descriptiveText(page){const m=page?.imageinfo?.[0]?.extmetadata||{};return[page?.title,page?.pageimage,stripHtml(m.ImageDescription?.value),stripHtml(m.ObjectName?.value),stripHtml(m.Categories?.value),page?.terms?.description?.join(' ')].filter(Boolean).join(' ').toLocaleLowerCase('nl-NL')}
 function pageCoordinate(page){const c=page?.coordinates?.[0];return c&&Number.isFinite(Number(c.lat))&&Number.isFinite(Number(c.lon))?{lat:Number(c.lat),lon:Number(c.lon)}:null}
-function fileLooksPhotographic(page){const info=page?.imageinfo?.[0]||{},mime=String(info.mime||'').toLowerCase(),w=Number(info.thumbwidth||info.width||0),h=Number(info.thumbheight||info.height||0),ratio=w&&h?w/h:1.5,text=descriptiveText(page);if(mime&&!/^image\/(jpeg|png|webp)$/i.test(mime))return false;if(badVisual.test(text)||w&&w<360||h&&h<220||ratio<.58||ratio>2.7)return false;return true}
+function fileLooksPhotographic(page){const info=page?.imageinfo?.[0]||{},mime=String(info.mime||'').toLowerCase(),w=Number(info.thumbwidth||info.width||0),h=Number(info.thumbheight||info.height||0),ratio=w&&h?w/h:1.5,text=descriptiveText(page);if(mime&&!/^image\/(jpeg|png|webp)$/i.test(mime))return false;if(badVisual.test(text)||w&&w<320||h&&h<190||ratio<.52||ratio>3)return false;return true}
 function pageImageLooksPhotographic(page){const text=[page?.pageimage,page?.title,page?.terms?.description?.join(' ')].filter(Boolean).join(' ');return Boolean(page?.thumbnail?.source)&&!badVisual.test(text)}
 function locationEvidence(page,destination){const anchor=anchorPoint(destination),p=pageCoordinate(page);if(!anchor||!p)return null;const radius=verificationRadiusKm(destination),distance=distanceKm(anchor,p);if(distance>radius)return null;return{anchor,point:p,distanceKm:Number(distance.toFixed(2)),radiusKm:radius}}
 function destinationNameMatch(page,destination){const text=[page?.title,page?.terms?.description?.join(' ')].filter(Boolean).join(' ').toLocaleLowerCase('nl-NL'),tokens=primaryTokens(destination);return tokens.length?tokens.some(t=>text.includes(t)):false}
@@ -39,16 +39,13 @@ export function normalizeWikipediaImage(payload,destination,endpoint){
   const pages=Object.values(payload?.query?.pages||{}).filter(Boolean),anchor=anchorPoint(destination);if(!pages.length||!anchor)return null;
   const candidates=[];
   for(const page of pages){
-    if(!pageImageLooksPhotographic(page))continue;
+    if(page?.missing!==undefined||!pageImageLooksPhotographic(page))continue;
     const ev=locationEvidence(page,destination);if(!ev)continue;
-    // A nearby POI may legitimately have a different name. Farther candidates
-    // need a destination-name match so a generic search hit elsewhere in the
-    // same broad region cannot masquerade as the selected destination.
-    if(ev.distanceKm>15&&!destinationNameMatch(page,destination))continue;
+    if(ev.distanceKm>18&&!destinationNameMatch(page,destination))continue;
     const title=String(page.title||''),visualText=[page.pageimage,title,page.terms?.description?.join(' ')].filter(Boolean).join(' '),category=visualCategory(visualText),host=new URL(endpoint).hostname,lang=host.split('.')[0];
-    const match=destinationNameMatch(page,destination)?1:0;
-    const score=categoryRank(category)*100+match*70+Math.max(0,60-ev.distanceKm)+(page.index?Math.max(0,18-Number(page.index)):20);
-    candidates.push({score,image:makeVerifiedImage(destination,{url:page.thumbnail.source,sourceUrl:`https://${lang}.wikipedia.org/?curid=${page.pageid}`,title,creator:'Zie bronpagina',license:'Wikimedia-bron; licentie op bronpagina',attribution:`${title} · Wikipedia/Wikimedia`,provider:'Wikipedia page image',visualCategory:category,provisionalAttribution:true},{...ev,method:'wikipedia-page-coordinate'})})
+    const match=destinationNameMatch(page,destination)?1:0,exact=slug(title)===slug(baseName(destination))?1:0;
+    const score=categoryRank(category)*1000+exact*100+match*60+Math.max(0,60-ev.distanceKm)+(page.index?Math.max(0,18-Number(page.index)):20);
+    candidates.push({score,image:makeVerifiedImage(destination,{url:page.thumbnail.source,sourceUrl:`https://${lang}.wikipedia.org/?curid=${page.pageid}`,title,creator:'Zie bronpagina',license:'Wikimedia-bron; licentie op bronpagina',attribution:`${title} · Wikipedia/Wikimedia`,provider:'Wikipedia location page image',visualCategory:category,provisionalAttribution:true},{...ev,method:'wikipedia-location-page-coordinate'})})
   }
   candidates.sort((a,b)=>b.score-a.score);return candidates[0]?.image||null
 }
@@ -58,7 +55,7 @@ export function normalizeCommonsImage(payload,destination=null){
   const pages=Object.values(payload?.query?.pages||{}).filter(p=>p?.imageinfo?.[0]),candidates=[];
   for(const page of pages){
     const info=page.imageinfo[0],m=info.extmetadata||{},ev=locationEvidence(page,destination);if(!ev||!info.thumburl||!fileLooksPhotographic(page)||!usableLicense(m))continue;
-    const text=descriptiveText(page),category=visualCategory(text),score=categoryRank(category)*100+Math.max(0,60-ev.distanceKm)-(badVisual.test(text)?500:0);
+    const text=descriptiveText(page),category=visualCategory(text),score=categoryRank(category)*1000+Math.max(0,70-ev.distanceKm)-(badVisual.test(text)?500:0);
     candidates.push({score,image:makeVerifiedImage(destination,{url:info.thumburl,sourceUrl:info.descriptionurl||`https://commons.wikimedia.org/?curid=${page.pageid}`,title:page.title?.replace(/^File:/,'')||'Bestemmingsbeeld',creator:stripHtml(m.Artist?.value)||'Onbekende maker',license:m.LicenseShortName?.value||'Open licentie',attribution:`${stripHtml(m.Artist?.value)||'Onbekende maker'} · ${m.LicenseShortName?.value||'open licentie'} · Wikimedia Commons`,provider:'Wikimedia Commons geotagged image',visualCategory:category},{...ev,method:'commons-geosearch-coordinate'})})
   }
   candidates.sort((a,b)=>b.score-a.score);return candidates[0]?.image||null
@@ -69,32 +66,71 @@ function write(storage,k,v){try{storage?.setItem(k,JSON.stringify({savedAt:Date.
 function announceImage(destination,image,cached=false){if(!isVerifiedImageForDestination(image,destination))return;try{globalThis.dispatchEvent?.(new CustomEvent('reisslim:image-ready',{detail:{id:destination?.id||null,name:destination?.name||'',image:{...image,cached:Boolean(cached)}}}))}catch{}}
 async function fetchJson(url,fetchImpl,timeoutMs){const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetchImpl(url,{signal:c.signal,headers:{accept:'application/json'},cache:'force-cache'});if(!r?.ok)return null;return await r.json()}catch{return null}finally{clearTimeout(t)}}
 
-async function queryWikipedia(destination,endpoint,{fetchImpl,timeoutMs}){
+async function queryWikipediaExact(destination,endpoint,{fetchImpl,timeoutMs}){
+  if(!anchorPoint(destination))return null;
+  const url=new URL(endpoint);url.search=new URLSearchParams({action:'query',titles:baseName(destination),redirects:'1',prop:'pageimages|pageterms|coordinates',piprop:'thumbnail|name',pithumbsize:'420',wbptterms:'description',colimit:'max',format:'json',origin:'*'});
+  return normalizeWikipediaImage(await fetchJson(url,fetchImpl,timeoutMs),destination,endpoint)
+}
+async function queryWikipediaSearch(destination,endpoint,{fetchImpl,timeoutMs}){
   if(!anchorPoint(destination))return null;
   const base=baseName(destination),country=destination?.country||'',url=new URL(endpoint);
   url.search=new URLSearchParams({action:'query',generator:'search',gsrsearch:`${base} ${country}`.trim(),gsrnamespace:'0',gsrlimit:'8',prop:'pageimages|pageterms|coordinates',piprop:'thumbnail|name',pithumbsize:'420',wbptterms:'description',colimit:'max',format:'json',origin:'*'});
   return normalizeWikipediaImage(await fetchJson(url,fetchImpl,timeoutMs),destination,endpoint)
 }
-async function fastWikipediaImage(destination,{fetchImpl,timeoutMs}){const tasks=WIKI_ENDPOINTS.map(endpoint=>queryWikipedia(destination,endpoint,{fetchImpl,timeoutMs}).then(image=>{if(!image)throw new Error('no-grounded-page-image');return image}));try{return await Promise.any(tasks)}catch{return null}}
-
-async function queryCommonsNearby(destination,{fetchImpl,timeoutMs}){
-  const anchor=anchorPoint(destination);if(!anchor)return null;
-  const url=new URL(COMMONS_ENDPOINT),radiusMeters=Math.max(1000,Math.min(10000,Math.round(verificationRadiusKm(destination)*1000)));
-  url.search=new URLSearchParams({action:'query',generator:'geosearch',ggsprimary:'all',ggsnamespace:'6',ggsradius:String(radiusMeters),ggslimit:'30',ggscoord:`${anchor.lat}|${anchor.lon}`,prop:'imageinfo|coordinates',iiprop:'url|extmetadata|mime|size',iiurlwidth:'420',colimit:'max',format:'json',origin:'*'});
+function destinationPoint(origin,distanceKmValue,bearingDegrees){const R=6371,b=bearingDegrees*Math.PI/180,lat1=Number(origin.lat)*Math.PI/180,lon1=Number(origin.lon)*Math.PI/180,a=distanceKmValue/R,lat2=Math.asin(Math.sin(lat1)*Math.cos(a)+Math.cos(lat1)*Math.sin(a)*Math.cos(b)),lon2=lon1+Math.atan2(Math.sin(b)*Math.sin(a)*Math.cos(lat1),Math.cos(a)-Math.sin(lat1)*Math.sin(lat2));return{lat:lat2*180/Math.PI,lon:lon2*180/Math.PI}}
+async function queryCommonsAt(destination,point,{fetchImpl,timeoutMs}){
+  const url=new URL(COMMONS_ENDPOINT);
+  url.search=new URLSearchParams({action:'query',generator:'geosearch',ggsprimary:'all',ggsnamespace:'6',ggsradius:'10000',ggslimit:'40',ggscoord:`${point.lat}|${point.lon}`,prop:'imageinfo|coordinates',iiprop:'url|extmetadata|mime|size',iiurlwidth:'420',colimit:'max',format:'json',origin:'*'});
   return normalizeCommonsImage(await fetchJson(url,fetchImpl,timeoutMs),destination)
 }
+async function queryCommonsNearby(destination,{fetchImpl,timeoutMs}){const anchor=anchorPoint(destination);return anchor?queryCommonsAt(destination,anchor,{fetchImpl,timeoutMs}):null}
+
+async function firstVerifiedWithUpgrade(destination,tasks){
+  let winner=null,settled=0,resolved=false;return await new Promise(resolve=>{
+    if(!tasks.length)return resolve(null);
+    const finish=()=>{settled++;if(settled===tasks.length&&!resolved){resolved=true;resolve(winner)}};
+    tasks.forEach(task=>Promise.resolve(task).then(image=>{
+      if(image){const previous=winner,chosen=betterImage(image,winner);if(chosen!==previous){winner=chosen;announceImage(destination,winner,false)}if(!resolved){resolved=true;resolve(winner)}}
+      finish();
+    }).catch(finish));
+  })
+}
+async function visibleLookup(destination,{fetchImpl,timeoutMs}){
+  const budget=Math.min(2200,Math.max(700,Number(timeoutMs)||VISIBLE_TIMEOUT_MS));
+  const tasks=[queryCommonsNearby(destination,{fetchImpl,timeoutMs:budget}),...WIKI_ENDPOINTS.map(endpoint=>queryWikipediaExact(destination,endpoint,{fetchImpl,timeoutMs:budget}))];
+  return firstVerifiedWithUpgrade(destination,tasks)
+}
+
 function runBackgroundQueue(){while(backgroundActive<BACKGROUND_CONCURRENCY&&backgroundQueue.length){const job=backgroundQueue.shift();backgroundActive++;Promise.resolve().then(job.run).then(job.resolve,job.resolve).finally(()=>{backgroundActive--;runBackgroundQueue()})}}
-async function backgroundLookup(destination,{fetchImpl,storage}){const k=cacheKey(destination);if(backgroundInFlight.has(k))return backgroundInFlight.get(k);let resolveOuter;const task=new Promise(resolve=>{resolveOuter=resolve});backgroundInFlight.set(k,task);backgroundQueue.push({resolve:resolveOuter,run:async()=>{try{const candidate=await queryCommonsNearby(destination,{fetchImpl,timeoutMs:BACKGROUND_TIMEOUT_MS});if(candidate){const chosen=betterImage(candidate,isVerifiedImageForDestination(destination.image,destination)?destination.image:null);destination.image=chosen;write(storage,k,chosen);announceImage(destination,chosen,false);return chosen}write(storage,NEGATIVE_PREFIX+k,true);return null}finally{backgroundInFlight.delete(k)}}});runBackgroundQueue();return task}
+async function expandedCommonsSearch(destination,fetchImpl){
+  const anchor=anchorPoint(destination);if(!anchor)return null;
+  const radius=verificationRadiusKm(destination),seeds=[anchor];
+  for(const ring of [18,34,50]){if(ring>radius+10)continue;for(const bearing of [0,60,120,180,240,300])seeds.push(destinationPoint(anchor,Math.min(ring,radius*.85),bearing))}
+  let best=null,next=0;
+  const workers=Array.from({length:Math.min(4,seeds.length)},async()=>{while(next<seeds.length){const seed=seeds[next++],image=await queryCommonsAt(destination,seed,{fetchImpl,timeoutMs:BACKGROUND_TIMEOUT_MS});if(image)best=betterImage(image,best)}});
+  await Promise.all(workers);return best
+}
+async function backgroundLookup(destination,{fetchImpl,storage}){
+  const k=cacheKey(destination);if(backgroundInFlight.has(k))return backgroundInFlight.get(k);let resolveOuter;const task=new Promise(resolve=>{resolveOuter=resolve});backgroundInFlight.set(k,task);
+  backgroundQueue.push({resolve:resolveOuter,run:async()=>{try{
+    const searchTasks=[expandedCommonsSearch(destination,fetchImpl),...WIKI_ENDPOINTS.map(endpoint=>queryWikipediaSearch(destination,endpoint,{fetchImpl,timeoutMs:BACKGROUND_TIMEOUT_MS}))];
+    const rows=await Promise.allSettled(searchTasks);let chosen=isVerifiedImageForDestination(destination.image,destination)?destination.image:null;
+    for(const row of rows)if(row.status==='fulfilled'&&row.value)chosen=betterImage(row.value,chosen);
+    if(chosen){destination.image=chosen;write(storage,k,chosen);announceImage(destination,chosen,false);return chosen}
+    write(storage,NEGATIVE_PREFIX+k,true);return null
+  }finally{backgroundInFlight.delete(k)}}});runBackgroundQueue();return task
+}
 
 async function fetchDestinationImageUncached(destination,{fetchImpl,storage,timeoutMs,backgroundRetry}){
   const k=cacheKey(destination),cached=read(storage,k,META_TTL);
   if(isVerifiedImageForDestination(cached,destination)){destination.image=cached;announceImage(destination,cached,true);return{...cached,cached:true}}
   if(destination?.image&&!isVerifiedImageForDestination(destination.image,destination))delete destination.image;
-  if(read(storage,NEGATIVE_PREFIX+k,NEGATIVE_TTL))return null;
-  const image=await fastWikipediaImage(destination,{fetchImpl,timeoutMs:Math.min(FAST_TIMEOUT_MS,Math.max(120,Number(timeoutMs)||FAST_TIMEOUT_MS))});
+  const negative=read(storage,NEGATIVE_PREFIX+k,NEGATIVE_TTL);
+  const image=await visibleLookup(destination,{fetchImpl,timeoutMs:Math.max(VISIBLE_TIMEOUT_MS,Number(timeoutMs)||0)});
   if(image){destination.image=image;write(storage,k,image);announceImage(destination,image,false);if(backgroundRetry!==false&&image.visualCategory!=='nature')void backgroundLookup(destination,{fetchImpl,storage});return image}
-  if(backgroundRetry!==false)void backgroundLookup(destination,{fetchImpl,storage});return null
+  // A previous miss suppresses only expanded background work, never the fast visible lookup.
+  if(backgroundRetry!==false&&!negative)void backgroundLookup(destination,{fetchImpl,storage});return null
 }
-export async function fetchDestinationImage(destination,{fetchImpl=globalThis.fetch,storage=globalThis.localStorage,timeoutMs=FAST_TIMEOUT_MS,backgroundRetry=true}={}){if(typeof fetchImpl!=='function'||!destination||!anchorPoint(destination))return null;const k=cacheKey(destination);if(inFlight.has(k))return inFlight.get(k);const task=fetchDestinationImageUncached(destination,{fetchImpl,storage,timeoutMs,backgroundRetry}).finally(()=>inFlight.delete(k));inFlight.set(k,task);return task}
-export async function enrichDestinationImages(destinations,options={}){const maximum=Number.isFinite(Number(options.maximum))?Math.max(0,Math.floor(Number(options.maximum))):Infinity;const selected=(destinations||[]).filter(Boolean).slice(0,maximum);let cursor=0;const workers=Array.from({length:Math.min(10,selected.length)},async()=>{while(cursor<selected.length){const d=selected[cursor++];if(isVerifiedImageForDestination(d.image,d)){announceImage(d,d.image,true);continue}if(d.image)delete d.image;const image=await fetchDestinationImage(d,options);if(image)d.image=image}});await Promise.all(workers);return destinations}
-export const imageProviderAttribution='Bestemmingsbeelden zijn locatie-gegrond: alleen beelden die via echte pagina-/fotocoördinaten aan de geselecteerde reisregio zijn gekoppeld worden getoond. Natuurbeelden krijgen voorrang; daarna stad/architectuur en andere echte POI’s. Als geen geverifieerd beeld beschikbaar is, blijft een neutrale placeholder zichtbaar.';
+export async function fetchDestinationImage(destination,{fetchImpl=globalThis.fetch,storage=globalThis.localStorage,timeoutMs=VISIBLE_TIMEOUT_MS,backgroundRetry=true}={}){if(typeof fetchImpl!=='function'||!destination||!anchorPoint(destination))return null;const k=cacheKey(destination);if(inFlight.has(k))return inFlight.get(k);const task=fetchDestinationImageUncached(destination,{fetchImpl,storage,timeoutMs,backgroundRetry}).finally(()=>inFlight.delete(k));inFlight.set(k,task);return task}
+export async function enrichDestinationImages(destinations,options={}){const maximum=Number.isFinite(Number(options.maximum))?Math.max(0,Math.floor(Number(options.maximum))):Infinity,selected=(destinations||[]).filter(Boolean).slice(0,maximum);let cursor=0;const workers=Array.from({length:Math.min(10,selected.length)},async()=>{while(cursor<selected.length){const d=selected[cursor++];if(isVerifiedImageForDestination(d.image,d)){announceImage(d,d.image,true);continue}if(d.image)delete d.image;const image=await fetchDestinationImage(d,options);if(image)d.image=image}});await Promise.all(workers);return destinations}
+export const imageProviderAttribution='Bestemmingsbeelden worden alleen getoond wanneer ze aan de echte reisregio zijn gekoppeld. De zichtbare zoeklaag raadpleegt tegelijk een geotagged Wikimedia Commons-zoekactie en de exacte Wikipedia-locatiepagina; natuur krijgt voorrang. Bij een trage bron blijft de zoekactie langer actief en volgt een bredere geografische achtergrondzoekactie, zonder ooit een willekeurige reisfoto te tonen.';

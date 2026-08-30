@@ -1,6 +1,6 @@
-export const VERSION = '1.15.7';
-export const BUILD = '1947';
-export const ENGINE_VERSION = 78;
+export const VERSION = '1.15.9';
+export const BUILD = '1949';
+export const ENGINE_VERSION = 80;
 export const STORAGE_SCHEMA_VERSION = 7;
 
 export const inputLimits=Object.freeze({
