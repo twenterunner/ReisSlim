@@ -2,6 +2,7 @@ import { vehicleProfiles } from './config.js';
 import { createCanonicalPlan } from './canonical-plan-engine.js';
 import { validateCanonicalPlan } from './validator.js';
 import { haversineKm } from './travel-data.js';
+import { annotatePlanContext, summarizePlanContext } from './trip-context.js';
 
 const PREF_TAGS=Object.freeze({
   natuur:['nature','wilderness','wildlife','waterfalls','wetlands','river'],
@@ -73,9 +74,10 @@ export async function discoverDestinations(trip,data,{limit=6,prefilter=36}={}){
   for(const row of ranked){
     const region=await data.getRegion(row.summary.id);if(!region)continue;
     const result=createCanonicalPlan({...trip,destinationQuery:row.summary.name},region,data);if(!result.ok)continue;
+    annotatePlanContext(result.plan,data);
     const validation=validateCanonicalPlan(result.plan);if(!validation.valid)continue;
-    const exactScore=scoreExact(trip,row.summary,result.plan,row.pref);
-    exact.push({...row.summary,...exactScore,matches:row.pref.matches,estimate:result.plan.budget.total,totalDistanceKm:result.plan.budget.distanceKm,changes:result.plan.accommodationChanges,plan:result.plan,reason:reasonText({...exactScore,matches:row.pref.matches}),roughDistanceKm:round(row.rough.km)});
+    const exactScore=scoreExact(trip,row.summary,result.plan,row.pref),context=summarizePlanContext(result.plan);
+    exact.push({...row.summary,...exactScore,matches:row.pref.matches,estimate:result.plan.budget.total,totalDistanceKm:result.plan.budget.distanceKm,changes:result.plan.accommodationChanges,plan:result.plan,context,reason:reasonText({...exactScore,matches:row.pref.matches}),roughDistanceKm:round(row.rough.km)});
   }
   exact.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
   const shortlist=diversify(exact,limit).map((x,i)=>({...x,rank:i+1}));
