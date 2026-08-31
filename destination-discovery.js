@@ -67,7 +67,13 @@ function diversify(rows,limit){
   return selected;
 }
 
-export async function discoverDestinations(trip,data,{limit=6,prefilter=36}={}){
+
+export function visibleDestinationQueue(pool=[],dismissedIds=[],minimum=5){
+  const dismissed=dismissedIds instanceof Set?dismissedIds:new Set(dismissedIds||[]);
+  return (pool||[]).filter(item=>item&&!dismissed.has(item.id)).slice(0,Math.max(5,Number(minimum)||5));
+}
+
+export async function discoverDestinations(trip,data,{limit=15,prefilter=90}={}){
   const origin=data.resolveOrigin(trip.origin);if(!origin)return{ok:false,failure:{code:'ORIGIN_NOT_IN_OFFLINE_CATALOG',reason:'Vertrekpunt kon offline niet betrouwbaar worden herleid.',constraint:'origin',actual:trip.origin,permitted:'offline known place or lat,lon',possibleSolutions:['Kies een bekende plaats uit de offline catalogus.']}};
   const ranked=(data.index?.regions||[]).map(summary=>({summary,...preScore(trip,origin,summary)})).sort((a,b)=>b.score-a.score).slice(0,prefilter);
   const exact=[];
