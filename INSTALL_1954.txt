@@ -1,0 +1,16 @@
+ReisSlim 1.16.4 · build 1954
+
+Install:
+1. Extract the runtime ZIP.
+2. Copy every file directly into the ReisSlim repository root, overwriting files with the same names.
+3. Do not delete unrelated existing application files.
+4. Wait for GitHub Pages to redeploy, then reopen/refresh ReisSlim.
+5. Confirm the header shows: v1.16.4 · 1954.
+
+Key acceptance contract:
+- every generated calendar day has at least one map-visible POI/route target;
+- every actual overnight night has a map-visible accommodation marker before live APIs return;
+- concrete live POIs/accommodations replace planned markers when found;
+- provider failure never removes planned POIs or overnight markers;
+- a rejected live route mutation cannot roll back already found POIs/accommodations;
+- selected trips are built only by the canonical trip engine; the service worker loads only the 1954 source repair.

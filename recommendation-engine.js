@@ -1,5 +1,5 @@
-import { validCoordinate } from './config.js?v=1947';
-import { transportId } from './vehicle-intelligence.js?v=1947';
+import { validCoordinate } from './config.js?v=1954';
+import { transportId } from './vehicle-intelligence.js?v=1954';
 
 const rules={
   car:{accommodation:'Specifiek verblijf wordt live gezocht',stop:'Specifieke ruststop wordt live gezocht',restaurant:'Specifieke eetstop wordt live gezocht',activity:'Specifieke activiteit wordt live gezocht',service:'Specifieke voertuigservice wordt live gezocht'},
@@ -59,18 +59,21 @@ export function buildRecommendations(trip,destination,days){
 
 export function collectRecommendationPoints(plan){
   /*
-   * Coverage contract: every overnight night must remain visible on the map/GPX.
-   * Named live POIs are shown as before. For accommodation only, a verified live
-   * lookup failure is also exposed as a planned bed marker at the actual overnight
-   * coordinate with its external search link. Other unresolved POIs stay hidden so
-   * we never pretend a generic restaurant/activity placeholder is a real place.
+   * Rendering is deliberately fail-open for planned route data and fail-closed
+   * for factual claims. Every valid planned recommendation is allowed onto the
+   * map, but is visually labelled as planned because live=false. A provider
+   * outage therefore cannot make a day or night disappear.
    */
-  const recommendations=(plan?.recommendations||[]).filter(item=>validCoordinate(item.point)&&(item.live&&item.genericFallback!==true||item.type==='accommodation'&&item.lookupComplete===true));
-  // A base/daytrip route target is part of the verified route geometry even when
-  // external POI providers temporarily return nothing. Expose that route target
-  // explicitly as a PLANNED activity marker; do not invent a business/attraction.
-  const representedDays=new Set(recommendations.filter(item=>item.type==='activity').map(item=>Number(item.day)));
-  const plannedTargets=(plan?.days||[]).filter(day=>day.kind==='daytrip'&&validCoordinate(day.destinationPoint)&&!representedDays.has(Number(day.day))).map(day=>({type:'activity',name:day.destinationPoint.name||day.location||`Dagdoel dag ${day.day}`,point:{...day.destinationPoint},day:Number(day.day),live:false,genericFallback:true,lookupComplete:true,plannedRouteTarget:true,source:'Canonieke dagritroute',reason:'Geografisch route-doelpunt van deze dagrit. Een specifieker genoemd POI kon nog niet betrouwbaar worden bevestigd.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${day.destinationPoint.lat},${day.destinationPoint.lon}`)}`}));
-  return[...recommendations,...plannedTargets]
+  const recommendations=(plan?.recommendations||[]).filter(item=>validCoordinate(item.point));
+  const representedActivityDays=new Set(recommendations.filter(item=>item.type==='activity').map(item=>Number(item.day)));
+  const representedAccommodationDays=new Set(recommendations.filter(item=>item.type==='accommodation').map(item=>Number(item.day)));
+  const plannedTargets=(plan?.days||[])
+    .filter(day=>day.kind==='daytrip'&&validCoordinate(day.destinationPoint)&&!representedActivityDays.has(Number(day.day)))
+    .map(day=>({type:'activity',name:day.destinationPoint.name||day.location||`Dagdoel dag ${day.day}`,point:{...day.destinationPoint},day:Number(day.day),live:false,genericFallback:true,lookupComplete:true,plannedRouteTarget:true,source:'Canonieke dagritroute',reason:'Geografisch route-doelpunt van deze dagrit. Een specifieker genoemd POI kon nog niet betrouwbaar worden bevestigd.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${day.destinationPoint.lat},${day.destinationPoint.lon}`)}`}));
+  const rows=plan?.days||[];
+  const plannedBeds=rows.slice(0,-1)
+    .filter(day=>validCoordinate(day.toPoint)&&!representedAccommodationDays.has(Number(day.day)))
+    .map(day=>({type:'accommodation',name:`Geplande overnachting dag ${day.day}`,point:{...day.toPoint},day:Number(day.day),night:Number(day.day),live:false,genericFallback:true,lookupComplete:true,plannedAccommodation:true,source:'Canonieke overnachtingslocatie',reason:'Deze nacht blijft op de kaart zichtbaar. Een concrete accommodatie wordt live gezocht; bij provideruitval blijft deze zoeklocatie beschikbaar.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`accommodation near ${day.toPoint.lat},${day.toPoint.lon}`)}`}));
+  return[...recommendations,...plannedTargets,...plannedBeds]
     .map(item=>({...item.point,...item,role:item.type,planned:!item.live}))
 }

@@ -1,4 +1,4 @@
-import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1947';
+import { mapConcurrent } from './roadtrip-runtime-engine.js?v=1954';
 
 const ENDPOINTS=['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter'];
 const PHOTON='https://photon.komoot.io/api/';
