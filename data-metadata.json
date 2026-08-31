@@ -1,0 +1,17 @@
+{
+  "datasetVersion": "2026.08.31.1",
+  "generatedAt": "2026-08-31",
+  "source": "curated stable travel seed; update tooling supports GeoNames dump reconciliation",
+  "licenseNotes": [
+    "OpenStreetMap names/roads may be used during future refresh; attribution required",
+    "GeoNames CC BY 4.0 when dump reconciliation is used"
+  ],
+  "totals": {
+    "countries": 29,
+    "regions": 203,
+    "pois": 409,
+    "scenicAnchors": 203,
+    "accommodationZones": 351,
+    "bases": 351
+  }
+}

@@ -1,0 +1,534 @@
+{
+  "generatedAt": "2026-08-31T14:33:10.991Z",
+  "datasetTotals": {
+    "countries": 29,
+    "regions": 203,
+    "pois": 409,
+    "scenicAnchors": 203,
+    "accommodationZones": 351,
+    "bases": 351
+  },
+  "cases": [
+    {
+      "label": "CASE A Harz base",
+      "query": "Harz",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Harz",
+        "country": "DE",
+        "days": 5,
+        "nights": 4,
+        "changes": 0,
+        "maxDriveActual": 4.78,
+        "offlinePois": [
+          "Torfhaus",
+          "Goslar",
+          "Brocken",
+          "Oderteich",
+          "Rappbode Dam"
+        ],
+        "dayKinds": [
+          "outward",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE B Harz moving",
+      "query": "Harz",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Harz",
+        "country": "DE",
+        "days": 5,
+        "nights": 4,
+        "changes": 2,
+        "maxDriveActual": 4.78,
+        "offlinePois": [
+          "Torfhaus",
+          "Goslar",
+          "Brocken",
+          "Oderteich",
+          "Rappbode Dam"
+        ],
+        "dayKinds": [
+          "outward",
+          "transfer",
+          "daytrip",
+          "transfer",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE C Dinant",
+      "query": "Ardennes & Meuse",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Ardennes & Meuse",
+        "country": "BE",
+        "days": 4,
+        "nights": 3,
+        "changes": 2,
+        "maxDriveActual": 2.54,
+        "offlinePois": [
+          "Citadel of Dinant",
+          "Furfooz"
+        ],
+        "dayKinds": [
+          "outward",
+          "transfer",
+          "transfer",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE D Cape Town 5",
+      "query": "Cape Peninsula",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Cape Peninsula",
+        "country": "ZA",
+        "days": 5,
+        "nights": 4,
+        "changes": 0,
+        "maxDriveActual": 0.99,
+        "offlinePois": [
+          "Cape Point",
+          "Boulders Beach",
+          "Chapman’s Peak Drive"
+        ],
+        "dayKinds": [
+          "outward",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE E Cape Town 10",
+      "query": "Garden Route",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Garden Route",
+        "country": "ZA",
+        "days": 10,
+        "nights": 9,
+        "changes": 2,
+        "maxDriveActual": 4.02,
+        "offlinePois": [
+          "Tsitsikamma National Park",
+          "Knysna Heads",
+          "Seven Passes Road"
+        ],
+        "dayKinds": [
+          "outward",
+          "transfer",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "transfer",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE F Namibia 5",
+      "query": "Sossusvlei & Sesriem",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Sossusvlei & Sesriem",
+        "country": "NA",
+        "days": 5,
+        "nights": 4,
+        "changes": 0,
+        "maxDriveActual": 6.12,
+        "offlinePois": [
+          "Sossusvlei",
+          "Deadvlei",
+          "C27 Namib road"
+        ],
+        "dayKinds": [
+          "outward",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE G Namibia 10",
+      "query": "Etosha",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Etosha",
+        "country": "NA",
+        "days": 10,
+        "nights": 9,
+        "changes": 2,
+        "maxDriveActual": 5.64,
+        "offlinePois": [
+          "Etosha Pan",
+          "Namutoni",
+          "Etosha internal roads"
+        ],
+        "dayKinds": [
+          "outward",
+          "transfer",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "transfer",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE H 1-day",
+      "query": "Veluwe",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Veluwe",
+        "country": "NL",
+        "days": 1,
+        "nights": 0,
+        "changes": 0,
+        "maxDriveActual": 1.77,
+        "offlinePois": [
+          "Hoge Veluwe National Park",
+          "Radio Kootwijk"
+        ],
+        "dayKinds": [
+          "daytrip"
+        ],
+        "overnightStates": [],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE I 60-day",
+      "query": "Harz",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Harz",
+        "country": "DE",
+        "days": 60,
+        "nights": 59,
+        "changes": 0,
+        "maxDriveActual": 4.78,
+        "offlinePois": [
+          "Torfhaus",
+          "Goslar",
+          "Brocken",
+          "Oderteich",
+          "Rappbode Dam",
+          "B4 Torfhaus"
+        ],
+        "dayKinds": [
+          "outward",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "rest",
+          "daytrip",
+          "daytrip",
+          "daytrip",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    },
+    {
+      "label": "CASE J multi-transit",
+      "query": "Spanish Pyrenees",
+      "ok": true,
+      "failure": null,
+      "summary": {
+        "destination": "Spanish Pyrenees",
+        "country": "ES",
+        "days": 12,
+        "nights": 11,
+        "changes": 10,
+        "maxDriveActual": 4.67,
+        "offlinePois": [
+          "Ordesa National Park",
+          "Col du Portalet"
+        ],
+        "dayKinds": [
+          "outward",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "transfer",
+          "return"
+        ],
+        "overnightStates": [
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE",
+          "PLANNED_ACCOMMODATION_ZONE"
+        ],
+        "validator": true,
+        "map": true,
+        "gpx": true
+      }
+    }
+  ],
+  "providerOutage": {
+    "valid": true,
+    "days": 5,
+    "nights": 4,
+    "pois": 5,
+    "routeStatus": "estimated",
+    "nightStates": [
+      "PLANNED_ACCOMMODATION_ZONE",
+      "PLANNED_ACCOMMODATION_ZONE",
+      "PLANNED_ACCOMMODATION_ZONE",
+      "PLANNED_ACCOMMODATION_ZONE"
+    ],
+    "gpx": true,
+    "map": true,
+    "enrichment": {
+      "routing": "unavailable",
+      "pois": "offline-only",
+      "accommodation": "zones-only",
+      "weather": "unavailable",
+      "images": "placeholder"
+    }
+  },
+  "southAfrica": {
+    "regions": 20,
+    "pois": 40,
+    "scenic": 20,
+    "zones": 28
+  },
+  "namibia": {
+    "regions": 18,
+    "pois": 36,
+    "scenic": 18,
+    "zones": 18
+  }
+}

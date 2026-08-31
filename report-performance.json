@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-08-31T14:32:53.365Z",
+  "method": "Production indexing/query functions with genuine catalogue rows cloned only to exercise scale; times are local CPU wall-clock milliseconds.",
+  "destinationSearch": {
+    "100": {
+      "p50": 0.02,
+      "p95": 0.18,
+      "p99": 0.9,
+      "max": 2.551
+    },
+    "1000": {
+      "p50": 0.247,
+      "p95": 0.824,
+      "p99": 1.763,
+      "max": 3.44
+    },
+    "5000": {
+      "p50": 1.433,
+      "p95": 3.358,
+      "p99": 5.186,
+      "max": 8.625
+    }
+  },
+  "poiSpatial": {
+    "10000": {
+      "p50": 0.12,
+      "p95": 1.032,
+      "p99": 2.67,
+      "max": 5.223
+    },
+    "50000": {
+      "p50": 0.516,
+      "p95": 1.477,
+      "p99": 2.387,
+      "max": 7.61
+    }
+  },
+  "planning": {
+    "100": {
+      "p50": 0.208,
+      "p95": 0.557,
+      "p99": 0.925,
+      "max": 1.38
+    },
+    "1000": {
+      "p50": 0.205,
+      "p95": 0.77,
+      "p99": 2.164,
+      "max": 3.586
+    },
+    "5000": {
+      "p50": 0.295,
+      "p95": 2.47,
+      "p99": 9.015,
+      "max": 11.005
+    }
+  },
+  "thresholds": {
+    "destinationP99Ms": 20,
+    "poiP99Ms": 30,
+    "planningP99Ms": 40
+  },
+  "result": "PASS"
+}

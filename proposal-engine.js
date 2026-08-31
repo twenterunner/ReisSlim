@@ -1,25 +1,14 @@
-import { rankDestinationGroups } from './destination-engine.js';
-import { preferenceBonus } from './preference-engine.js';
-const clamp01=value=>Math.max(0,Math.min(1,value)),band=(value,size)=>Math.floor(Number(value||0)/size),overlap=(left=[],right=[])=>{const a=new Set(left),b=new Set(right),union=new Set([...a,...b]);return union.size?[...a].filter(item=>b.has(item)).length/union.size:0};
-const focusProfiles=Object.freeze({balanced:{label:'Beste mix'},closer:{label:'Dichterbij'},cheaper:{label:'Voordeliger'},surprising:{label:'Meer verrassend'},family:{label:'Gezinsvriendelijk'},scenic:{label:'Mooiste route'}});
-function focusBonus(item,focus){if(focus==='closer')return Math.max(0,12-item.distanceKm/90);if(focus==='cheaper')return Math.max(0,(100-item.dimensions.budget)*-.04+6);if(focus==='family')return(item.dimensions.family||50)*.06;if(focus==='scenic')return(item.dimensions.scenery||50)*.05+(item.dimensions.motorcycle||50)*.02;return 0}
-function proposalFromDestination(item,trip,focus,learnedProfile=null){const learned=preferenceBonus(item,learnedProfile),bases=item.bases?.length||1,recommendedBases=Math.max(1,Math.min(bases,trip.maxChanges<=2?1:trip.days>=10?3:2)),topology=trip.routeTopology==='out-and-back'?'heen en terug over dezelfde route':trip.routeTopology==='open-ended'?'open einde — geen terugkeer naar start': 'lus met alternatieve terugcorridor';return{...item,proposalId:item.id,destinationId:item.id,proposalLabel:trip.transport==='motorcycle'?'Roadtrip voor motor':'Roadtripvoorstel',labelReason:`Geselecteerd op jouw voorkeuren: ${(item.preferenceReasons||[]).join('; ')||'algemene roadtripfit'}.`,focusLabel:focusProfiles[focus]?.label||'Beste mix',portfolioScore:item.score+focusBonus(item,focus)+learned.score,learnedPreferenceReasons:learned.reasons,recommendedBases,routeCharacter:topology,tripShape:`${recommendedBases} uitvalsbasis${recommendedBases===1?'':'sen'} · ${trip.days} dagen · ${topology}`,keyTradeoff:item.compromises?.[0]||'Geen harde overschrijding.',evidence:[`Voorkeursmatch ${Math.round((item.preferenceCoverage||0)*100)}%`,...(item.preferenceReasons||[]).slice(0,3),`Roadtripfit ${item.cardMetrics?.roadtrip||item.dimensions.driving}/100`],sourceLabel:item.dynamic?'Live ontdekt via OpenStreetMap binnen roadtripbereik':'ReisSlim regiocatalogus, gefilterd op roadtripbereik'}}
-export function proposalDifference(left,right){if(!left||!right||left.destinationId===right.destinationId)return 0;return clamp01((left.country===right.country?.42:1)*.25+Math.min(1,Math.abs(left.distanceKm-right.distanceKm)/600)*.2+Math.min(1,Math.abs(left.estimate-right.estimate)/1600)*.1+(1-overlap(left.tags,right.tags))*.35+(left.recommendedBases===right.recommendedBases?.25:1)*.1)}
-export function nearDuplicate(left,right){return Boolean(left&&right&&(left.destinationId===right.destinationId||(band(left.distanceKm,90)===band(right.distanceKm,90)&&overlap(left.tags,right.tags)>=.86&&left.country===right.country)))}
-
-// Score is the primary contract: never hide a higher-scoring trip behind a lower-scoring
-// one merely to create visual/geographic variety. Diversity is useful as metadata,
-// not as a reason to reorder the user's best matches.
-export function selectDiversePortfolio(candidates,{limit=20,excludedIds=[]}={}){
-  const excluded=new Set(excludedIds),seen=new Set();
-  return candidates
-    .filter(item=>!excluded.has(item.id))
-    .filter(item=>{const key=item.destinationId||item.id;if(seen.has(key))return false;seen.add(key);return true})
-    .sort((a,b)=>Number(b.portfolioScore||b.score)-Number(a.portfolioScore||a.score)
-      ||Number(b.score)-Number(a.score)
-      ||Number(b.preferenceCoverage||0)-Number(a.preferenceCoverage||0)
-      ||String(a.name||'').localeCompare(String(b.name||''),'nl'))
-    .slice(0,limit);
-}
-export function buildProposalPortfolio(trip,catalog,{limit=8,focus='balanced',excludedIds=[],preferenceProfile=null}={}){const ranking=rankDestinationGroups(trip,catalog),candidates=[...ranking.exact,...ranking.stretched].map(item=>proposalFromDestination(item,trip,focus,preferenceProfile)),visible=selectDiversePortfolio(candidates,{limit:Math.max(6,Math.min(10,Number(limit||8))),excludedIds}),accepted=[...visible.filter(x=>x.category==='exact'),...visible.filter(x=>x.category==='stretch').slice(0,4)];return{...ranking,exact:accepted.filter(x=>x.category==='exact'),stretched:accepted.filter(x=>x.category==='stretch'),visible:accepted,candidates,shortage:accepted.length>=6?null:{requested:6,available:accepted.length,explanation:`Er zijn ${accepted.length} haalbare roadtripopties binnen de huidige voorwaarden.`,relaxations:ranking.closestAdjustments.slice(0,5)},requestedMismatch:ranking.rejected.find(item=>item.intentMatch)||null,focus,focusOptions:focusProfiles}}
-export function getMoreProposals(trip,catalog,shownIds,{limit=4,focus='balanced',preferenceProfile=null}={}){return buildProposalPortfolio(trip,catalog,{limit:Math.max(12,limit),focus,excludedIds:shownIds,preferenceProfile}).visible.slice(0,limit)}
+// ReisSlim v2 compatibility guard. Structural planning moved exclusively to canonical-plan-engine.js.
+const disabled=()=>{throw new Error('LEGACY_STRUCTURAL_PLANNER_DISABLED: use createCanonicalPlan from canonical-plan-engine.js')};
+export const legacyStructuralPlannerDisabled=true;
+export const buildItinerary=disabled;
+export const buildItineraryVariants=disabled;
+export const solveDayAllocation=disabled;
+export const selectRoadtripOvernights=disabled;
+export const selectRoadtripBase=disabled;
+export const selectBaseDayTrips=disabled;
+export const optimisePlan=disabled;
+export const applyOptimizationProposal=disabled;
+export const buildProposalPortfolio=disabled;
+export const buildAlternativeReturnNodes=disabled;
+export default Object.freeze({legacyStructuralPlannerDisabled:true});

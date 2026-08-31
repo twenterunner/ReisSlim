@@ -1,0 +1,47 @@
+import { providerConfig, validCoordinate } from './config.js';
+import { validateCanonicalPlan } from './validator.js';
+import { canonicalSignature } from './canonical-plan-engine.js';
+import { haversineKm } from './travel-data.js';
+const clone=v=>globalThis.structuredClone?globalThis.structuredClone(v):JSON.parse(JSON.stringify(v));
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const timeout=(ms)=>{const c=new AbortController();const id=setTimeout(()=>c.abort(),ms);return{signal:c.signal,clear:()=>clearTimeout(id)}};
+async function jsonFetch(url,ms=5000,options={}){const t=timeout(ms);try{const r=await fetch(url,{...options,signal:t.signal});if(!r.ok)throw new Error(`HTTP_${r.status}`);return await r.json()}finally{t.clear()}}
+function transactional(plan,mutator){const candidate=clone(plan),sig=plan.canonicalSignature||canonicalSignature(plan);candidate.canonicalSignature=sig;const result=mutator(candidate);const finish=p=>{p.canonicalSignature=sig;const validation=validateCanonicalPlan(p);if(!validation.valid)return{committed:false,plan,validation};p.validation=validation;return{committed:true,plan:p,validation}};return result?.then?result.then(finish).catch(error=>({committed:false,plan,error})):finish(result)}
+
+export async function enrichRouting(plan,provider){
+  return transactional(plan,async candidate=>{
+    let liveCount=0;for(const day of candidate.days){if(day.transportMode==='ferry'||day.kind==='rest')continue;try{const r=await provider(day,candidate.trip);if(!r||!Array.isArray(r.geometry)||r.geometry.length<2)continue;if(!validCoordinate(r.geometry[0])||!validCoordinate(r.geometry.at(-1)))continue;if(haversineKm(r.geometry[0],day.fromPoint)>3||haversineKm(r.geometry.at(-1),day.toPoint)>3)continue;const old={distanceKm:day.distanceKm,roadHours:day.roadHours,driveHours:day.driveHours,elapsedHours:day.elapsedHours,geometry:day.geometry,routeSource:day.routeSource};day.distanceKm=Math.round(Number(r.distanceKm)||old.distanceKm);day.roadHours=Number(r.roadHours||r.driveHours||old.roadHours);day.driveHours=Number(r.driveHours||r.elapsedHours||day.roadHours);day.elapsedHours=Number(r.elapsedHours||day.driveHours);day.geometry=r.geometry.map(p=>({lat:Number(p.lat),lon:Number(p.lon),name:p.name||''}));day.routeSource='live-routing';const check=validateCanonicalPlan(candidate);if(!check.valid){Object.assign(day,old);continue}liveCount++}catch{}}
+    candidate.routing={status:liveCount?'live':'estimated',source:liveCount?'live-provider':'offline'};candidate.enrichment.routing=liveCount?`live:${liveCount}/${candidate.days.length}`:'unavailable';return candidate;
+  });
+}
+export async function enrichPois(plan,provider){
+  return transactional(plan,async candidate=>{let added=0;try{const rows=await provider(candidate);for(const p of rows||[]){if(!p?.name||!validCoordinate(p))continue;if((candidate.offlinePois||[]).some(x=>x.id===p.id||haversineKm(x,p)<.05))continue;candidate.offlinePois.push({...p,stable:false,live:true,source:p.source||'live-poi'});added++}}catch{}candidate.enrichment.pois=added?`offline+live:${added}`:'offline-only';return candidate});
+}
+export async function enrichAccommodations(plan,provider){
+  return transactional(plan,async candidate=>{let matched=0;for(const night of candidate.overnights){try{const p=await provider(night,candidate);if(!p?.name||!validCoordinate(p))continue;const radius=Number(night.zone?.preferredRadiusKm||20);if(haversineKm(p,night.zone)>radius*1.5)continue;night.state='SPECIFIC_LIVE_ACCOMMODATION';night.property={...p,canonicalZoneId:night.canonicalZoneId,source:p.source||'live-accommodation'};night.source=night.property.source;matched++}catch{}}candidate.enrichment.accommodation=matched===candidate.overnights.length?'live-all':matched?`live-partial:${matched}/${candidate.overnights.length}`:'zones-only';return candidate});
+}
+export async function enrichWeather(plan,provider){return transactional(plan,async candidate=>{try{const w=await provider(candidate);candidate.weather=w||null;candidate.enrichment.weather=w?'live':'unavailable'}catch{candidate.enrichment.weather='unavailable'}return candidate})}
+export async function enrichImages(plan,provider){
+  return transactional(plan,async candidate=>{let image=null;try{image=await provider(candidate)}catch{}const allowed=new Set([candidate.destinationId,...candidate.offlinePois.map(p=>p.id)]);if(image&&image.url&&allowed.has(image.verifiedEntityId)){candidate.images=[{...image,placeholder:false}];candidate.enrichment.images='live-verified'}else{candidate.images=[{placeholder:true,verifiedEntityId:candidate.destinationId,label:candidate.destinationName}];candidate.enrichment.images='placeholder'}return candidate});
+}
+export async function runEnrichmentPipeline(plan,providers={},onUpdate=()=>{}){
+  let current=plan;for(const [stage,fn] of [['routing',enrichRouting],['pois',enrichPois],['accommodation',enrichAccommodations],['weather',enrichWeather],['images',enrichImages]]){const provider=providers[stage];if(typeof provider!=='function'){current.enrichment[stage]=stage==='pois'?'offline-only':stage==='accommodation'?'zones-only':'unavailable';onUpdate(stage,current,{committed:false,skipped:true});continue}const r=await fn(current,provider);if(r.committed)current=r.plan;else current.enrichment[stage]=`${stage}-discarded`;onUpdate(stage,current,r)}return current;
+}
+
+export const liveProviders={
+  async routing(day){
+    const coords=[day.fromPoint,...(day.waypoints||[]),day.toPoint].map(p=>`${p.lon},${p.lat}`).join(';');const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false`;const d=await jsonFetch(url,providerConfig.routingTimeoutMs);const routes=d?.routes||[],r=day.routePreference==='alternative-return'&&routes.length>1?routes[1]:routes[0];if(!r)return null;return{distanceKm:r.distance/1000,roadHours:r.duration/3600,driveHours:r.duration/3600,elapsedHours:r.duration/3600,geometry:r.geometry.coordinates.map(([lon,lat])=>({lat,lon}))};
+  },
+  async pois(plan){
+    const a=plan.days.find(d=>d.canonicalRegionId===plan.destinationId)?.toPoint||plan.origin;const q=`[out:json][timeout:8];(nwr(around:30000,${a.lat},${a.lon})[tourism];nwr(around:30000,${a.lat},${a.lon})[historic];nwr(around:30000,${a.lat},${a.lon})[natural];);out center 30;`;const d=await jsonFetch('https://overpass-api.de/api/interpreter',providerConfig.poiTimeoutMs,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded;charset=UTF-8'},body:`data=${encodeURIComponent(q)}`});return(d.elements||[]).map(e=>({id:`osm-${e.type}-${e.id}`,name:e.tags?.name,lat:e.lat??e.center?.lat,lon:e.lon??e.center?.lon,type:e.tags?.tourism||e.tags?.historic||e.tags?.natural||'poi',source:'OpenStreetMap/Overpass'})).filter(p=>p.name&&validCoordinate(p)).slice(0,12);
+  },
+  async accommodation(night){
+    const z=night.zone,type=plan.trip?.accommodationType||night.acceptedAccommodationType||'any',filter=type==='camping'?'camp_site|caravan_site':type==='hotel-bnb'?'hotel|guest_house|hostel':'hotel|guest_house|hostel|camp_site|caravan_site',q=`[out:json][timeout:7];(nwr(around:${Math.round((z.preferredRadiusKm||15)*1000)},${z.lat},${z.lon})[tourism~"${filter}"];);out center 20;`;const d=await jsonFetch('https://overpass-api.de/api/interpreter',providerConfig.accommodationTimeoutMs,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded;charset=UTF-8'},body:`data=${encodeURIComponent(q)}`});const row=(d.elements||[]).map(e=>({name:e.tags?.name,lat:e.lat??e.center?.lat,lon:e.lon??e.center?.lon,type:e.tags?.tourism,source:'OpenStreetMap/Overpass',providerId:`osm-${e.type}-${e.id}`})).filter(p=>p.name&&validCoordinate(p)).sort((a,b)=>haversineKm(a,z)-haversineKm(b,z))[0];return row||null;
+  },
+  async weather(plan){
+    const p=plan.days.find(d=>d.canonicalRegionId===plan.destinationId)?.toPoint||plan.origin;const start=plan.trip.startDate,end=new Date(`${start}T12:00:00`);end.setDate(end.getDate()+Math.min(15,plan.trip.days-1));const e=end.toISOString().slice(0,10);return await jsonFetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&start_date=${start}&end_date=${e}&timezone=auto`,providerConfig.weatherTimeoutMs);
+  },
+  async images(plan){
+    const query=encodeURIComponent(`${plan.destinationName} landscape`);const d=await jsonFetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${query}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*`,providerConfig.imageTimeoutMs);const token=norm(plan.destinationName).split(' ')[0];for(const page of Object.values(d.query?.pages||{})){const info=page.imageinfo?.[0],text=norm(`${page.title} ${info?.extmetadata?.ImageDescription?.value||''}`);if(info?.thumburl&&token&&text.includes(token))return{url:info.thumburl,verifiedEntityId:plan.destinationId,source:'Wikimedia Commons',title:page.title}}return null;
+  }
+};

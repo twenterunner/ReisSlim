@@ -1,0 +1,2 @@
+import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url)),root=here,files=fs.readdirSync(root).filter(name=>/\.(?:js|mjs)$/.test(name)).map(name=>path.join(root,name));for(const f of files)execFileSync(process.execPath,['--check',f],{stdio:'pipe'});console.log(JSON.stringify({result:'PASS',files:files.length},null,2));

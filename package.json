@@ -1,14 +1,17 @@
 {
   "name": "reisslim",
-  "version": "1.16.2",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Voertuigbewuste, transparante roadtripplanner voor Nederlandse reizigers.",
+  "description": "Offline-first deterministic roadtrip planner.",
   "scripts": {
-    "test": "node --test --test-reporter=spec",
-    "check:syntax": "node scripts/check-syntax.mjs",
-    "check:pwa": "node scripts/check-pwa.mjs",
-    "check": "node scripts/check-syntax.mjs && node --test --test-reporter=spec && node scripts/check-pwa.mjs"
+    "generate:data": "node tool-generate-dataset.mjs",
+    "validate:data": "node tool-validate-dataset.mjs",
+    "test": "node --test --test-reporter=spec test-*.test.mjs",
+    "bench": "node test-performance.mjs",
+    "check": "node tool-check-syntax.mjs && node tool-validate-dataset.mjs && node tool-check-static.mjs && node --test --test-reporter=spec test-*.test.mjs && node test-performance.mjs",
+    "check:static": "node tool-check-static.mjs",
+    "check:syntax": "node tool-check-syntax.mjs"
   },
   "engines": {
     "node": ">=20"

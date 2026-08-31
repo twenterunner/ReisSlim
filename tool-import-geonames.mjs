@@ -1,0 +1,3 @@
+import fs from 'node:fs';import readline from 'node:readline';
+const file=process.argv[2];if(!file||!fs.existsSync(file)){console.error('Usage: node tool-import-geonames.mjs /path/to/XX.txt');process.exit(2)}
+const wanted=process.argv.slice(3).map(x=>x.toLowerCase()),hits=[];const rl=readline.createInterface({input:fs.createReadStream(file)});for await(const line of rl){const c=line.split('\t');if(c.length<19)continue;const name=c[1],ascii=c[2],lat=Number(c[4]),lon=Number(c[5]),featureClass=c[6],featureCode=c[7],country=c[8];if(!wanted.length||wanted.some(w=>name.toLowerCase()===w||ascii.toLowerCase()===w))hits.push({geonameid:c[0],name,ascii,lat,lon,featureClass,featureCode,country})}console.log(JSON.stringify(hits,null,2));

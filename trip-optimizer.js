@@ -1,12 +1,14 @@
-import { buildBudget } from './budget-engine.js';
-import { evaluatePlanConstraints } from './constraint-engine.js';
-import { calculateTripQuality } from './trip-quality-engine.js';
-const clone=v=>typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v));
-export const createUndoSnapshot=plan=>clone(plan);export const restorePlan=snapshot=>clone(snapshot);
-function structuralFingerprint(plan){return JSON.stringify((plan?.days||[]).map(d=>({kind:d.kind,from:d.from,to:d.to,overnight:d.overnight,fromPoint:d.fromPoint,toPoint:d.toPoint,destinationPoint:d.destinationPoint,geometry:d.geometry}))) }
-function evaluate(trip,destination,plan){const next=clone(plan),budget=buildBudget(trip,destination,next),constraintStatus=evaluatePlanConstraints(trip,next,budget,{allowStretch:destination.category==='stretch'});next.constraintStatus=constraintStatus;next.feasible=constraintStatus.exact;const quality=calculateTripQuality(trip,destination,next,budget);return{plan:next,budget,quality,constraintStatus}}
-function applyNonStructural(plan,ids){const next=clone(plan);for(const id of ids||[]){if(id==='weather')for(const day of next.days||[])if(!day.rainAlternative)day.rainAlternative=`Kies een kortere of overdekte activiteit rond ${day.location||day.to}.`;if(id==='value')next.costStrategy={...(next.costStrategy||{}),accommodationFactor:.9,restaurantFactor:.85,activityFactor:.9,label:'Kostenoptimalisatie zonder routewijziging'}}next.optimized=Boolean((ids||[]).length);next.appliedOptimizationIds=[...(ids||[])];return next}
-export function applyOptimizationProposal(trip,destination,plan,actionIds){const before=structuralFingerprint(plan),next=applyNonStructural(plan,actionIds);if(structuralFingerprint(next)!==before)throw new Error('Optimizer mag canonieke routegeometrie niet wijzigen');return evaluate(trip,destination,next)}
-export function proposeOptimizations(trip,destination,plan,{mode='balanced',locks={}}={}){const baseline=evaluate(trip,destination,plan),available=[];if(!locks.activities)available.push({id:'weather',title:'Weerbestendiger plan',description:'Voegt alleen slechtweer-alternatieven toe; route blijft exact gelijk.'});if(!locks.budget)available.push({id:'value',title:'Lagere kosten',description:'Past alleen kostenstrategie aan; route en overnachtingsstructuur blijven exact gelijk.'});let best={ids:[],result:baseline};for(let mask=1;mask<(1<<available.length);mask++){const ids=available.filter((_,i)=>mask&(1<<i)).map(x=>x.id),result=applyOptimizationProposal(trip,destination,plan,ids);if(!result.constraintStatus.exact)continue;if(result.quality.overall>best.result.quality.overall)best={ids,result}}const actions=available.filter(a=>best.ids.includes(a.id)),roundedGain=Math.round(best.result.quality.overall-baseline.quality.overall),meaningful=actions.length>0&&roundedGain>=4;return{mode,modeLabel:'Niet-structurele optimalisatie',locks:{...locks},actions:meaningful?actions:[],changes:meaningful?actions.map(a=>a.description):[],before:baseline,after:meaningful?best.result:baseline,improvement:{roundedGain:meaningful?roundedGain:0,minimumGain:4,meaningful},meaningful,threshold:'Optimalisatie mag routegeometrie, kalenderdagen en overnachtingsstructuur nooit wijzigen.',message:meaningful?`Verbetering gevonden zonder routewijziging: +${roundedGain} punten.`:'Geen zinvolle niet-structurele optimalisatie nodig.'}}
-export function optimisePlan(trip,destination,plan,options={}){const p=proposeOptimizations(trip,destination,plan,options);return p.meaningful?{plan:p.after.plan,changes:p.changes,proposal:p}:{plan:clone(plan),changes:[],proposal:p}}
-export function constraintsPreserved(before,after,trip){return structuralFingerprint(before)===structuralFingerprint(after)&&before.days.length===after.days.length&&after.days.every(d=>Number(d.elapsedHours??d.driveHours??0)<=trip.maxDrive+.05)&&Number(after.accommodationChanges||0)<=Number(trip.maxChanges||0)}
+// ReisSlim v2 compatibility guard. Structural planning moved exclusively to canonical-plan-engine.js.
+const disabled=()=>{throw new Error('LEGACY_STRUCTURAL_PLANNER_DISABLED: use createCanonicalPlan from canonical-plan-engine.js')};
+export const legacyStructuralPlannerDisabled=true;
+export const buildItinerary=disabled;
+export const buildItineraryVariants=disabled;
+export const solveDayAllocation=disabled;
+export const selectRoadtripOvernights=disabled;
+export const selectRoadtripBase=disabled;
+export const selectBaseDayTrips=disabled;
+export const optimisePlan=disabled;
+export const applyOptimizationProposal=disabled;
+export const buildProposalPortfolio=disabled;
+export const buildAlternativeReturnNodes=disabled;
+export default Object.freeze({legacyStructuralPlannerDisabled:true});

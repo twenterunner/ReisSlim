@@ -1,0 +1,24 @@
+{
+  "result": "BLOCKED_BY_ENVIRONMENT",
+  "attemptedAt": "2026-08-31T14:21:00Z",
+  "browser": "/usr/bin/chromium",
+  "framework": "Python Playwright",
+  "attempts": [
+    "http://127.0.0.1:<ephemeral>/index.html",
+    "https://reisslim.test/index.html with Playwright request interception",
+    "file:///mnt/data/ReisSlim_2.0.0_flat_all/index.html"
+  ],
+  "error": "net::ERR_BLOCKED_BY_ADMINISTRATOR",
+  "verifiedInstead": [
+    "production module pipeline in Node",
+    "controlled provider adapters",
+    "service-worker production script install/activate cache logic in VM",
+    "static precache integrity and cache-version checks",
+    "map model and GPX consistency in authoritative validator"
+  ],
+  "notVerified": [
+    "actual DOM event/render pipeline in Chromium",
+    "actual browser ServiceWorker CacheStorage persistence across offline reload",
+    "browser download UX beyond production GPX generation function"
+  ]
+}

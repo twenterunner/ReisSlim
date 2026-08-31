@@ -1,0 +1,272 @@
+[
+  {
+    "country": "AT",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 9,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "BE",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "BG",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 7,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "CY",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 7,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "CZ",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 8,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "DE",
+    "regions": 11,
+    "pois": 25,
+    "scenicAnchors": 11,
+    "accommodationZones": 15,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "DK",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "EE",
+    "regions": 4,
+    "pois": 8,
+    "scenicAnchors": 4,
+    "accommodationZones": 5,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "ES",
+    "regions": 11,
+    "pois": 22,
+    "scenicAnchors": 11,
+    "accommodationZones": 16,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "FI",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "FR",
+    "regions": 12,
+    "pois": 24,
+    "scenicAnchors": 12,
+    "accommodationZones": 16,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "GR",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 9,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "HR",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 10,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "HU",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 7,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "IE",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "IT",
+    "regions": 11,
+    "pois": 22,
+    "scenicAnchors": 11,
+    "accommodationZones": 18,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "LT",
+    "regions": 4,
+    "pois": 8,
+    "scenicAnchors": 4,
+    "accommodationZones": 7,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "LU",
+    "regions": 4,
+    "pois": 8,
+    "scenicAnchors": 4,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "LV",
+    "regions": 4,
+    "pois": 8,
+    "scenicAnchors": 4,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "MT",
+    "regions": 4,
+    "pois": 8,
+    "scenicAnchors": 4,
+    "accommodationZones": 5,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "NL",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 10,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "PL",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 8,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "PT",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 10,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "RO",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 9,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "SE",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 9,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "SI",
+    "regions": 6,
+    "pois": 12,
+    "scenicAnchors": 6,
+    "accommodationZones": 8,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  },
+  {
+    "country": "SK",
+    "regions": 5,
+    "pois": 10,
+    "scenicAnchors": 5,
+    "accommodationZones": 6,
+    "offlineTrip": "PASS",
+    "providerOutage": "PASS",
+    "result": "PASS"
+  }
+]

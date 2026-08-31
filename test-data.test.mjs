@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {EU27,validCoordinate} from './config.js';import {loadData} from './test-helpers.mjs';
+const {index,countries}=loadData();
+test('all EU27 partitions have meaningful region/POI/zone/scenic coverage',()=>{for(const code of EU27){const c=countries[code];assert.ok(c,code);assert.ok(c.regions.length>=4,`${code} regions`);assert.ok(c.regions.every(r=>r.pois.length>=2&&r.scenicAnchors.length>=1&&r.accommodationZones.length>=1&&r.bases.length>=1),code)}});
+test('all runtime coordinates are valid',()=>{for(const c of Object.values(countries))for(const r of c.regions)for(const p of [r.anchor,...r.bases,...r.pois,...r.scenicAnchors,...r.accommodationZones])assert.ok(validCoordinate(p),`${r.id}:${p.name}`)});
+test('Namibia sparse-road metadata is present',()=>{const rows=countries.NA.regions;assert.ok(rows.some(r=>r.roadCharacter==='gravel'));assert.ok(rows.some(r=>r.remoteness>=5));assert.ok(rows.some(r=>r.fuelGapKm>=300));});
+test('South Africa hard coverage has at least 20 regions',()=>assert.ok(countries.ZA.regions.length>=20));
+test('dataset totals match physical partitions',()=>{const regions=Object.values(countries).reduce((s,c)=>s+c.regions.length,0),pois=Object.values(countries).reduce((s,c)=>s+c.regions.reduce((q,r)=>q+r.pois.length,0),0);assert.equal(regions,index.totals.regions);assert.equal(pois,index.totals.pois)});

@@ -1,88 +1,9 @@
-import { ENGINE_VERSION, STORAGE_SCHEMA_VERSION } from './config.js';
-import { normalizeTrip } from './trip-model.js';
-
-export const STORAGE_KEYS = {
-  current: 'reisslim.current.v7', trips: 'reisslim.trips.v7',
-  legacyCurrent: ['reisslim.current.v6', 'reisslim.current.v5', 'reisslim.current.v4', 'reisslim.current.v3', 'reisslim.current.v2', 'reisslim.current'],
-  legacyTrips: ['reisslim.trips.v6', 'reisslim.trips.v5', 'reisslim.trips.v4', 'reisslim.trips.v3', 'reisslim.trips.v2']
-};
-
-function safeParse(value, fallback) {
-  try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
-}
-
-export function migrateState(input) {
-  if (!input || typeof input !== 'object' || !input.trip) return null;
-  const trip = normalizeTrip(input.trip);
-  const plan = input.plan && typeof input.plan === 'object' ? input.plan : null;
-  const sameEngine = Number(input.engineVersion) === ENGINE_VERSION;
-  return {
-    schemaVersion: STORAGE_SCHEMA_VERSION,
-    engineVersion: ENGINE_VERSION,
-    trip,
-    destinationId: input.destinationId || input.destination?.id || null,
-    destinationProfile: input.destinationProfile?.dynamic ? input.destinationProfile : null,
-    compareIds: Array.isArray(input.compareIds) ? input.compareIds.slice(0, 4) : [],
-    savedProposalIds: Array.isArray(input.savedProposalIds) ? input.savedProposalIds : [],
-    dismissedIds: Array.isArray(input.dismissedIds) ? input.dismissedIds : [],
-    selectedVariantId: input.selectedVariantId || null,
-    optimized: Boolean(input.optimized),
-    plan,
-    needsRebuild: !sameEngine || !plan,
-    savedAt: input.savedAt || new Date().toISOString()
-  };
-}
-
-function readFirst(storage, keys) {
-  for (const key of keys) {
-    let value = null;
-    try { value = safeParse(storage.getItem(key), null); } catch { value = null; }
-    if (value) return { key, value };
-  }
-  return null;
-}
-
-export function saveDraft(state, storage = localStorage) {
-  const record = { ...state, schemaVersion: STORAGE_SCHEMA_VERSION, engineVersion: ENGINE_VERSION, savedAt: new Date().toISOString() };
-  storage.setItem(STORAGE_KEYS.current, JSON.stringify(record));
-  return record;
-}
-
-export function loadDraft(storage = localStorage) {
-  const found = readFirst(storage, [STORAGE_KEYS.current, ...STORAGE_KEYS.legacyCurrent]);
-  if (!found) return null;
-  const migrated = migrateState(found.value);
-  if (migrated && found.key !== STORAGE_KEYS.current) {
-    saveDraft(migrated, storage);
-    try { storage.removeItem(found.key); } catch { /* best effort */ }
-  }
-  return migrated;
-}
-
-export function clearDraft(storage = localStorage) {
-  [STORAGE_KEYS.current, ...STORAGE_KEYS.legacyCurrent].forEach(key => {
-    try { storage.removeItem(key); } catch { /* best effort */ }
-  });
-}
-
-export function loadTrips(storage = localStorage) {
-  const found = readFirst(storage, [STORAGE_KEYS.trips, ...STORAGE_KEYS.legacyTrips]);
-  const records = Array.isArray(found?.value) ? found.value.map(migrateState).filter(Boolean) : [];
-  const sorted = records.sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0));
-  if (found && found.key !== STORAGE_KEYS.trips) storage.setItem(STORAGE_KEYS.trips, JSON.stringify(sorted));
-  return sorted;
-}
-
-export function saveTrip(state, storage = localStorage) {
-  const record = saveDraft(state, storage);
-  const existing = loadTrips(storage).filter(item => item.trip.id !== record.trip.id);
-  const updated = [record, ...existing].slice(0, 20);
-  storage.setItem(STORAGE_KEYS.trips, JSON.stringify(updated));
-  return updated;
-}
-
-export function deleteTrip(id, storage = localStorage) {
-  const updated = loadTrips(storage).filter(item => item.trip.id !== id);
-  storage.setItem(STORAGE_KEYS.trips, JSON.stringify(updated));
-  return updated;
-}
+import { STORAGE_SCHEMA_VERSION, VERSION } from './config.js';
+import { validateCanonicalPlan } from './validator.js';
+const KEY='reisslim.v2.trips';
+export function serializeTrip(plan){return JSON.stringify({schemaVersion:STORAGE_SCHEMA_VERSION,appVersion:VERSION,savedAt:new Date().toISOString(),plan})}
+export function deserializeTrip(text){const x=JSON.parse(text);if(x.schemaVersion!==STORAGE_SCHEMA_VERSION)throw new Error('STORAGE_SCHEMA_MISMATCH');const v=validateCanonicalPlan(x.plan);if(!v.valid)throw Object.assign(new Error('STORED_PLAN_INVALID'),{validation:v});x.plan.validation=v;return x.plan}
+export function loadTrips(storage=localStorage){try{return JSON.parse(storage.getItem(KEY)||'[]').map(x=>{try{return deserializeTrip(x)}catch{return null}}).filter(Boolean)}catch{return[]}}
+export function saveTrip(plan,storage=localStorage){const current=loadTrips(storage).filter(p=>p.createdAt!==plan.createdAt);current.unshift(plan);storage.setItem(KEY,JSON.stringify(current.slice(0,25).map(serializeTrip)));return current}
+export function deleteTrip(createdAt,storage=localStorage){const current=loadTrips(storage).filter(p=>p.createdAt!==createdAt);storage.setItem(KEY,JSON.stringify(current.map(serializeTrip)));return current}
+export class MemoryStorage{constructor(){this.m=new Map()}getItem(k){return this.m.get(k)??null}setItem(k,v){this.m.set(k,String(v))}removeItem(k){this.m.delete(k)}}
