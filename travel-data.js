@@ -47,7 +47,7 @@ export function nearbySpatial(index,point,radiusKm=250,limit=50){
 
 
 export class TravelDataClient{
-  constructor({fetchImpl=globalThis.fetch,baseUrl='.'}={}){this.fetchImpl=fetchImpl;this.baseUrl=baseUrl;this.index=null;this.metadata=null;this.searchIndex=null;this.spatialIndex=null;this.countryCache=new Map()}
+  constructor({fetchImpl=((...args)=>globalThis.fetch(...args)),baseUrl='.'}={}){this.fetchImpl=fetchImpl;this.baseUrl=baseUrl;this.index=null;this.metadata=null;this.searchIndex=null;this.spatialIndex=null;this.countryCache=new Map()}
   async init(){
     if(this.index)return this;
     const [indexRes,metaRes]=await Promise.all([this.fetchImpl(`${this.baseUrl}/data-index.json`),this.fetchImpl(`${this.baseUrl}/data-metadata.json`)]);
