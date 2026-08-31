@@ -1,5 +1,5 @@
 import { CANONICAL_ENGINE_ID, validCoordinate } from './config.js';
-import { canonicalSignature } from './canonical-plan-engine.js';
+import { allowedLoopOverlap, canonicalSignature, loopRouteOverlap } from './canonical-plan-engine.js';
 import { haversineKm } from './travel-data.js';
 import { buildGpx, gpxConsistency } from './gpx-generator.js';
 import { buildMapModel, mapConsistency } from './map-view.js';
@@ -25,6 +25,12 @@ export function validateCanonicalPlan(plan,{requireCanonicalSignature=true}={}){
   }
   if(days.length&& !same(days[0].fromPoint,plan.origin))errors.push(issue('ORIGIN_MISMATCH','First day does not start at canonical origin.'));
   if(days.length&&trip.routeTopology!=='open-ended'&&!same(days.at(-1).toPoint,plan.origin))errors.push(issue('CLOSED_ENDPOINT','Closed trip does not end at origin.'));
+  const destinationApproach=days.findLast?.(d=>d.journeyPhase==='outbound')?.toPoint||days.find(d=>d.canonicalRegionId===plan.destinationId)?.toPoint;
+  if(trip.routeTopology==='loop'&&days.length>1&&destinationApproach&&haversineKm(plan.origin,destinationApproach)>=80){
+    const outbound=days.filter(d=>d.journeyPhase==='outbound'),ret=days.filter(d=>d.journeyPhase==='return');
+    if(!outbound.length||!ret.length)errors.push(issue('LOOP_PHASES','Loop trip lacks explicit outbound/return phases.'));
+    else{const overlap=loopRouteOverlap(plan),distanceKm=haversineKm(plan.origin,destinationApproach),limit=allowedLoopOverlap(distanceKm);if(overlap>limit)errors.push(issue('LOOP_RETURN_OVERLAP',`Alternative return overlaps ${Math.round(overlap*100)}% of the outbound corridor.`,{overlap,limit}));}
+  }
   const visits=days.some(d=>d.canonicalRegionId===plan.destinationId)||(plan.offlinePois||[]).some(p=>p.regionId===plan.destinationId);if(!visits)errors.push(issue('DESTINATION_NOT_VISITED','Canonical destination is not represented in the plan.'));
   const expectedNights=Math.max(0,Number(trip.days)-1);if(nights.length!==expectedNights)errors.push(issue('OVERNIGHT_COUNT',`Expected ${expectedNights} nights; got ${nights.length}.`,{actual:nights.length,expected:expectedNights}));
   for(let i=0;i<nights.length;i++){
