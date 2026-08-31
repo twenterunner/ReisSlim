@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
-  <meta name="reisslim-build" content="2.0.2-2002-offline-canonical">
+  <meta name="reisslim-build" content="2.1.0-2100-offline-discovery">
   <title>ReisSlim – offline-first roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2002">
-  <link rel="stylesheet" href="styles.css?v=2002">
+  <link rel="manifest" href="manifest.webmanifest?v=2100">
+  <link rel="stylesheet" href="styles.css?v=2100">
 </head>
 <body>
-<header class="topbar"><div class="brand"><span class="brand-mark">R</span><div><strong>ReisSlim</strong><small><span id="headerVersion">v2.0.2 · b2002</span> · Offline-first roadtripplanner</small></div></div><button id="newTripBtn" type="button" class="ghost">Nieuwe reis</button></header>
+<header class="topbar"><div class="brand"><span class="brand-mark">R</span><div><strong>ReisSlim</strong><small><span id="headerVersion">v2.1.0 · b2100</span> · Offline-first roadtripplanner</small></div></div><button id="newTripBtn" type="button" class="ghost">Nieuwe reis</button></header>
 <main class="shell">
   <section class="hero"><p class="eyebrow">VERSIONED OFFLINE TRAVEL KNOWLEDGE → CANONICAL PLAN → LIVE ENRICHMENT</p><h1>Je reis bestaat <em>vóór</em> live services.</h1><p>ReisSlim bouwt eerst een bruikbare reis uit de verpakte reiskennis. Live routing, POI’s, accommodaties en weer maken die daarna beter.</p><div id="datasetStats" class="data-badge">Offline catalogus laden…</div></section>
   <section class="layout">
@@ -18,7 +18,7 @@
       <div class="section-head"><div><p class="eyebrow">Reisgegevens</p><h2>Plan je roadtrip</h2></div><span id="status" class="status">Gereed</span></div>
       <div class="grid two">
         <label>Vertrekpunt<input id="origin" list="originList" value="Saasveld" required><datalist id="originList"></datalist></label>
-        <label>Bestemming / regio<input id="destinationQuery" list="destinationList" value="Harz" maxlength="100" required><datalist id="destinationList"></datalist></label>
+        <label>Bestemming / regio<input id="destinationQuery" list="destinationList" value="" maxlength="100" placeholder="Laat leeg voor beste voorstellen"><small id="destinationHint" class="field-hint">Leeg = ReisSlim vergelijkt de beste haalbare bestemmingen vanaf je vertrekpunt.</small><datalist id="destinationList"></datalist></label>
         <label>Startdatum<input id="startDate" type="date" required></label>
         <label>Dagen<input id="days" type="number" min="1" max="60" step="1" value="5" required></label>
         <label>Budget (€)<input id="budget" type="number" min="500" max="100000" step="100" value="3500" required></label>
@@ -43,12 +43,18 @@
       </div></details>
       <section><h3>Voorkeuren <small>0–3</small></h3><div id="preferenceGrid" class="preferences"></div></section>
       <div class="switches"><label><input id="strictBudget" type="checkbox" checked> Budget hard</label><label><input id="strictDrive" type="checkbox" checked> Reistijd hard</label><label><input id="strictChanges" type="checkbox" checked> Wissels hard</label><label><input id="liveData" type="checkbox" checked> Live verrijking</label></div>
-      <button class="primary" type="submit">Bouw reisplan</button>
+      <button id="planSubmit" class="primary" type="submit">Vind beste roadtrips</button>
       <div id="diagnostics"></div>
     </form>
 
     <section class="results">
-      <div id="emptyPlan" class="panel empty"><h2>Nog geen reisplan</h2><p>Het eerste resultaat komt uit de offline catalogus. Live providers zijn niet nodig om deze kaart te vullen.</p></div>
+      <div id="emptyPlan" class="panel empty"><h2>Nog geen reisplan</h2><p>Laat Bestemming / regio leeg en ReisSlim vergelijkt de beste haalbare roadtrips vanaf je vertrekpunt. Of vul een regio in om die direct te plannen.</p></div>
+      <div id="discoveryView" class="hidden discovery-view">
+        <section class="panel discovery-head"><div class="section-head"><div><p class="eyebrow">Reisportfolio</p><h2 id="discoveryTitle">Beste roadtrips</h2><p id="discoveryMeta" class="muted"></p></div><span class="portfolio-badge">CANONICAL</span></div></section>
+        <section id="destinationCards" class="destination-card-grid"></section>
+        <section class="panel"><div class="section-head"><div><p class="eyebrow">Vergelijking</p><h2>Vergelijk voorstellen</h2><p class="muted">Kies op de kaarten welke bestemmingen je naast elkaar wilt zetten.</p></div></div><div id="discoveryComparison" class="comparison-wrap"></div></section>
+        <section class="panel"><div class="section-head"><div><p class="eyebrow">Kaart</p><h2>Waar liggen de voorstellen?</h2><p class="muted">Offline vergelijkingskaart vanaf je vertrekpunt. Lijnen zijn geografische verbindingen, geen live wegroute.</p></div></div><div id="discoveryMap" class="map-wrap discovery-map"></div></section>
+      </div>
       <div id="planView" class="hidden">
         <section class="panel"><div class="section-head"><div><p class="eyebrow">CanonicalPlan</p><h2 id="tripTitle"></h2><p id="tripMeta" class="muted"></p></div><div class="actions"><button id="saveTripBtn" type="button">Opslaan</button><button id="gpxBtn" type="button">GPX</button></div></div><div id="summary" class="summary"></div><div id="enrichment" class="enrichment"></div><div id="validation"></div></section>
         <section id="days" class="days"></section>
@@ -59,6 +65,6 @@
   </section>
 </main>
 <footer><span id="versionLabel">ReisSlim</span> · dataset 2026.08.31.1 · © OpenStreetMap contributors / GeoNames where update tooling is used</footer>
-<script type="module" src="app.js?v=2002"></script>
+<script type="module" src="app.js?v=2100"></script>
 </body>
 </html>
