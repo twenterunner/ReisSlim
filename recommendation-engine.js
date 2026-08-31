@@ -42,6 +42,9 @@ export function buildRecommendations(trip,destination,days){
   for(const day of days){
     const recommendations=[],isTravel=['outward','return','transfer','daytrip'].includes(day.kind),isHomecoming=(day.kind==='return'||day.kind==='daytrip')&&day.to===trip.origin,anchor=day.toPoint||day.fromPoint||destination.bases?.[0];
     recommendations.push(...operationalTargets(day,trip,transport,rule));
+    if(day.kind==='daytrip'&&validCoordinate(day.destinationPoint)){
+      recommendations.push(proposal({day:day.day,type:'activity',name:rule.activity,reason:'Specifieke natuur-, cultuur- of uitzichtstop rond het echte doel van deze lokale dagrit.',point:day.destinationPoint,transport,seed:8}));
+    }
     if(!isHomecoming){
       const accommodationType=trip.accommodationType||'any',accommodationName=accommodationType==='camping'?'Specifieke camping wordt live gezocht':accommodationType==='hotel-bnb'?'Specifiek hotel/B&B wordt live gezocht':rule.accommodation;
       recommendations.push(proposal({day:day.day,type:'accommodation',name:accommodationName,accommodationType,reason:accommodationType==='camping'?'Zoek uitsluitend een specifieke camping zo dicht mogelijk bij de geplande overnachtingsbasis.':accommodationType==='hotel-bnb'?'Zoek uitsluitend een specifiek hotel of B&B zo dicht mogelijk bij de geplande overnachtingsbasis.':'Specifiek verblijf zo dicht mogelijk bij de geplande overnachtingsbasis, met voertuiggeschikte toegang.',point:anchor,transport,seed:4}));

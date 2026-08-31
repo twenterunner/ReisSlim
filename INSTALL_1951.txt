@@ -1,0 +1,10 @@
+ReisSlim 1.16.1 / build 1951 — canonical route engine v2
+
+Copy every file in this ZIP into the repository root, replacing files with the same names.
+Do not delete unrelated assets already in the repository.
+
+After GitHub Pages deploys, confirm the app shows:
+  ReisSlim v1.16.1 · Build 1951
+
+The service worker reloads an already-open page once so the new canonical app path becomes active.
+For a five-day Saasveld -> Harz slimme-uitvalsbasis motorcycle trip, all five calendar days must have route geometry; day 3 is a base -> local target -> base loop.

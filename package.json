@@ -1,6 +1,6 @@
 {
   "name": "reisslim",
-  "version": "1.15.9",
+  "version": "1.16.1",
   "private": true,
   "type": "module",
   "description": "Voertuigbewuste, transparante roadtripplanner voor Nederlandse reizigers.",
