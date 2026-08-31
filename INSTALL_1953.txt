@@ -1,0 +1,15 @@
+ReisSlim 1.16.3 / build 1953
+
+Overwrite ALL files from the runtime ZIP in the repository root.
+Do not omit release-sync-1951.js or release-sync-1952.js: they are upgrade bridges for phones still controlled by an older service worker.
+
+Key 1953 contracts:
+- one canonical selected-trip engine; legacy itinerary variants cannot become the selected structural plan;
+- every requested day has drawable geometry or the trip fails with an exact reason;
+- accommodation coverage is transactional: existing night markers are never deleted before a replacement succeeds;
+- every overnight night remains represented even when all live accommodation sources fail;
+- a verified daytrip route target remains visible as a planned POI target if live POI sources fail;
+- service worker verifies build 1953 via handshake and injects the 1953 runtime integrity layer;
+- header/footer show v1.16.3 / build 1953 only once that worker controls the page.
+
+After upload, open ReisSlim normally. The bridge should update the existing installation without clearing browser data.

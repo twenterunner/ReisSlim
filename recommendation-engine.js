@@ -65,7 +65,12 @@ export function collectRecommendationPoints(plan){
    * coordinate with its external search link. Other unresolved POIs stay hidden so
    * we never pretend a generic restaurant/activity placeholder is a real place.
    */
-  return(plan?.recommendations||[])
-    .filter(item=>validCoordinate(item.point)&&(item.live&&item.genericFallback!==true||item.type==='accommodation'&&item.lookupComplete===true))
+  const recommendations=(plan?.recommendations||[]).filter(item=>validCoordinate(item.point)&&(item.live&&item.genericFallback!==true||item.type==='accommodation'&&item.lookupComplete===true));
+  // A base/daytrip route target is part of the verified route geometry even when
+  // external POI providers temporarily return nothing. Expose that route target
+  // explicitly as a PLANNED activity marker; do not invent a business/attraction.
+  const representedDays=new Set(recommendations.filter(item=>item.type==='activity').map(item=>Number(item.day)));
+  const plannedTargets=(plan?.days||[]).filter(day=>day.kind==='daytrip'&&validCoordinate(day.destinationPoint)&&!representedDays.has(Number(day.day))).map(day=>({type:'activity',name:day.destinationPoint.name||day.location||`Dagdoel dag ${day.day}`,point:{...day.destinationPoint},day:Number(day.day),live:false,genericFallback:true,lookupComplete:true,plannedRouteTarget:true,source:'Canonieke dagritroute',reason:'Geografisch route-doelpunt van deze dagrit. Een specifieker genoemd POI kon nog niet betrouwbaar worden bevestigd.',mapUrl:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${day.destinationPoint.lat},${day.destinationPoint.lon}`)}`}));
+  return[...recommendations,...plannedTargets]
     .map(item=>({...item.point,...item,role:item.type,planned:!item.live}))
 }
