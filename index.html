@@ -1,20 +1,20 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta name="reisslim-build" content="2.2.5-2250-dayplan">
+  <meta name="reisslim-build" content="2.2.6-2260-dayplan">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123f3a">
   <title>ReisSlim – roadtripplanner</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2250">
+  <link rel="manifest" href="manifest.webmanifest?v=2260">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=2250">
+  <link rel="stylesheet" href="styles.css?v=2260">
 </head>
 <body>
   <header class="topbar">
     <div class="brand brand-static" aria-label="ReisSlim">
       <span class="brand-app-icon">R</span>
-      <span class="brand-copy"><strong>ReisSlim</strong><small><span id="headerVersion">v2.2.5 · b2250</span> · Global travel assistant</small></span>
+      <span class="brand-copy"><strong>ReisSlim</strong><small><span id="headerVersion">v2.2.6 · b2260</span> · Global travel assistant</small></span>
     </div>
     <button id="newTripBtn" class="top-action" type="button">Nieuwe reis</button>
   </header>
@@ -71,7 +71,7 @@
     <section id="itineraryView" class="app-view">
       <section id="planSection" class="panel hidden">
         <div class="section-heading"><div><button id="backToOverviewBtn" class="back-button" type="button">← Terug naar voorstellen</button><p class="eyebrow">Gekozen reis</p><h1 id="tripTitle">Reisplan</h1><p id="tripMeta" class="muted"></p></div><div class="actions compact"><button id="saveTripBtn" class="secondary" type="button">Opslaan</button><button id="gpxBtn" type="button">GPX</button></div></div>
-        <div id="summary" class="summary-grid"></div><div id="enrichment" class="enrichment"></div><div id="validation"></div><section class="day-plan-section" aria-labelledby="dayPlanTitle"><div class="itinerary-section-heading"><div><p class="eyebrow">Dag voor dag</p><h2 id="dayPlanTitle">Dagplanning</h2><p class="muted">Afstand, rijtijd, routeplaatsen, POI’s, ruststops en overnachting per dag.</p></div><span id="dayPlanCount" class="badge">—</span></div><div id="days" class="timeline"></div></section>
+        <div id="summary" class="summary-grid"></div><div id="enrichment" class="enrichment"></div><div id="validation"></div><section class="day-plan-section" aria-labelledby="dayPlanTitle"><div class="itinerary-section-heading"><div><p class="eyebrow">Dag voor dag</p><h2 id="dayPlanTitle">Dagplanning</h2><p class="muted">Afstand, rijtijd, routeplaatsen, POI’s, ruststops en overnachting per dag.</p></div><span id="dayPlanCount" class="badge">—</span></div><div id="dayPlanList" class="timeline"></div></section>
       </section>
       <section id="noPlanItinerary" class="panel empty-view"><h2>Nog geen reis gekozen</h2><p>Maak eerst reisvoorstellen en kies daarna een bestemming.</p><button data-go-planner type="button">Naar planner</button></section>
     </section>
@@ -85,8 +85,8 @@
 
   <dialog id="proposalDialog" class="proposal-dialog"><div class="dialog-head"><div><p class="eyebrow">Voorsteldetails</p><h2 id="proposalDialogTitle">Roadtrip</h2></div><button id="proposalDialogClose" type="button" aria-label="Sluiten">×</button></div><div id="proposalDialogBody"></div></dialog>
 
-  <footer><p><span id="versionLabel">ReisSlim v2.2.5 · Build 2250</span><br>Offline-first roadtripplanning · © OpenStreetMap-bijdragers.</p></footer>
+  <footer><p><span id="versionLabel">ReisSlim v2.2.6 · Build 2260</span><br>Offline-first roadtripplanning · © OpenStreetMap-bijdragers.</p></footer>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="app.js?v=2250"></script>
+  <script type="module" src="app.js?v=2260"></script>
 </body>
 </html>
