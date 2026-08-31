@@ -1,0 +1,8 @@
+ReisSlim 1.16.2 · build 1952
+
+Replace the matching files in the repository root with the files from the runtime ZIP.
+Do not delete unrelated application files.
+
+This release repairs the canonical-plan/UI contract that caused a valid plan to exist in state while the Reisplan renderer crashed before displaying summary, days and dashboard data.
+
+After upload, confirm the header/footer shows v1.16.2 · 1952. The service worker will reload an open page once when 1952 takes control.
