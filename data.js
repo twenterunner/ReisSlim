@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';
 export const DEMO_NOW = new Date('2026-09-04T08:00:00Z');
 
 export const priorityRank = { Critical: 4, High: 3, Normal: 2, Low: 1 };
@@ -119,7 +119,7 @@ export function createDemoData(){
   ['VP-HOTEL','Project Quartz','Northstar Controls','VibeGuard V7','High',22,'Equipment breakdown'],
   ['VP-INDIA','Project Cedar','Meridian Aero','OptiSense O8','Normal',35,'On track'],
   ['VP-JULIET','Project Nova','Internal R&D','SmartDAQ D9','Low',60,'Development pipeline']
- ].map((p,i)=>({id:p[0],project:p[1],customer:p[2],product:p[3],productRevision:`R${1+i%3}.${i%2}`,priority:p[4],businessPriority:70-i*3,dueDate:dayISO(p[5],17),status:i===6?'At Risk':i===7?'Blocked':'Active',owner:staff[(i+2)%staff.length].name,storyline:p[6],created:dayISO(-60-i*3),forecastCompletion:null}));
+ ].map((p,i)=>({id:p[0],project:p[1],customer:p[2],product:p[3],productRevision:`R${1+i%3}.${i%2}`,priority:p[4],businessPriority:70-i*3,dueDate:dayISO(p[5],17),status:i===6?'At Risk':i===7?'Blocked':'Active',owner:staff[(i+2)%staff.length].name,storyline:p[6],created:dayISO(-60-i*3),forecastCompletion:null,gateStatus:i===4?'Draft':'Released',budget:0,programmeManager:staff[(i+2)%staff.length].id,changeReason:'Seeded baseline'}));
 
  const specifications=programmes.map((p,i)=>({
    id:`SPEC-${String(i+1).padStart(3,'0')}`,programmeId:p.id,name:`${p.product} Validation Test Specification`,revision:`R${1+i%3}`,
@@ -165,7 +165,7 @@ export function createDemoData(){
      const leg={id:`LEG-${String(legN).padStart(3,'0')}`,programmeId:prog.id,name:l===0?'Initial Characterisation':l===count-1?'Final Verification':`${methods.find(m=>m.id===methodId).name}`,
        sequence:l+1,methodId,dutIds:selected,requirementIds:[reqs[l%reqs.length].id,reqs[(l+1)%reqs.length].id],predecessorIds:l===0?[]:[`LEG-${String(legN-1).padStart(3,'0')}`],parallelGroup:null,
        status:l===0&&(pi<3||pi===6)?'Completed':pi===7&&l===2?'Blocked':'Draft',requestedDate:dayISO(-2+pi+l),dueDate:addDays(prog.dueDate,-Math.max(0,(count-1-l)*2)),plannedStart:null,plannedEnd:null,actualStart:null,actualEnd:null,
-       equipmentId:null,staffId:null,locked:false,blockingReason:null,developmentTaskId:null,planExplanation:[],priority:prog.priority};
+       equipmentId:null,staffId:null,preferredStaffId:null,staffPolicy:'Auto',locked:false,blockingReason:null,developmentTaskId:null,planExplanation:[],priority:prog.priority,sampleReadyDate:dayISO(-2+pi+l,8)};
      legs.push(leg);
    }
    if([4,9].includes(pi)){
@@ -278,7 +278,7 @@ export function createDemoData(){
  for(const sp of specifications)documents.push({id:`DOC-${sp.id}`,type:'Test Specification',entityId:sp.id,name:sp.name,path:sp.documentPath});
 
  const audit=[{timestamp:DEMO_NOW.toISOString(),actor:'Demo Lab Manager',action:'Demo dataset initialised',entity:'System',previousValue:'',newValue:APP_VERSION}];
- const settings={actor:'Demo Lab Manager',role:'Lab Manager',calibrationWarningDays:[60,30,14,7],scenario:null,lastPlannerRun:null,kpiPeriod:{preset:'30d',start:dayISO(-30,0).slice(0,10),end:dayISO(0,23).slice(0,10)},scenarioFocusProgramme:'VP-ALPHA'};
+ const settings={actor:'Demo Lab Manager',role:'Lab Manager',calibrationWarningDays:[60,30,14,7],scenario:null,lastPlannerRun:null,kpiPeriod:{preset:'30d',start:dayISO(-30,0).slice(0,10),end:dayISO(0,23).slice(0,10)},scenarioFocusProgramme:'VP-ALPHA',planningProject:'',builderDraft:null,costFramework:{currency:'EUR',overheadPct:12,contingencyPct:8,defaultStaffRate:92,defaultEquipmentRate:45,defaultConsumablesPerDut:6}};
  return {meta:{version:APP_VERSION,seed:8675309,generatedAt:DEMO_NOW.toISOString()},programmes,requirements,specifications,testRequests,testRuns,issues,disruptions,methods,legs,duts,devTasks,equipment,staff,calibrations,maintenance,results,documents,audit,bookings:[],settings};
 }
 

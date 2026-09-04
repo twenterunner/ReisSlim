@@ -1,0 +1,6 @@
+resource_type,resource_id,description,rate_eur_per_hour,notes
+Staff,STF-001,Senior Validation Engineer,118,Loaded planning charge rate
+Staff,STF-004,Laboratory Technician,72,Loaded planning charge rate
+Equipment,TC-02,Climatic chamber,34,Occupied-hour internal rate
+Equipment,VIB-01,Vibration system,95,Occupied-hour internal rate
+Equipment,EB-01,Electrical bench,28,Occupied-hour internal rate

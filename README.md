@@ -1,73 +1,186 @@
-# LabOS Prototype v0.2.0
+# LabOS Prototype v0.3.0
 
-LabOS is a static, browser-only prototype combining Laboratory Information Management (LIMS), validation requirements management, test-specification control, resource-constrained laboratory planning, equipment/calibration management, people/skills management, test-development management, programme prioritisation, capacity analytics, lessons learned and management decision support.
+LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
-## What this prototype demonstrates
+The application is intentionally deployable directly on GitHub Pages with no backend, login, API key, npm build or external service required at runtime.
 
-The canonical workflow is **requirements -> specifications / test demand -> deterministic resource-constrained planning -> execution -> evidence -> issues / lessons -> management visibility**.
+## Core operating model
 
-The seeded dataset includes requirement flowdown, 10 interconnected programmes, multi-leg DUT populations, a reusable test library, uploaded/seeded test specifications, new-method development tasks, equipment and calibration validity, staff qualifications, deterministic scheduling, operational disruptions, manual locked bookings, planning explanations, priority scenarios, numeric result evaluation, DUT genealogy, historical KPI data, bottleneck analytics, lessons-learned analytics, global search, browser-local documents, JSON/CSV export and a deterministic system-verification page.
+The canonical workflow is:
 
-Deliberate demo storylines include a normal standard programme, thermal-chamber capacity pressure, calibration expiry conflict, a single-person EMC qualification bottleneck, test-method development delay, critical reprioritisation, a failed DUT, vibration-system breakdown, sample-arrival delay, test-execution recovery and specification-quality issues.
+**requirements → specifications → test programme → test legs → DUT/sample demand → method availability/development → resource-constrained planning → execution → evidence/results → issues/lessons learned → cost/delivery/capacity management**
 
-## New in v0.2.0
+All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
+
+## New in v0.3.0
+
+### Test cost & finance framework
+
+A new **Test Cost & Finance** module calculates transparent costs from the same test legs used by planning and execution.
+
+Cost components include:
+
+- direct labour;
+- equipment occupancy/use;
+- consumables and fixtures;
+- external laboratory/vendor spend;
+- test/method development;
+- overhead;
+- contingency.
+
+Costs are visible at:
+
+- test-method level;
+- individual test-leg level;
+- complete test-programme/project level;
+- portfolio level.
+
+Programme financial views show budget, estimate, actual-to-date where historical execution exists, estimate-to-complete, forecast-at-completion and variance. Rate-card settings can be adjusted in the demo and cost CSV export is provided.
+
+Included examples:
+
+- `LabOS-Cost-Framework-Guide.pdf`;
+- `LabOS-Cost-Rate-Card.csv`.
+
+### Project-specific planning and controls
+
+The planning view now supports both **Portfolio** and **single-project** focus.
+
+For an individual project/programme, the user can adjust:
+
+- programme priority;
+- business priority score;
+- required completion date;
+- programme budget;
+- programme gate/release status;
+- programme owner;
+- project/sample-ready date;
+- individual leg due dates;
+- automatic/preferred/required staff assignment policy;
+- preferred/required staff member;
+- change reason.
+
+Saving project planning changes immediately reruns the shared deterministic laboratory plan. The project is not scheduled in isolation: displacement and impact on competing projects remain visible.
+
+### Test Programme Builder
+
+A new **Test Programme Builder** can create a validation programme from scratch.
+
+The workflow supports:
+
+1. project/customer/product definition;
+2. DUT quantity, priority, due date and budget;
+3. selection of existing released Test Library methods;
+4. creation of a new/non-existing method when required;
+5. sequential test-leg generation and dependencies;
+6. preferred or required staff assignment;
+7. development-hour/fixture/lead-time assumptions for new methods;
+8. cost forecast before programme creation;
+9. lessons-learned intelligence for the selected test mix;
+10. saving as Draft or **Create & Auto Plan**.
+
+When a selected test does not exist, the builder creates both the draft method and a corresponding Test Development Task. The validation leg is development-gated and cannot be scheduled before forecast method release.
+
+Included examples:
+
+- `LabOS-Test-Programme-Template.pdf`;
+- `LabOS-Test-Programme-Template.csv`;
+- `LabOS-Method-Development-Plan.pdf`;
+- `LabOS-Sample-Test-Report.pdf`.
+
+### Lessons learned embedded in programme design
+
+The programme builder does not merely list historical issues. For selected tests it surfaces:
+
+- most frequent issue/root-cause patterns;
+- Test Execution versus Bad Specification occurrence;
+- delay impact;
+- actual-duration variance versus library standard;
+- competency coverage;
+- method-development exposure;
+- recurring setup/equipment/specification themes.
+
+This allows lessons from previous programmes to influence planning before new work is released.
+
+### Additional operational controls added in v0.3.0
+
+To make the prototype more credible as an operational system, v0.3.0 also adds:
+
+- programme release/readiness gates;
+- specification release gates;
+- sample/DUT-ready dates as hard planning inputs;
+- qualification validity through the attended portion of a future test;
+- project-level change reasons and audit entries;
+- programme readiness scoring;
+- project cost and schedule visibility in execution/programme drill-downs;
+- test-method cost and historical issue intelligence in the Test Library;
+- project-specific leg/staff planning controls;
+- operational templates and example records suitable for immediate demonstration.
+
+## Capabilities retained from v0.2.0
 
 ### Test specifications
 
-A dedicated **Specifications** module now supports:
+The **Specifications** module supports:
 
-- seeded dummy test specifications with 10 synthetic PDF documents;
+- 10 seeded synthetic test-specification PDFs;
 - programme, requirement and test-method linkage;
-- revision, status, owner, effective date and acceptance-basis metadata;
-- specification-quality score and quality flags;
+- revision, status, owner and effective date;
+- quality score and quality flags;
 - specification-caused issue history;
-- browser-local upload of PDF, Word, text, CSV and image specifications (8 MB prototype limit);
+- browser-local upload of PDF, Word, text, CSV and image specifications;
 - IndexedDB persistence for uploaded documents;
 - global search and drill-down.
 
-Uploaded specifications are prototype documents stored in the browser; this is not a production document-control or approval system.
+### Period-selectable KPIs
 
-### Period-selectable management KPIs
+Dashboard and Analytics KPIs can be recalculated for:
 
-The Dashboard and Reports / Analytics views can recalculate KPIs for:
-
-- this week;
-- last week;
+- this week / last week;
 - any selected ISO week;
-- this month;
-- last month;
+- this month / last month;
 - any selected month;
 - last 7 / 30 / 90 days;
-- an arbitrary From / To date range.
+- arbitrary From / To dates.
 
-Period calculations use historical execution and issue records, and use relevant future planned bookings for forward-looking utilisation where applicable. Visuals include throughput trends, issue trends, outcome mix, root-cause mix, issue Pareto/rankings, category performance, equipment utilisation and staff utilisation.
+Period metrics include throughput, on-time performance, turnaround, utilisation, issue rate, delay impact and outcome mix. Future periods include relevant planned utilisation.
 
-### Operational-event-driven automatic planning
+### Visual management analytics
 
-**Log Delay / Test Issue** records operational changes such as:
+The demo includes visual trend, mix and ranking views for:
 
-- sample / DUT delays;
-- test-execution issues;
-- equipment outages / interruptions;
-- staff / qualification constraints;
-- bad / ambiguous specifications.
+- throughput;
+- issue frequency;
+- root-cause mix;
+- pass/rework/fail outcomes;
+- equipment utilisation;
+- staff utilisation;
+- capacity by category;
+- bottlenecks;
+- recurring issue Pareto;
+- programme-priority scenarios;
+- cost composition and budget/forecast status.
 
-Sample, test, equipment and resource events become real planning constraints. The plan is marked as needing refresh and **Update Plan Now** deterministically rebuilds the laboratory schedule around the latest constraints while preserving hard qualification, calibration, equipment, predecessor and resource rules. Equipment interruptions require an affected asset, and active events can be resolved when the constraint clears.
+### Operational event → one-click replanning
 
-### Priority-scenario comparison
+**Log Delay / Test Issue** can record sample/DUT delays, execution problems, equipment interruptions, resource/qualification constraints and specification problems.
 
-The planning and dashboard views compare non-destructive project-priority strategies, including:
+These become real planning inputs. **Update Plan Now** reruns deterministic scheduling around the latest constraints while preserving calibration, qualification, method, dependency, capacity and resource rules.
 
-- baseline priorities;
+### Priority scenarios
+
+The planner can compare alternative project-priority strategies without first altering baseline data, including:
+
+- baseline;
 - due-date protection;
-- business-value-first prioritisation;
+- business-value first;
 - focus-project prioritisation.
 
-Each strategy is run through the deterministic scheduler and compares on-time delivery, at-risk work, lateness and moved bookings. A selected strategy can then be applied to the live browser-local demo plan.
+The user can inspect movement, lateness and delivery impact, then apply a chosen strategy.
 
 ### Automatic lessons learned
 
-Historical and newly logged issues are classified into root causes such as:
+Issue history is deterministically classified into causes including:
 
 - Test Execution;
 - Bad Specification;
@@ -76,41 +189,64 @@ Historical and newly logged issues are classified into root causes such as:
 - Planning / Resource;
 - Test Method / Development.
 
-The analytics automatically rank highest-occurrence issue types and root causes, calculate delay impact and generate recurring lessons / corrective-action themes. A dedicated comparison shows how much issue occurrence came from **test execution versus bad specifications**.
+The system ranks recurrence and delay impact and derives recurring corrective-action themes from the actual issue records in the canonical state.
 
-## Seeded v0.2.0 demo scale
+## Seeded demo scale
 
-- Programmes: 10
-- Validation requirements: 60
-- Test legs: 50
-- DUTs: 100
-- Test-library methods: 30
-- Test specifications: 10
-- Historical/current test runs: 100
-- Historical/current issue records: 46
-- Operational disruptions: 3 (including active sample and test issues)
-- Equipment assets: 33
-- Staff: 15
-- Calibration records: 36
-- Test-development tasks: 5
-- Numeric/result records: 40
-- Synthetic calibration certificate PDFs: 31
-- Synthetic test-specification PDFs: 10
+The baseline deterministic environment includes approximately:
+
+- Programmes: 10 active seeded programmes;
+- Validation requirements: 60;
+- Test legs: 50;
+- DUTs: 100;
+- Test-library methods: 30;
+- Test specifications: 10;
+- Historical/current test runs: 100;
+- Historical/current issue records: 46;
+- Equipment assets: 33;
+- Staff: 15;
+- Calibration records: 36;
+- Test-development tasks: 5;
+- Numeric/result records: 40;
+- Synthetic calibration certificates: 31 PDFs;
+- Synthetic test specifications: 10 PDFs;
+- Operational example/template PDFs: 4;
+- Operational example/template CSVs: 2.
+
+The Programme Builder can add further programmes, test legs, DUTs, specifications, draft methods and development tasks during a demo session.
+
+## Major modules
+
+1. **Dashboard** — period KPIs, delivery, visual trends, capacity, issue/root-cause mix, bottlenecks, lessons and scenario comparison.
+2. **Requirements** — requirement flowdown and traceability matrix.
+3. **Specifications** — uploaded/seeded test specifications, quality flags and linkage.
+4. **Programmes** — programme status, forecast, priority, readiness, cost and test-leg progression.
+5. **Test Planning** — portfolio/single-project planning, timeline, constraints, manual locks, project controls, replanning and scenarios.
+6. **Programme Builder** — create complete programmes from existing and new tests with cost, staff, development and lessons intelligence.
+7. **Test Execution** — lifecycle/readiness validation, results and evidence.
+8. **DUTs** — genealogy and full test journey.
+9. **Test Library** — standard methods, duration/capacity, costs, actual-vs-standard performance and issue history.
+10. **Test Cost & Finance** — leg/programme/portfolio cost roll-up, budgets, forecasts and rate-card controls.
+11. **Equipment** — capability, utilisation, maintenance and operating state.
+12. **Calibration** — current/historical calibration, expiry risk, certificates and upload.
+13. **People & Skills** — workload, qualification coverage and single-point competency risks.
+14. **Reports / Analytics** — arbitrary-period visual KPI and lessons-learned analytics.
+15. **Administration / Demo** — audit history, role view, import/export/reset and deterministic verification.
 
 ## GitHub Pages deployment
 
 1. Create a GitHub repository.
 2. Upload **all ZIP contents directly to the repository root**.
-3. Commit the files to `main`.
-4. Open **GitHub Settings -> Pages**.
+3. Commit to `main`.
+4. Open **GitHub Settings → Pages**.
 5. Select **Deploy from a branch**, branch `main`, folder `/ (root)`.
 6. Open the generated GitHub Pages URL.
 
-All application paths are relative, so deployment also works at URLs such as `https://username.github.io/repository-name/`.
+All application paths are relative, so repository-path deployments such as `https://username.github.io/repository-name/` work correctly.
 
 ## Run locally
 
-The app is static. For the most reliable browser behaviour (service worker and IndexedDB), serve the files with any local static server, for example:
+The app requires no build step. For reliable module, IndexedDB and service-worker behaviour, serve the directory with any static server, for example:
 
 ```bash
 python -m http.server 8000
@@ -118,84 +254,70 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/`.
 
-Opening `index.html` directly may be restricted by browser module/service-worker rules on `file://` URLs.
+## Persistence and transfer
 
-## Major modules
+Canonical application state is stored in **IndexedDB**, with localStorage fallback. Changes survive browser refresh/restart for the same browser profile.
 
-- **Dashboard:** visual period KPIs, delivery, root-cause mix, issue Pareto, lessons learned, capacity, bottlenecks and priority-scenario comparison.
-- **Requirements:** traceability matrix and end-to-end requirement drill-down.
-- **Specifications:** seeded/uploaded specifications, quality flags, linked requirements/methods and spec-caused issues.
-- **Programmes:** priority control, forecast dates, storylines and test-leg progression.
-- **Test Planning:** automatic deterministic scheduling, operational disruption inputs, one-click plan refresh, equipment timeline, priority scenarios, planning explanations, manual locked bookings and what-if scenarios.
-- **Test Execution:** lifecycle/readiness checks and result/evidence visibility.
-- **DUTs:** genealogy and full programme journey.
-- **Test Library:** standard durations, equipment/skill requirements, usage and actual-vs-standard analytics.
-- **Equipment:** asset register, capability, utilisation, maintenance and calibration state.
-- **Calibration:** current/historical records, warning states, demo certificates and local certificate upload.
-- **People & Skills:** workloads, qualifications and single-point competency risks.
-- **Reports / Analytics:** arbitrary-period KPI analytics, graphical trends, Pareto/root-cause analysis, execution-vs-spec issue split, lessons learned, utilisation and planned-vs-actual performance.
-- **Administration / Demo:** role view, audit history, scenarios, reset/import/export and system verification.
+Available controls include:
 
-## Persistence and data transfer
+- Export full state to JSON;
+- Import JSON;
+- Reset Demo Data;
+- CSV exports for operational/management tables, including costs.
 
-The canonical application state is stored in **IndexedDB**, with localStorage fallback where IndexedDB is unavailable. User changes survive refresh/browser restart on the same browser profile.
+Uploaded certificates and specifications are stored browser-locally as part of prototype state.
 
-Use:
+## Planning model and assumptions
 
-- **Export Data** for a complete JSON snapshot;
-- **Import Data** to restore a snapshot;
-- **Reset Demo Data** to restore the deterministic original dataset;
-- CSV exports for requirements, planning, equipment, calibration and KPI data.
+The prototype uses a deterministic heuristic scheduler rather than an industrial MILP/CP-SAT solver. It selects the earliest feasible compatible equipment/staff combination while considering:
 
-Uploaded calibration certificates and uploaded test specifications are stored browser-locally as data URLs inside the prototype state. The delivery also contains synthetic local PDF documents for immediate demonstration.
-
-## Planning assumptions
-
-This prototype uses a deterministic heuristic scheduler rather than an industrial MILP/CP-SAT optimiser. It orders demand according to effective programme priority and due-date logic, then finds the earliest feasible equipment/operator combination while enforcing:
-
-- test-method/equipment compatibility;
-- predecessor completion;
-- test-development readiness;
-- sample/DUT operational availability constraints;
-- equipment outages/interruptions;
-- calibration validity through the full equipment booking;
-- required staff qualification and equipment authorisation;
-- staff unavailability;
-- prohibited equipment/staff overlaps;
-- capacity and DUT batch constraints;
+- programme priority and business score;
+- due dates;
+- programme/specification release gates;
+- predecessors;
+- method-development readiness;
+- sample/DUT-ready dates and active delays;
+- method/equipment compatibility;
+- equipment capacity and DUT batching;
+- equipment outages and maintenance;
+- calibration validity for the full equipment-use period;
+- staff skills, method authorisation and equipment authorisation;
+- qualification expiry through attended work;
+- staff availability;
+- prohibited staff/equipment double booking;
+- preferred/required staff policy;
 - locked/manual bookings.
 
-Unattended methods reserve equipment for the full run but reserve the assigned person for the attended setup/teardown/analysis window. The planning horizon and deterministic work-slot choices keep the browser-only demo fast and reproducible while preserving the conceptual architecture required for a later enterprise optimiser.
+Unattended methods reserve equipment for the full run but staff only for attended setup/teardown/analysis work.
 
-## Lessons-learned assumptions
+## Cost-model assumptions
 
-Root-cause and lesson analytics are deliberately deterministic and transparent. They aggregate the issue records saved in the canonical state; they are not generated by an external AI service. New issue records immediately contribute to recurrence rankings, delay impact and the Test Execution vs Bad Specification comparison for any KPI period that contains the issue date.
+The cost framework is intended for transparent operational comparison, not statutory accounting. Rates are configurable demo assumptions. Cost is calculated from canonical method, resource, development and programme data; it is not manually hard-coded into dashboard totals.
 
-## Static-prototype limitations
+A production system would typically source labour rates, equipment rates, purchase orders, actual consumables and external invoices from controlled ERP/finance systems.
 
-This is intentionally **not** presented as a production-validated LIMS. It does not yet provide:
+## Prototype limitations
 
-- a central multi-user database;
-- true authentication;
-- server-enforced authorisation;
+This browser-only prototype does **not** claim production capabilities such as:
+
+- central multi-user database;
+- real authentication/authorisation;
+- server-enforced security;
 - validated electronic signatures;
-- authoritative enterprise audit storage;
-- automated server backups;
-- concurrent-user conflict management;
-- production document-control workflow;
-- regulated validation evidence storage;
-- enterprise notification/workflow integrations.
+- authoritative immutable enterprise audit storage;
+- regulated document-control workflow;
+- automated central backups;
+- concurrent-user conflict handling;
+- ERP/HR/PLM integrations;
+- production notification/escalation workflow;
+- production-grade optimisation service.
 
-Role switching is illustrative only and is not security.
-
-A production migration can preserve the conceptual model: move canonical entities to a transactional backend/database, replace browser persistence with APIs, add identity/authorisation and immutable audit storage, migrate documents to managed object storage, and replace/augment the deterministic heuristic scheduler with an enterprise optimisation service.
+The conceptual model is designed so those services can later replace browser-local persistence without changing the overall operational architecture.
 
 ## Verification
 
-Administration -> **Run System Verification** performs 14 deterministic checks spanning references, equipment/staff overlaps, calibration validity, qualified allocations, requirement coverage, method durations, dependency integrity, numeric pass/fail, specification traceability, disruption integrity, lessons-learned classification, KPI-history scale and seeded dataset integrity.
-
-The repository also includes `verify-model.mjs`, which tests the new specification, period-KPI, operational-delay and prioritisation-scenario behaviour outside the UI. See `VERIFICATION.md` for the final build record.
+Administration → **Run System Verification** performs **18 deterministic integrity checks**. The repository also includes `verify-model.mjs` for extended model verification. See `VERIFICATION.md` for the final build record.
 
 ## Package structure
 
-The delivery retains the requested **completely flat repository structure**. Every HTML, CSS, JavaScript, manifest, icon, documentation file, calibration PDF and test-specification PDF is directly at repository root. There are no asset, certificate or specification subfolders.
+This delivery uses the requested **completely flat repository structure**. Every HTML, CSS, JavaScript, manifest, icon, README, verification file, calibration certificate, specification and operational example/template is directly at ZIP root. There are no nested folders.

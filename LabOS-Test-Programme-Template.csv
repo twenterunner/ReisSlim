@@ -1,0 +1,4 @@
+sequence,method_id,method_state,dut_count,staff_policy,preferred_staff,predecessor_sequence,sample_ready_date,leg_due_date
+1,ELEC-FUNC-001,Released,12,Auto,,,2026-09-07,2026-09-12
+2,ENV-TC-004,Released,12,Preferred,STF-004,1,2026-09-07,2026-09-20
+3,NEW-XXX,Development required,12,Required,STF-008,2,2026-09-07,2026-09-30
