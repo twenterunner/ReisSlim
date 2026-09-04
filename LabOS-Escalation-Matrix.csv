@@ -1,0 +1,5 @@
+Severity,Acknowledge_SLA_Minutes,Notify_Roles,Create_Issue,Create_Delay,Block_Test,Default_Replan_Scope,Example
+Low,240,Test Engineer,No,No,No,None,Informational drift or local observation
+Medium,120,Test Engineer;Planner,Yes,No,No,Programme,Repeatable anomaly requiring engineering review
+High,30,Test Engineer;Planner;Lab Manager,Yes,Yes,No,Programme,Test anomaly or delay with schedule impact
+Critical,10,Test Engineer;Planner;Lab Manager;Quality,Yes,Yes,Yes,Portfolio,Safety/data-integrity/major-test-validity event

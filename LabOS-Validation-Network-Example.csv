@@ -1,0 +1,6 @@
+Leg,Name,Method,DUT_Count,Population,Depends_On,Lane,Mode
+L1,Initial electrical characterisation,ELEC-CHAR-001,20,All incoming,,0,Start
+L2,Thermal cycling,ENV-TC-004,20,Continue from L1,L1,0,Sequential
+L3,Vibration,MECH-VIB-003,10,Split A from L2,L2,0,Branch
+L4,Humidity,ENV-HUM-002,10,Split B from L2,L2,1,Branch
+L5,Final electrical characterisation,ELEC-CHAR-001,20,Survivors from L3 + L4,L3;L4,0,Join

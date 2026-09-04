@@ -1,11 +1,33 @@
-# LabOS Prototype v0.6.0 - Verification Record
+# LabOS Prototype v0.7.0 - Verification Record
 
 Verification date: 4 September 2026
 
 ## Final acceptance result
 
-**PASS** - v0.6.0 extends the verified v0.5.0 build with multi-leg programme construction, live test monitoring and anomaly alerts, drillable lessons provenance, automated reporting, granular cost controls, closed-loop duration learning, efficiency analytics, automated solution recommendations, and calibration-maintenance synergy.
+**PASS** - v0.7.0 refines the verified v0.6.0 build into a connected exception-to-action laboratory operating model: visual validation networks, programme-only and portfolio replanning, live/manual exception escalation, notifications, delay constraints, recurring-issue lesson detection and deep KPI drill-down.
 
+
+## New v0.7.0 connected-workflow verification
+
+- In-app deterministic diagnostics: **36/36 PASS**.
+- Extended deterministic model verification: **PASS**.
+- All **20 primary navigation routes** exercised in browser smoke testing.
+- Visual validation-network rendering with explicit dependencies: **PASS**.
+- Parallel/sequential dependency editor and multi-predecessor model integrity: **PASS**.
+- Programme-only automatic replanning while preserving other programme bookings: **PASS**.
+- Programme/leg delay logging and shared planning-constraint path: **PASS**.
+- Live anomaly → escalation event → notification workflow: **PASS**.
+- High/critical live-event planning-delay behaviour: **PASS**.
+- Manual issue → same severity/escalation framework: **PASS**.
+- Automatic recurring-issue lesson detection with source issue provenance: **PASS**.
+- Manual lesson source issue/run/person provenance: **PASS**.
+- Top command-center KPI drill-downs: **6/6 PASS**.
+- Analytics efficiency KPI drill-down controls: **PASS**.
+- Exceptions & Escalation Center rendering and acknowledgements: **PASS**.
+- Project planning exposes separate Log Delay / Replan Programme / Replan Portfolio controls: **PASS**.
+- Mobile smoke at 390 px for Dashboard, Builder, Live, Escalation and Planning: **PASS; no page-level horizontal overflow**.
+- Uncaught browser errors in completed connected-workflow smoke pass: **0**.
+- Deterministic initial planning time in verification run: comfortably below target (sub-200 ms in final model pass).
 
 ## New v0.6.0 workflow verification
 
@@ -155,7 +177,7 @@ An in-memory-origin Chromium smoke harness was used because this execution envir
 ## Static deployment / service worker - PASS
 
 - All application paths are relative and remain compatible with GitHub Pages repository-path deployment.
-- Service-worker cache version is `labos-v0.6.0`.
+- Service-worker cache version is `labos-v0.7.0`.
 - HTML, JavaScript, CSS and manifest requests use a network-first update strategy with cached offline fallback, reducing stale-code mismatches after GitHub deployment updates.
 - Non-code example documents/assets remain cacheable for offline demonstration.
 
@@ -165,8 +187,20 @@ An in-memory-origin Chromium smoke harness was used because this execution envir
 - `LabOS-Audit-Checklist-IATF16949.csv`
 - `LabOS-Opportunity-Pipeline-Template.csv`
 - `LabOS-Maintenance-Plan-Template.csv`
+- `LabOS-Escalation-Matrix.csv`
+- `LabOS-Validation-Network-Example.csv`
 
-These are delivered in addition to the existing cost, programme, requirements and specification templates plus calibration certificates, dummy test specifications and operational example PDFs.
+These are delivered in addition to the existing cost, programme, requirements, specification, live-data and efficiency templates plus calibration certificates, dummy test specifications and operational example PDFs.
+
+## v0.7.0 update-only package
+
+The user-requested delivery package contains only files that are new or changed relative to the delivered v0.6.0 state:
+
+- **14 files total**
+- **3 new files:** `workflow.js`, `LabOS-Escalation-Matrix.csv`, `LabOS-Validation-Network-Example.csv`
+- **11 changed files:** `app.js`, `data.js`, `diagnostics.js`, `index.html`, `package.json`, `planner.js`, `README.md`, `service-worker.js`, `styles.css`, `VERIFICATION.md`, `verify-model.mjs`
+- **0 unchanged files**
+- **0 nested folders**
 
 ## Static-prototype boundary
 
@@ -174,11 +208,11 @@ This verification confirms deterministic prototype behaviour, not production acc
 
 ## Final flat-package preflight - PASS
 
-- Root-level deliverable files: **70**
+- Full v0.7.0 root-level deployable/source files: **78**
 - Nested folders/directories: **0**
-- Service-worker asset references resolved: **65/65**
+- Service-worker asset references resolved: **73/73**
 - Bundled PDFs parsed successfully: **45/45**
-- Bundled CSV example/template files parsed successfully: **8/8**
+- Bundled CSV example/template files parsed successfully: **12/12**
 - JavaScript/module syntax preflight: **PASS**
 - ZIP path-safety check: **PASS**
 - ZIP nested paths: **0**

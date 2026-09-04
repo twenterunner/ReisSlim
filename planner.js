@@ -94,3 +94,14 @@ export function manualMove(input,bookingId,changes){const data=cloneData(input);
 export function applyPriority(input,programmeId,priority){const data=cloneData(input); const p=data.programmes.find(x=>x.id===programmeId); if(!p)return data; const old=p.priority;p.priority=priority; for(const l of data.legs.filter(l=>l.programmeId===programmeId))l.priority=priority; data.audit.push({timestamp:new Date().toISOString(),actor:data.settings.actor,action:'Priority changed',entity:programmeId,previousValue:old,newValue:priority}); return data;}
 
 export function computePlanningMetrics(data){const planned=data.legs.filter(l=>['Planned','At Risk'].includes(l.status)).length, unscheduled=data.legs.filter(l=>l.status!=='Completed'&&!l.plannedStart&&!['Cancelled','Failed'].includes(l.status)).length, late=data.bookings.filter(b=>b.lateHours>0).length, atRisk=data.programmes.filter(p=>['Late','At Risk','Blocked'].includes(p.scheduleRisk)).length; return {planned,unscheduled,late,atRisk};}
+
+export function scheduleProgramme(input,programmeId,{scenario=input.settings?.scenario,recordAudit=true}={}){
+ const data=cloneData(input);const originalLegLocks={},originalBookingLocks={};
+ for(const l of data.legs){if(l.programmeId!==programmeId){originalLegLocks[l.id]=!!l.locked;l.locked=true;}}
+ for(const b of data.bookings||[]){if(b.programmeId!==programmeId&&b.status!=='Completed'){originalBookingLocks[b.id]=!!b.locked;b.locked=true;}}
+ const r=scheduleAll(data,{scenario,recordAudit:false});
+ for(const l of r.data.legs){if(Object.prototype.hasOwnProperty.call(originalLegLocks,l.id))l.locked=originalLegLocks[l.id];}
+ for(const b of r.data.bookings||[]){if(Object.prototype.hasOwnProperty.call(originalBookingLocks,b.id))b.locked=originalBookingLocks[b.id];}
+ if(recordAudit)r.data.audit.push({timestamp:new Date().toISOString(),actor:r.data.settings.actor,action:'Programme plan recalculated',entity:programmeId,previousValue:'Other programme bookings preserved',newValue:`${r.diagnostics.moved.filter(x=>r.data.legs.find(l=>l.id===x.legId)?.programmeId===programmeId).length} programme bookings moved`});
+ return r;
+}

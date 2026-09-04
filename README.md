@@ -1,4 +1,4 @@
-# LabOS Prototype v0.6.0
+# LabOS Prototype v0.7.0
 
 LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
@@ -12,6 +12,35 @@ The canonical workflow is:
 
 All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
 
+
+## New in v0.7.0 — connected laboratory operations
+
+- **Visual validation network builder:** test legs are now displayed as a validation graph. A leg can start a programme, follow another leg, branch in parallel, or join multiple predecessor legs. Each node retains its own DUT population, method maturity, staff policy, cost and readiness state.
+- **Explicit local vs portfolio planning:** planners can log a programme/leg delay, replan only the affected programme while preserving other project bookings, or deliberately recalculate the full laboratory portfolio. Replanning records a booking-by-booking impact set.
+- **Exception & Escalation Center:** live anomalies and manually logged issues use one severity framework (Low / Medium / High / Critical) with acknowledgement SLA, notified roles, issue/delay creation policy, test blocking policy and programme/portfolio replan scope.
+- **Notification/event traceability:** anomalies and issues create operational events and role-targeted notification records linked back to programme, test leg, issue, disruption and live alert.
+- **Automatic recurring-issue learning:** LabOS clusters recurring issues by method, issue family and root cause, automatically creates lessons when recurrence thresholds are met, and retains the exact source issues, runs, people and programmes. Manual lessons can be logged alongside automatically detected lessons.
+- **Deeper KPI drill-down:** command-center and analytics KPI tiles are interactive. Delivery, validation assurance, productive time, live alerts, financial control, capacity, FTR, queue, setup, rework, automation, audit and service KPIs open their underlying records and drivers instead of remaining passive summary cards.
+- **Live anomaly → operational action:** a configured live-data rule can now generate the same escalation and planning workflow used for manually reported test issues, including acknowledgements, notifications, delays and blocking for critical events.
+- **Builder dependency editing:** explicit predecessor selection supports parallel branches and multi-predecessor joins without requiring users to infer dependency logic from row order.
+- **New operating examples:** `LabOS-Validation-Network-Example.csv` and `LabOS-Escalation-Matrix.csv`.
+
+### Recommended next best-in-class layer
+
+The prototype now has a strong connected operations backbone. The highest-value next production/product modules are:
+
+1. **Deviation / NCR / OOS / OOT / CAPA / MRB:** one quality-event object spanning test anomalies, failed DUT disposition, root-cause investigation, containment, effectiveness verification and CAPA.
+2. **Sample chain of custody:** barcode/QR receipt, location, condition, quantity, reservation, split/merge, consumption, retention and disposal with full genealogy.
+3. **Guided LES execution:** step-by-step work instructions, mandatory checkpoints, instrument prompts, review-by-exception and controlled test-step deviations.
+4. **Metrology depth:** MSA/Gage R&R, uncertainty budgets, reference standards, intermediate checks and calibration drift / out-of-tolerance impact analysis.
+5. **Predictive asset reliability:** failure-rate and condition trends feeding maintenance interval optimisation, spares demand, redundancy risk and calibration/maintenance bundling.
+6. **Materials / consumables / fixtures inventory:** stock, lot/expiry, test-kit readiness, fixture configuration and automated replenishment risk.
+7. **External laboratory / supplier workflow:** RFQ, external-test booking, competence/accreditation scope, sample shipment, results/certificate intake, cost and turnaround tracking.
+8. **Controlled approvals and e-signatures:** method/spec/report approval workflows, segregation of duties, RBAC/SSO and server-enforced audit history for a production deployment.
+9. **Industrial integration layer:** secure gateway/broker support for OPC UA, MQTT, historian/SDMS/ELN and equipment APIs rather than browser-direct feeds.
+10. **Advanced planning digital twin:** Monte-Carlo/probabilistic due-date confidence, portfolio option optimisation, outsource-vs-buy-vs-hire comparisons and investment ROI from avoided delay.
+11. **Knowledge graph / similarity intelligence:** connect requirements, specs, methods, issues, DUT failures, staff, equipment and reports so new validation programmes can reuse historically successful patterns and preventive controls.
+12. **Mobile laboratory execution:** barcode scanning, photo/evidence capture, offline task execution and rapid issue/maintenance reporting at the asset or DUT.
 
 ## New in v0.6.0
 
