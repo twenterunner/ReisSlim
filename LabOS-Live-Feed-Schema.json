@@ -1,0 +1,14 @@
+{
+  "purpose": "Example payload for LabOS browser-side live test-data polling",
+  "endpoint_note": "The endpoint must allow CORS access from the GitHub Pages origin. Use an authenticated gateway/proxy in production.",
+  "poll_response": {
+    "timestamp": "2026-09-04T16:00:12Z",
+    "values": {
+      "temperature_C": 91.8,
+      "dut_voltage_V": 4.921,
+      "current_A": 0.566
+    }
+  },
+  "supported_demo_rule_types": ["threshold", "rate", "zscore"],
+  "production_recommendation": "Stream equipment data to a secured ingestion service/historian, then expose a controlled read API or websocket gateway to the UI."
+}

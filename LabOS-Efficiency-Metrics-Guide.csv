@@ -1,0 +1,12 @@
+metric,definition,management_use
+Productive Test Time %,Active test/exposure time divided by total cycle time including setup teardown analysis and queue,Shows what share of elapsed laboratory cycle time is producing validation evidence
+Execution Share %,Active test/exposure time divided by recorded working cycle time excluding queue,Highlights test architecture versus support effort
+Setup Burden %,Setup time divided by total recorded cycle time,Identifies fixture automation and standard-work opportunities
+Analysis Burden %,Analysis/reporting time divided by total recorded cycle time,Supports automated analysis/reporting investment
+Queue Loss %,Waiting/queue time divided by total cycle time,Exposes scheduling and resource bottlenecks
+Rework Burden %,Rework hours divided by total recorded cycle time,Quantifies avoidable repeat effort
+Hands-on %,Operator-attended hours divided by total execution cycle time,Supports unattended automation and staffing decisions
+First Time Right %,Runs completed PASS without rework divided by completed runs,Measures execution robustness
+Schedule Efficiency %,Standard planned cycle hours divided by actual cycle hours,Shows duration-standard accuracy and operational execution performance
+Automation Leverage %,Unattended execution hours divided by total active execution hours,Indicates how effectively equipment runs without continuous staffing
+Development Efficiency %,Estimated method-development effort divided by actual development effort,Captures method-development forecasting accuracy

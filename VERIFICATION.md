@@ -1,10 +1,30 @@
-# LabOS Prototype v0.5.0 - Verification Record
+# LabOS Prototype v0.6.0 - Verification Record
 
 Verification date: 4 September 2026
 
 ## Final acceptance result
 
-**PASS** - v0.5.0 extends the verified v0.4.0 workflow into audit/compliance readiness, probabilistic future-demand and resource forecasting, preventive-maintenance optimisation, and an executive laboratory operations command center.
+**PASS** - v0.6.0 extends the verified v0.5.0 build with multi-leg programme construction, live test monitoring and anomaly alerts, drillable lessons provenance, automated reporting, granular cost controls, closed-loop duration learning, efficiency analytics, automated solution recommendations, and calibration-maintenance synergy.
+
+
+## New v0.6.0 workflow verification
+
+- In-app deterministic diagnostics: **32/32 PASS**.
+- Extended model verification: **PASS**.
+- All **19 primary routes** exercised in browser smoke testing.
+- Six-leg validation programme with split DUT populations: **PASS**.
+- Existing methods plus new-method development gating: **PASS**.
+- Lessons-learned provenance to source run/person/equipment: **PASS**.
+- Live reading ingestion and anomaly-to-alert generation: **PASS**.
+- Configurable live alert rules and acknowledgements: **PASS**.
+- Automated report preview from canonical test records: **PASS**.
+- Skillset/test-method cost overrides: **PASS**.
+- Actual-time learning and learned future planning durations: **PASS**.
+- Efficiency KPI reconciliation: **PASS**.
+- Calibration/maintenance service-window synergy: **PASS**.
+- Automated operational recommendations: **PASS**.
+- 390 px mobile workflow smoke: **PASS**.
+- Uncaught browser errors in the completed smoke pass: **0**.
 
 ## New v0.5.0 workflow verification
 
@@ -135,7 +155,7 @@ An in-memory-origin Chromium smoke harness was used because this execution envir
 ## Static deployment / service worker - PASS
 
 - All application paths are relative and remain compatible with GitHub Pages repository-path deployment.
-- Service-worker cache version is `labos-v0.5.0`.
+- Service-worker cache version is `labos-v0.6.0`.
 - HTML, JavaScript, CSS and manifest requests use a network-first update strategy with cached offline fallback, reducing stale-code mismatches after GitHub deployment updates.
 - Non-code example documents/assets remain cacheable for offline demonstration.
 

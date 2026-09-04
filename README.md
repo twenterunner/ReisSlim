@@ -1,4 +1,4 @@
-# LabOS Prototype v0.5.0
+# LabOS Prototype v0.6.0
 
 LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
@@ -11,6 +11,20 @@ The canonical workflow is:
 **requirements → specifications → test programme → test legs → DUT/sample demand → method availability/development → resource-constrained planning → execution → evidence/results → issues/lessons learned → cost/delivery/capacity management → future demand / maintenance / audit assurance**
 
 All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
+
+
+## New in v0.6.0
+
+- Multi-leg validation Programme Builder with per-leg DUT populations, dependencies, staff policy, method state and learned/planned durations.
+- Drillable lessons-learned provenance linking each lesson to the originating issue, run, test leg, programme, person, equipment and corrective action.
+- Live Test Monitor with offline simulation, CSV/JSON ingestion, configurable thresholds/rate rules, statistical anomaly detection, alerts and acknowledgements.
+- Automated engineering test-report generation from canonical programme, DUT, result, equipment, calibration, live-data and issue records.
+- Granular cost controls at skillset, person, equipment and test-method level.
+- Closed-loop time learning from actual setup, execution/exposure, teardown, analysis, queue/rework and method-development effort. Learned planning times feed future scheduling and capacity forecasts.
+- Expanded efficiency analytics including productive test time, execution share, setup burden, analysis burden, queue loss, rework burden, hands-on ratio, first-time-right, schedule efficiency, automation leverage and development efficiency.
+- Automated bottleneck/issue recommendations with proposed management actions and confidence/impact.
+- Calibration and maintenance synergy analysis to combine compatible service windows and reduce duplicate downtime.
+- New operational examples: `LabOS-Live-Data-Example.csv`, `LabOS-Live-Feed-Schema.json`, and `LabOS-Efficiency-Metrics-Guide.csv`.
 
 ## New in v0.5.0
 

@@ -1,15 +1,17 @@
 import { createDemoData, DEMO_NOW } from './data.js';
 import { scheduleAll, applyPriority, manualMove } from './planner.js';
 import { runDiagnostics, recomputeRequirementStatuses, calibrationStatus, calibrationAt, periodMetrics, issueAnalytics } from './diagnostics.js';
-import { estimateLegCost, programmeCost, portfolioCost } from './costs.js';
+import { ensureCostFramework, estimateLegCost, programmeCost, portfolioCost } from './costs.js';
 import { ensureOperationsState, capacityForecast, inferOpportunityPlan, maintenanceSummary, optimizeMaintenancePlan, auditPortfolio, AUDIT_STANDARDS } from './operations.js';
+import { ensureTimeLearningState, efficiencyMetrics, methodTimeMetrics, operationalRecommendations, serviceSynergy } from './intelligence.js';
+import { ensureLiveState, simulateLiveTick } from './live.js';
 import { existsSync } from 'node:fs';
 
 function assert(ok, msg){ if(!ok) throw new Error(msg); console.log(`PASS  ${msg}`); }
 function seedCompletedBookings(d){ for(const l of d.legs.filter(x=>x.status==='Completed'&&x.actualStart&&x.actualEnd)) d.bookings.push({id:`BKG-${l.id}`,legId:l.id,programmeId:l.programmeId,methodId:l.methodId,start:l.actualStart,end:l.actualEnd,staffEnd:l.actualEnd,equipmentId:l.equipmentId,staffId:l.staffId,locked:true,status:'Completed',priority:d.programmes.find(p=>p.id===l.programmeId)?.priority||'Normal',dueDate:l.dueDate,lateHours:0}); }
 
 const started=performance.now();
-let data=createDemoData(); ensureOperationsState(data); seedCompletedBookings(data);
+let data=createDemoData(); ensureOperationsState(data); ensureTimeLearningState(data); ensureLiveState(data); seedCompletedBookings(data);
 let run=scheduleAll(data,{recordAudit:false}); data=run.data; recomputeRequirementStatuses(data);
 const elapsed=performance.now()-started;
 const diag=runDiagnostics(data);
@@ -52,7 +54,13 @@ const inferred=inferOpportunityPlan(data,data.opportunities.find(o=>o.id==='OPP-
 const c0=capacityForecast(data,12,'committed'),cw=capacityForecast(data,12,'weighted'),cf=capacityForecast(data,12,'full'),pipe=c=>c.weeks.reduce((a,w)=>a+w.pipelineEq+w.pipelineStaff,0);assert(pipe(c0)<=pipe(cw)&&pipe(cw)<=pipe(cf)&&cw.equipment.some(x=>x.gapHours>0)&&cw.staff.some(x=>x.peakUtil>=100), 'Future capacity model separates committed, probability-weighted and full-pipeline demand and surfaces resource constraints');
 const maintCopy=JSON.parse(JSON.stringify(data)),before=maintenanceSummary(maintCopy,90),opt=optimizeMaintenancePlan(maintCopy,90),after=maintenanceSummary(maintCopy,90);assert(before.due.length>0&&after.planned.length>0&&opt.planned+opt.moved>0, 'Maintenance optimizer creates demand-aware preventive downtime windows for due equipment');
 const pmLockedOverlap=maintCopy.maintenance.filter(m=>m.policyId).some(m=>maintCopy.bookings.some(b=>b.locked&&b.equipmentId===m.equipmentId&&new Date(m.start)<new Date(b.end)&&new Date(m.end)>new Date(b.start)));assert(!pmLockedOverlap,'Optimized preventive-maintenance windows do not overlap locked equipment bookings');
-const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv','LabOS-Requirements-Import-Template.csv','LabOS-Specification-Review-Checklist.csv','LabOS-Audit-Checklist-ISO17025.csv','LabOS-Audit-Checklist-IATF16949.csv','LabOS-Opportunity-Pipeline-Template.csv','LabOS-Maintenance-Plan-Template.csv'];
+const timeMethods=data.methods.filter(m=>Number(m.learningRuns)>=3);assert(timeMethods.length>0&&timeMethods.every(m=>Number.isFinite(m.learnedTotalHours)&&m.learnedTotalHours>0),`${timeMethods.length} test methods derive evidence-based learned planning times from actual execution history`);
+const tm=methodTimeMetrics(data,timeMethods[0].id),eff=efficiencyMetrics(data,new Date(DEMO_NOW.getTime()-120*86400000),DEMO_NOW);assert(tm.runs>=3&&tm.productivePct>=0&&tm.productivePct<=100&&eff.productiveTestPct>=0&&eff.productiveTestPct<=100&&eff.firstTimeRightPct>=0&&eff.firstTimeRightPct<=100,'Closed-loop time accounting produces learned method standards and bounded efficiency KPIs');
+const beforeAlerts=data.liveAlerts.length,stream=data.liveSessions.find(x=>x.status==='Streaming');simulateLiveTick(data,stream.id,{inject:true});assert(data.liveSessions.length>=2&&data.liveSessions.every(x=>x.readings.length>0)&&data.liveAlerts.length>beforeAlerts,'Live test-data simulator ingests readings and anomaly rules generate traceable alerts');
+const costMethod=data.methods[0],costCopy=JSON.parse(JSON.stringify(data));ensureCostFramework(costCopy);costCopy.settings.costFramework.skillRates[costMethod.requiredSkills[0]]=123;costCopy.settings.costFramework.methodOverrides[costMethod.id]={labourRate:155,equipmentRate:210,fixedConsumables:75,consumablesPerDut:3,externalCost:25};const overrideCost=estimateLegCost(costCopy,costCopy.legs.find(l=>l.methodId===costMethod.id));assert(overrideCost.total>0&&costCopy.settings.costFramework.skillRates[costMethod.requiredSkills[0]]===123&&costCopy.settings.costFramework.methodOverrides[costMethod.id].labourRate===155,'Cost framework supports explicit skillset rates and test-specific cost definitions');
+const syn=serviceSynergy(data,120),recs=operationalRecommendations(data);assert(Array.isArray(syn)&&syn.every(x=>Number.isFinite(Number(x.avoidedDowntimeHours||0)))&&recs.length>0&&recs.every(r=>r.solution&&r.impact),'Calibration-maintenance synergy and automated bottleneck solution engines produce actionable outputs');
+const variedPrograms=data.programmes.filter(p=>{const ls=data.legs.filter(l=>l.programmeId===p.id);return ls.length>1&&new Set(ls.map(l=>l.dutIds.length)).size>1;});assert(variedPrograms.length>0,'Validation data model supports multi-leg programmes with different DUT populations per leg');
+const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv','LabOS-Requirements-Import-Template.csv','LabOS-Specification-Review-Checklist.csv','LabOS-Audit-Checklist-ISO17025.csv','LabOS-Audit-Checklist-IATF16949.csv','LabOS-Opportunity-Pipeline-Template.csv','LabOS-Maintenance-Plan-Template.csv','LabOS-Live-Data-Example.csv','LabOS-Live-Feed-Schema.json','LabOS-Efficiency-Metrics-Guide.csv'];
 assert(exampleFiles.every(f=>existsSync(new URL(f,import.meta.url))), 'Operational example documents/templates are included');
 
 const roundtrip=JSON.parse(JSON.stringify(data));
