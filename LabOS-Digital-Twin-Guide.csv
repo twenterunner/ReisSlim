@@ -1,0 +1,6 @@
+Metric,Meaning,Management_Use
+P50,50 percent of simulated completion outcomes finish by this date,Most likely planning view
+P80,80 percent of simulated completion outcomes finish by this date,Commitment planning and contingency
+P95,95 percent of simulated completion outcomes finish by this date,High-confidence worst-case planning
+On_Time_Probability,Percent of simulations completed by programme due date,Delivery confidence KPI
+Drivers,Historical duration variance issue rate fail/rework rate dependencies and baseline schedule,Explain risk and prioritize mitigations

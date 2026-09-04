@@ -1,0 +1,3 @@
+Target_Programme,Historical_Programme,Method_Overlap_pct,Category_Overlap_pct,Product_Family_Signal,Similarity_Score,Reuse_Action
+VP-NEW,VP-ALPHA,80,75,1,81,Reuse sequence DUT population learned durations lessons and resource profile
+VP-NEW,VP-GAMMA,55,70,0,54,Reuse environmental method lessons only

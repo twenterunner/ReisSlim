@@ -1,0 +1,7 @@
+Event_Type,Severity,Stage,Required_Action,Execution_Hold,Typical_Owner,Next_Gate
+Deviation,Minor,Containment,Contain and document evidence,No,Test Engineer,Investigation
+NCR,Major,Containment,Stop affected work and preserve evidence,Yes,Quality Engineer,Investigation
+OOS,Major,Investigation,Confirm result validity and investigate assignable cause,Yes,Quality Engineer,Root Cause
+OOT,Minor,Investigation,Trend measurement and assess drift,Conditional,Metrology Engineer,Root Cause
+MRB,Major,Disposition,Decide rework retest use-as-is return or scrap,Yes,MRB Chair,CAPA
+CAPA,Major,CAPA,Implement systemic corrective action and verify effectiveness,Conditional,Action Owner,CAPA Verification

@@ -1,0 +1,8 @@
+Sequence,Step,Type,Mandatory,Evidence_Required,Review_By_Exception,Instruction
+1,Verify controlled method and specification,Document,Yes,No,Yes,Confirm released revisions before work begins
+2,Verify DUT identity and custody,Check,Yes,Yes,Yes,Scan DUTs and confirm released custody state
+3,Verify equipment metrology fixture and materials,Check,Yes,Yes,Yes,Confirm calibration maintenance MSA uncertainty fixture and consumables readiness
+4,Perform setup and baseline checks,Execution,Yes,Yes,Yes,Record setup parameters baseline and fixture verification
+5,Execute and monitor live data,Execution,Yes,Yes,Yes,Capture channels anomalies and notification events
+6,Review acceptance criteria,Review,Yes,Yes,Yes,Review deterministic results and open deviations
+7,Close evidence package,Approval,Yes,Yes,Yes,Route controlled execution for reviewer approval

@@ -1,4 +1,4 @@
-# LabOS Prototype v0.7.0
+# LabOS Prototype v0.8.0
 
 LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
@@ -12,6 +12,32 @@ The canonical workflow is:
 
 All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
 
+
+
+## New in v0.8.0 — P1/P2 operational depth
+
+- **Unified Quality Events / CAPA / MRB:** deviations, NCR, OOS and OOT records now progress through containment, investigation, disposition, CAPA and effectiveness verification. Major quality events can place affected test legs on hold and feed the shared exception/escalation engine.
+- **Full DUT/sample chain of custody:** sample status, location, quarantine, genealogy and split/merge population logic are now first-class records. Quarantined or otherwise unavailable DUTs block readiness through the same planning constraint path.
+- **Guided LES execution:** controlled step-by-step execution supports mandatory checkpoints/evidence and review-by-exception. Execution exceptions can automatically create controlled quality events.
+- **Planning digital twin:** deterministic Monte Carlo forecasting provides programme-level P50/P80/P95 completion dates, on-time confidence and schedule uncertainty alongside the deterministic plan.
+- **Metrology/MSA depth:** Gage R&R, uncertainty budgets, reference-standard status and measurement-system readiness now feed method/test readiness. Out-of-tolerance calibration outcomes support retrospective test-impact assessment.
+- **Predictive equipment health:** failure history, maintenance condition, live anomalies and calibration history combine into bounded asset-risk scores and recommended service actions.
+- **Calibration + maintenance synergy:** service opportunities can be combined to reduce duplicated equipment downtime while calibration validity and locked bookings remain protected.
+- **Fixtures, consumables and spares:** consumables use quantity/reservation logic; reusable fixtures use time-overlap capacity logic. Missing material or fixture capacity can block planning.
+- **External laboratories:** approved external labs, scope/accreditation metadata, turnaround and cost can be used as an explicit planning alternative. Outsourcing removes corresponding internal capacity demand and creates controlled supplier work.
+- **Knowledge / similarity engine:** comparable historical programmes are used to recommend test content, methods, resources and reusable lessons for new validation plans.
+
+### New v0.8.0 example files
+
+- `LabOS-Quality-CAPA-Workflow.csv`
+- `LabOS-Chain-of-Custody-Example.csv`
+- `LabOS-LES-Execution-Template.csv`
+- `LabOS-MSA-GageRR-Example.csv`
+- `LabOS-Uncertainty-Budget-Example.csv`
+- `LabOS-Fixtures-Consumables-Spares.csv`
+- `LabOS-External-Lab-Panel.csv`
+- `LabOS-Knowledge-Similarity-Example.csv`
+- `LabOS-Digital-Twin-Guide.csv`
 
 ## New in v0.7.0 — connected laboratory operations
 

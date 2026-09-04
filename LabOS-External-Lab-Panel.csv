@@ -1,0 +1,4 @@
+Lab_ID,Name,Scope,Status,Turnaround_Days,Expedite_Days,Base_Cost,Quality_Score,On_Time_pct,Capacity_Per_Week
+EXT-001,Apex Environmental Labs,Environmental and reliability,Approved,8,4,2800,94,92,4
+EXT-002,Vector EMC Services,EMC immunity and emissions,Approved,10,5,4200,97,95,3
+EXT-003,Nordic Dynamics Test Centre,Vibration shock mechanical,Approved,7,3,3600,91,89,5

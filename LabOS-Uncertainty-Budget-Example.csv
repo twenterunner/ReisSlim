@@ -1,0 +1,5 @@
+Budget_ID,Method_ID,Measurand,Unit,Source,Type,Standard_Uncertainty,Sensitivity,Coverage_Factor,Expanded_Uncertainty,Reference_Standard
+UNC-EX-001,ENV-TC-004,Temperature,degC,Reference thermometer,B,0.18,1,2,0.65,STD-TMP-01
+UNC-EX-001,ENV-TC-004,Temperature,degC,Resolution,B,0.12,1,2,0.65,
+UNC-EX-001,ENV-TC-004,Temperature,degC,Repeatability,A,0.22,1,2,0.65,
+UNC-EX-001,ENV-TC-004,Temperature,degC,Environment,B,0.10,1,2,0.65,

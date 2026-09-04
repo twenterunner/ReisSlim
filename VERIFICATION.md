@@ -1,11 +1,34 @@
-# LabOS Prototype v0.7.0 - Verification Record
+# LabOS Prototype v0.8.0 - Verification Record
 
 Verification date: 4 September 2026
 
 ## Final acceptance result
 
-**PASS** - v0.7.0 refines the verified v0.6.0 build into a connected exception-to-action laboratory operating model: visual validation networks, programme-only and portfolio replanning, live/manual exception escalation, notifications, delay constraints, recurring-issue lesson detection and deep KPI drill-down.
+**PASS** - v0.8.0 extends the verified v0.7.0 operating model with the full P1/P2 layer: unified quality events/CAPA/MRB, DUT chain of custody, guided LES execution, probabilistic P50/P80/P95 planning, metrology/MSA, predictive equipment health, fixture/consumable/spares constraints, external-lab alternatives, and knowledge/similarity reuse.
 
+
+
+## New v0.8.0 P1/P2 verification
+
+- In-app deterministic diagnostics: **45/45 PASS**.
+- Extended deterministic model verification: **PASS**.
+- Unified deviation/NCR/OOS/OOT/CAPA traceability: **PASS**.
+- Major quality event can hold an affected test leg: **PASS**.
+- DUT quarantine blocks test-leg readiness: **PASS**.
+- DUT/sample split and genealogy model: **PASS**.
+- Guided LES step exception → controlled quality event: **PASS**.
+- Review-by-exception execution model: **PASS**.
+- Planning digital twin P50/P80/P95 forecast reproducibility: **PASS**.
+- MSA readiness gate / unacceptable Gage R&R blocking: **PASS**.
+- Measurement uncertainty and reference-standard records: **PASS**.
+- Predictive equipment-health risk scoring and service actions: **PASS**.
+- Calibration/maintenance synergy recommendations: **PASS**.
+- Consumable stockout readiness blocking: **PASS**.
+- Reusable fixture capacity uses time-overlap rather than depletion logic: **PASS**.
+- External-lab conversion removes internal capacity demand and creates controlled outsourced work: **PASS**.
+- Knowledge/similarity recommendations from comparable programmes: **PASS**.
+- JSON state round-trip preserves canonical P1/P2 records: **PASS**.
+- Initial deterministic planning remains comfortably within responsiveness target.
 
 ## New v0.7.0 connected-workflow verification
 

@@ -1,0 +1,5 @@
+Timestamp,DUT,Event,From,To,Condition,Actor,Population_Group
+2026-09-01T08:10:00Z,A001,Received,Supplier / build,LOC-RECV,Seal intact,Jordan Blake,SG-ALPHA-ROOT
+2026-09-01T10:00:00Z,A001,Moved,LOC-RECV,LOC-A01,Released to controlled storage,Maya Patel,SG-ALPHA-ROOT
+2026-09-04T07:45:00Z,A001,Issued to Test,LOC-A01,LOC-TEST,Identity confirmed,Maya Patel,SG-ALPHA-BRANCH-1
+2026-09-05T16:20:00Z,A001,Returned,LOC-TEST,LOC-RET,Test complete evidence retained,Noah de Vries,SG-ALPHA-BRANCH-1

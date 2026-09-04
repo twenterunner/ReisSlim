@@ -1,0 +1,4 @@
+Item_ID,Name,Type,On_Hand,Reorder_Point,Lead_Time_Days,Compatible_Method_or_Equipment,Planner_Behaviour
+FIX-TC-01,Thermal chamber DUT harness,Fixture,2,1,14,ENV-TC-004,Reusable capacity blocks overlapping tests when fully booked
+CON-001,High-temperature connector set,Consumable,42,20,10,ENV-TC-004,Reserved quantity reduces available stock for future tests
+SPR-VIB-01,Vibration amplifier module,Spare,0,1,45,Vibration System,Predictive maintenance recommends procurement or backup capacity when risk is high

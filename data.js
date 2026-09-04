@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.7.0';
+export const APP_VERSION = '0.8.0';
 export const DEMO_NOW = new Date('2026-09-04T08:00:00Z');
 
 export const priorityRank = { Critical: 4, High: 3, Normal: 2, Low: 1 };
