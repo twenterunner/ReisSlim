@@ -1,7 +1,10 @@
 {
   "name": "labos-static-prototype",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "scripts": {"verify": "node verify-model.mjs"}
+  "scripts": {
+    "verify": "node verify-model.mjs",
+    "test": "node verify-model.mjs"
+  }
 }

@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 export const DEMO_NOW = new Date('2026-09-04T08:00:00Z');
 
 export const priorityRank = { Critical: 4, High: 3, Normal: 2, Low: 1 };
@@ -121,7 +121,14 @@ export function createDemoData(){
   ['VP-JULIET','Project Nova','Internal R&D','SmartDAQ D9','Low',60,'Development pipeline']
  ].map((p,i)=>({id:p[0],project:p[1],customer:p[2],product:p[3],productRevision:`R${1+i%3}.${i%2}`,priority:p[4],businessPriority:70-i*3,dueDate:dayISO(p[5],17),status:i===6?'At Risk':i===7?'Blocked':'Active',owner:staff[(i+2)%staff.length].name,storyline:p[6],created:dayISO(-60-i*3),forecastCompletion:null}));
 
- const specifications=programmes.map((p,i)=>({id:`SPEC-${String(i+1).padStart(3,'0')}`,programmeId:p.id,name:`${p.product} Validation Specification`,revision:`R${1+i%3}`,status:'Released',effectiveDate:dayISO(-45+i),acceptanceBasis:'Released product validation limits and customer requirements'}));
+ const specifications=programmes.map((p,i)=>({
+   id:`SPEC-${String(i+1).padStart(3,'0')}`,programmeId:p.id,name:`${p.product} Validation Test Specification`,revision:`R${1+i%3}`,
+   category:['Product Validation','Environmental','Electrical','Mechanical','Reliability'][i%5],status:i===4?'Draft':'Released',
+   owner:staff[(i+4)%staff.length].name,effectiveDate:dayISO(-45+i),uploadedAt:dayISO(-50+i),source:'Seeded demo',
+   acceptanceBasis:'Released product validation limits and customer requirements',description:`Test specification defining validation conditions, sample population, sequence and acceptance limits for ${p.product}.`,
+   linkedMethodIds:[],linkedRequirementIds:[],documentName:`SPEC-${String(i+1).padStart(3,'0')}-${p.product.replace(/[^A-Za-z0-9]+/g,'-')}.pdf`,documentPath:`SPEC-${String(i+1).padStart(3,'0')}.pdf`,mimeType:'application/pdf',fileData:null,
+   qualityScore:i===2?62:i===4?58:78+((i*3)%17),qualityFlags:i===2?['Ambiguous dwell-time wording','Acceptance limit missing for one parameter']:i===4?['Draft method reference','Fixture tolerance not released']:[]
+ }));
 
  const requirements=[]; let reqN=0;
  const reqCats=['Environmental','Electrical','Mechanical','Reliability','EMC','Functional'];
@@ -135,6 +142,7 @@ export function createDemoData(){
  }
  // Force status variety.
  requirements[7].status='Verified'; requirements[8].status='Verified'; requirements[13].status='Failed'; requirements[22].status='Not Covered'; requirements[31].status='Blocked'; requirements[44].status='Partially Verified';
+ for(const sp of specifications)sp.linkedRequirementIds=requirements.filter(r=>r.programmeId===sp.programmeId).map(r=>r.id);
 
  const methodByCategory={Electrical:'ELEC-001',Environmental:'ENV-TC-004',Mechanical:'MECH-VIB-006',Reliability:'REL-005',EMC:'EMC-007',Functional:'FUNC-004'};
  const legs=[]; let legN=0;
@@ -189,6 +197,7 @@ export function createDemoData(){
  // Explicit uncovered requirements for traceability KPIs.
  for(const idx of [22,37]){ const r=requirements[idx]; if(r){ for(const l of legs) l.requirementIds=l.requirementIds.filter(x=>x!==r.id); r.testLegIds=[]; r.status='Not Covered'; } }
  const testRequests=legs.map((l,i)=>({id:`TR-${String(i+1).padStart(3,'0')}`,programmeId:l.programmeId,legId:l.id,requestedBy:staff[(i+3)%staff.length].name,requestedDate:l.requestedDate,requiredCompletion:l.dueDate,priority:programmes.find(p=>p.id===l.programmeId)?.priority||'Normal',status:l.status==='Completed'?'Closed':'Open',methodId:l.methodId}));
+ for(const sp of specifications)sp.linkedMethodIds=[...new Set(legs.filter(l=>l.programmeId===sp.programmeId).map(l=>l.methodId))];
 
  // Calibration history + deliberate expiry risk.
  const calibrations=[]; let calN=0;
@@ -211,15 +220,66 @@ export function createDemoData(){
  ];
  calibrations.push({id:'CAL-PLN-001',equipmentId:'TC-04',calibrationDate:dayISO(10,12),dueDate:dayISO(375,17),certificateNumber:'PLANNED-TC04',provider:'Trescal',result:'Scheduled',comments:'Planned calibration; planning may use TC-04 only after this event.',certificatePath:'TC-04-certificate.pdf',uncertainty:'Pending calibration',asFound:'Pending',asLeft:'Pending',measurementTable:[]});
 
+
+ // Historical test runs provide deterministic period-based KPI history without duplicating active leg state.
+ const testRuns=[];
+ const histMethods=methods.filter(m=>m.active);
+ for(let i=0;i<96;i++){
+   const prog=programmes[i%programmes.length], method=histMethods[(i*7+3)%histMethods.length];
+   const startOff=-104+i; const plannedStart=dayISO(startOff,8+(i%3)*2);
+   const std=method.setupHours+method.executionHours+method.teardownHours+method.analysisHours;
+   const variance=0.82+((i*17)%43)/100; const actualHours=Math.round(std*variance*10)/10;
+   const actualStart=addHours(plannedStart,(i%8===0?6:i%11===0?18:0)); const actualEnd=addHours(actualStart,actualHours);
+   const plannedEnd=addHours(plannedStart,std); const delayHours=Math.max(0,Math.round(((new Date(actualEnd)-new Date(plannedEnd))/3600000)*10)/10);
+   const outcome=i%19===0?'FAIL':i%13===0?'REWORK':'PASS';
+   const eq=equipment.find(e=>e.type===method.equipmentType)||equipment[0]; const st=staff.find(x=>x.qualifications.some(q=>q.methodId===method.id))||staff[0];
+   testRuns.push({id:`RUN-H-${String(i+1).padStart(3,'0')}`,legId:legs.filter(l=>l.programmeId===prog.id)[i%5]?.id||null,programmeId:prog.id,methodId:method.id,plannedStart,plannedEnd,actualStart,actualEnd,equipmentId:eq.id,staffId:st.id,status:'Completed',outcome,actualHours,standardHours:Math.round(std*10)/10,delayHours,source:'Historical demo'});
+ }
+ // Add current completed leg executions to the canonical run history.
+ for(const leg of legs.filter(l=>l.actualStart&&l.actualEnd)){
+   const method=methods.find(m=>m.id===leg.methodId); const standardHours=method?method.setupHours+method.executionHours+method.teardownHours+method.analysisHours:0;
+   testRuns.push({id:`RUN-${leg.id}`,legId:leg.id,programmeId:leg.programmeId,methodId:leg.methodId,plannedStart:leg.plannedStart,plannedEnd:leg.plannedEnd,actualStart:leg.actualStart,actualEnd:leg.actualEnd,equipmentId:leg.equipmentId,staffId:leg.staffId,status:'Completed',outcome:results.some(r=>r.legId===leg.id&&r.status==='FAIL')?'FAIL':'PASS',actualHours:Math.round((new Date(leg.actualEnd)-new Date(leg.actualStart))/3600000*10)/10,standardHours,delayHours:Math.max(0,Math.round((new Date(leg.actualEnd)-new Date(leg.plannedEnd))/3600000*10)/10),source:'Current programme'});
+ }
+
+ const issueTypes=[
+   ['Specification ambiguity','Bad Specification','Clarify acceptance limits and test conditions before release'],
+   ['Missing acceptance limit','Bad Specification','Require completeness check for every measured parameter'],
+   ['Late specification revision','Bad Specification','Freeze test inputs before resource commitment'],
+   ['Incorrect setup / configuration','Test Execution','Use setup checklist and peer verification for critical tests'],
+   ['Fixture / connection problem','Test Execution','Add fixture health check before starting exposure'],
+   ['Script or data-capture error','Test Execution','Version-control and dry-run test automation before execution'],
+   ['Sample arrival delay','Sample / DUT','Confirm sample readiness at planning gate and expose late samples immediately'],
+   ['DUT damage / handling','Sample / DUT','Improve sample handling and quarantine controls'],
+   ['Equipment interruption','Equipment / Facility','Use condition monitoring and contingency equipment planning'],
+   ['Qualification / staffing gap','Planning / Resource','Cross-train single-point skills and maintain coverage targets'],
+   ['Method development overrun','Test Method / Development','Use staged method-development readiness gates']
+ ];
+ const issues=[];
+ for(let i=0;i<44;i++){
+   const ix=i%10<3?3:i%10<5?0:i%10===5?1:i%10===6?6:i%10===7?4:i%10===8?8:10;
+   const [issueType,rootCause,lesson]=issueTypes[ix]; const run=testRuns[(i*9+5)%testRuns.length]; const prog=programmes.find(p=>p.id===run.programmeId);
+   const sp=specifications.find(x=>x.programmeId===run.programmeId); const date=dayISO(-92+i*2,11);
+   issues.push({id:`ISS-${String(i+1).padStart(3,'0')}`,reportedAt:date,programmeId:run.programmeId,legId:run.legId,testRunId:run.id,specificationId:rootCause==='Bad Specification'?sp?.id:null,issueType,rootCause,severity:i%9===0?'High':i%4===0?'Medium':'Low',delayHours:[2,4,8,12,24,36][i%6],status:i>40?'Open':'Closed',description:`${issueType} identified during ${prog?.project||run.programmeId}.`,lesson,correctiveAction:lesson,owner:staff[(i+6)%staff.length].name});
+ }
+ const disruptions=[
+   {id:'DSP-001',type:'sample_delay',status:'Active',programmeId:'VP-ALPHA',legId:'LEG-002',reportedAt:dayISO(0,9),effectiveUntil:dayISO(5,8),reason:'Customer sample lot A arrival slipped by five days',impactHours:120,sourceIssueId:null},
+   {id:'DSP-002',type:'test_issue',status:'Active',programmeId:'VP-HOTEL',legId:'LEG-038',reportedAt:dayISO(0,10),effectiveUntil:dayISO(3,12),reason:'Fixture connector repair and repeat setup required',impactHours:74,sourceIssueId:null},
+   {id:'DSP-003',type:'sample_delay',status:'Resolved',programmeId:'VP-BETA',legId:'LEG-007',reportedAt:dayISO(-8,9),effectiveUntil:dayISO(-5,8),reason:'Prototype shipment customs delay',impactHours:72,sourceIssueId:null}
+ ];
+ issues.push({id:'ISS-045',reportedAt:dayISO(0,9),programmeId:'VP-ALPHA',legId:'LEG-002',testRunId:null,specificationId:null,issueType:'Sample arrival delay',rootCause:'Sample / DUT',severity:'High',delayHours:120,status:'Open',description:'Customer sample lot A arrival slipped by five days.',lesson:'Confirm sample readiness at planning gate and expose late samples immediately',correctiveAction:'Planner to use confirmed sample-ready date before booking constrained chamber capacity',owner:'Demo Lab Manager'});
+ issues.push({id:'ISS-046',reportedAt:dayISO(0,10),programmeId:'VP-HOTEL',legId:'LEG-038',testRunId:null,specificationId:null,issueType:'Fixture / connection problem',rootCause:'Test Execution',severity:'Medium',delayHours:74,status:'Open',description:'Fixture connector repair and repeat setup required.',lesson:'Add fixture health check before starting exposure',correctiveAction:'Complete connector repair and repeat pre-test fixture verification',owner:'Demo Lab Manager'});
+
  const documents=[
   {id:'DOC-001',type:'Calibration Certificate',entityId:'TC-04',name:'TC-04 Calibration Certificate',path:'TC-04-certificate.pdf'},
   {id:'DOC-002',type:'Calibration Certificate',entityId:'VIB-01',name:'VIB-01 Calibration Certificate',path:'VIB-01-certificate.pdf'},
   {id:'DOC-003',type:'Calibration Certificate',entityId:'EMC-01',name:'EMC-01 Calibration Certificate',path:'EMC-01-certificate.pdf'}
  ];
 
+ for(const sp of specifications)documents.push({id:`DOC-${sp.id}`,type:'Test Specification',entityId:sp.id,name:sp.name,path:sp.documentPath});
+
  const audit=[{timestamp:DEMO_NOW.toISOString(),actor:'Demo Lab Manager',action:'Demo dataset initialised',entity:'System',previousValue:'',newValue:APP_VERSION}];
- const settings={actor:'Demo Lab Manager',role:'Lab Manager',calibrationWarningDays:[60,30,14,7],scenario:null,lastPlannerRun:null};
- return {meta:{version:APP_VERSION,seed:8675309,generatedAt:DEMO_NOW.toISOString()},programmes,requirements,specifications,testRequests,methods,legs,duts,devTasks,equipment,staff,calibrations,maintenance,results,documents,audit,bookings:[],settings};
+ const settings={actor:'Demo Lab Manager',role:'Lab Manager',calibrationWarningDays:[60,30,14,7],scenario:null,lastPlannerRun:null,kpiPeriod:{preset:'30d',start:dayISO(-30,0).slice(0,10),end:dayISO(0,23).slice(0,10)},scenarioFocusProgramme:'VP-ALPHA'};
+ return {meta:{version:APP_VERSION,seed:8675309,generatedAt:DEMO_NOW.toISOString()},programmes,requirements,specifications,testRequests,testRuns,issues,disruptions,methods,legs,duts,devTasks,equipment,staff,calibrations,maintenance,results,documents,audit,bookings:[],settings};
 }
 
 export function cloneData(data){ return JSON.parse(JSON.stringify(data)); }

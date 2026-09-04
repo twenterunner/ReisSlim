@@ -1,6 +1,6 @@
 import { createDemoData, DEMO_NOW } from './data.js';
 import { scheduleAll, applyPriority, manualMove } from './planner.js';
-import { runDiagnostics, recomputeRequirementStatuses, calibrationStatus, calibrationAt } from './diagnostics.js';
+import { runDiagnostics, recomputeRequirementStatuses, calibrationStatus, calibrationAt, periodMetrics, issueAnalytics } from './diagnostics.js';
 
 function assert(ok, msg){ if(!ok) throw new Error(msg); console.log(`PASS  ${msg}`); }
 function seedCompletedBookings(d){ for(const l of d.legs.filter(x=>x.status==='Completed'&&x.actualStart&&x.actualEnd)) d.bookings.push({id:`BKG-${l.id}`,legId:l.id,programmeId:l.programmeId,methodId:l.methodId,start:l.actualStart,end:l.actualEnd,staffEnd:l.actualEnd,equipmentId:l.equipmentId,staffId:l.staffId,locked:true,status:'Completed',priority:d.programmes.find(p=>p.id===l.programmeId)?.priority||'Normal',dueDate:l.dueDate,lateHours:0}); }
@@ -13,6 +13,17 @@ const diag=runDiagnostics(data);
 assert(diag.overall==='PASS',`System diagnostics ${diag.pass}/${diag.checks.length}`);
 assert(data.programmes.length===10 && data.requirements.length===60 && data.legs.length===50 && data.duts.length===100, 'Seeded dataset scale is deterministic');
 assert(data.methods.length===30 && data.equipment.length>=20 && data.staff.length===15 && data.calibrations.length>=30, 'Library/resource dataset scale is deterministic');
+
+assert(data.specifications.length===10 && data.specifications.every(sp=>sp.documentPath||sp.fileData), 'Seeded test specifications are present and have viewable document references');
+assert(data.testRuns.length>=100 && data.issues.length>=40, 'Period KPI and lessons-learned history is sufficiently populated');
+const sampleDelay=data.disruptions.find(d=>d.id==='DSP-001'),sampleLeg=data.legs.find(l=>l.id===sampleDelay.legId);
+assert(sampleLeg.plannedStart && new Date(sampleLeg.plannedStart)>=new Date(sampleDelay.effectiveUntil), 'Automatic planning respects active sample-availability delays');
+const pm=periodMetrics(data,'2026-08-01','2026-09-04'),ia=issueAnalytics(data,'2026-08-01','2026-09-04');
+assert(pm.completed>0 && pm.issues>0 && Number.isFinite(pm.onTimePct) && Number.isFinite(pm.equipmentUtil), 'Week/month/custom-period KPI engine reconciles executions, issues and utilisation');
+assert(ia.topTypes.length>0 && ia.rootCauses.some(x=>x.name==='Test Execution') && ia.rootCauses.some(x=>x.name==='Bad Specification'), 'Automatic lessons learned separates execution causes from bad specifications');
+const priorityMap=Object.fromEntries(data.programmes.map((p,i)=>[p.id,i===0?'Critical':i<4?'High':'Low']));
+const priorityScenario=scheduleAll(data,{recordAudit:false,scenario:{type:'priority_mix',priorityMap,label:'verification priority mix'}});
+assert(priorityScenario.diagnostics.moved.length>0, `Project-priority scenario materially changes the plan (${priorityScenario.diagnostics.moved.length} booking changes)`);
 const tc04=data.equipment.find(e=>e.id==='TC-04'),tc04Now=calibrationStatus(tc04,data),tc04Future=calibrationAt(data,'TC-04','2026-09-15T08:00:00Z',{allowScheduled:true});
 assert(tc04Now.calibration?.result!=='Scheduled' && new Date(tc04Now.calibration?.calibrationDate)<=DEMO_NOW, 'Current calibration status excludes future scheduled calibration');
 assert(tc04Future?.id==='CAL-PLN-001', 'Future planning uses the scheduled recalibration only after its effective date');
