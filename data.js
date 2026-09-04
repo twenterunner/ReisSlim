@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 export const DEMO_NOW = new Date('2026-09-04T08:00:00Z');
 
 export const priorityRank = { Critical: 4, High: 3, Normal: 2, Low: 1 };
@@ -143,6 +143,8 @@ export function createDemoData(){
  // Force status variety.
  requirements[7].status='Verified'; requirements[8].status='Verified'; requirements[13].status='Failed'; requirements[22].status='Not Covered'; requirements[31].status='Blocked'; requirements[44].status='Partially Verified';
  for(const sp of specifications)sp.linkedRequirementIds=requirements.filter(r=>r.programmeId===sp.programmeId).map(r=>r.id);
+ const acceptanceByCategory={Environmental:'No loss of required function and all measured parameters remain within released limits after exposure.',Electrical:'Measured electrical parameters shall remain within released product limits.',Mechanical:'No structural damage and required functional performance shall be maintained.',Reliability:'No critical failure and degradation shall remain within the defined released limit.',EMC:'The DUT shall meet the applicable released immunity/emissions acceptance limits.',Functional:'All specified functions shall operate within the released performance limits.'};
+ for(const r of requirements){const sp=specifications.find(s=>s.programmeId===r.programmeId);r.specificationId=sp?.id||'';r.acceptanceCriterion=acceptanceByCategory[r.category]||'Result shall meet the released specification acceptance limits.';r.validationIntent='Demonstrate requirement compliance with objective test evidence.';}
 
  const methodByCategory={Electrical:'ELEC-001',Environmental:'ENV-TC-004',Mechanical:'MECH-VIB-006',Reliability:'REL-005',EMC:'EMC-007',Functional:'FUNC-004'};
  const legs=[]; let legN=0;

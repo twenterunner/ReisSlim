@@ -17,6 +17,7 @@ assert(data.programmes.length===10 && data.requirements.length===60 && data.legs
 assert(data.methods.length===30 && data.equipment.length>=20 && data.staff.length===15 && data.calibrations.length>=30, 'Library/resource dataset scale is deterministic');
 
 assert(data.specifications.length===10 && data.specifications.every(sp=>sp.documentPath||sp.fileData), 'Seeded test specifications are present and have viewable document references');
+assert(data.requirements.every(r=>r.acceptanceCriterion&&data.specifications.some(sp=>sp.id===r.specificationId)), 'Every seeded requirement has an objective acceptance criterion and controlled specification basis');
 assert(data.testRuns.length>=100 && data.issues.length>=40, 'Period KPI and lessons-learned history is sufficiently populated');
 const sampleDelay=data.disruptions.find(d=>d.id==='DSP-001'),sampleLeg=data.legs.find(l=>l.id===sampleDelay.legId);
 assert(sampleLeg.plannedStart && new Date(sampleLeg.plannedStart)>=new Date(sampleDelay.effectiveUntil), 'Automatic planning respects active sample-availability delays');
@@ -45,7 +46,7 @@ const alphaCost=programmeCost(data,'VP-ALPHA'),portCost=portfolioCost(data);
 assert(alphaCost.forecast>0 && alphaCost.legs.length>0 && portCost.programmes.length===data.programmes.length && portCost.totalForecast>0, 'Programme and portfolio cost roll-ups reconcile to canonical test legs');
 assert(data.legs.filter(l=>l.status!=='Completed'&&l.plannedStart&&l.sampleReadyDate).every(l=>new Date(l.plannedStart)>=new Date(l.sampleReadyDate)), 'All future planned legs respect project sample-ready inputs');
 assert(data.legs.filter(l=>l.plannedStart).every(l=>{const p=data.programmes.find(p=>p.id===l.programmeId),sp=data.specifications.filter(s=>s.programmeId===l.programmeId);return (p?.gateStatus||'Released')==='Released'&&(!sp.length||sp.some(s=>s.status==='Released'))}), 'Draft/unreleased programme and specification gates do not consume planned capacity');
-const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv'];
+const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv','LabOS-Requirements-Import-Template.csv','LabOS-Specification-Review-Checklist.csv'];
 assert(exampleFiles.every(f=>existsSync(new URL(f,import.meta.url))), 'Operational example documents/templates are included');
 
 const roundtrip=JSON.parse(JSON.stringify(data));

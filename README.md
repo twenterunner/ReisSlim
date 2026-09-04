@@ -1,4 +1,4 @@
-# LabOS Prototype v0.3.0
+# LabOS Prototype v0.4.0
 
 LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
@@ -12,7 +12,7 @@ The canonical workflow is:
 
 All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
 
-## New in v0.3.0
+## New in v0.4.0
 
 ### Test cost & finance framework
 
@@ -85,6 +85,8 @@ Included examples:
 
 - `LabOS-Test-Programme-Template.pdf`;
 - `LabOS-Test-Programme-Template.csv`;
+- `LabOS-Requirements-Import-Template.csv`;
+- `LabOS-Specification-Review-Checklist.csv`;
 - `LabOS-Method-Development-Plan.pdf`;
 - `LabOS-Sample-Test-Report.pdf`.
 
@@ -102,9 +104,9 @@ The programme builder does not merely list historical issues. For selected tests
 
 This allows lessons from previous programmes to influence planning before new work is released.
 
-### Additional operational controls added in v0.3.0
+### Additional operational controls added in v0.4.0
 
-To make the prototype more credible as an operational system, v0.3.0 also adds:
+To make the prototype more credible as an operational system, v0.4.0 also adds:
 
 - programme release/readiness gates;
 - specification release gates;
@@ -116,6 +118,30 @@ To make the prototype more credible as an operational system, v0.3.0 also adds:
 - test-method cost and historical issue intelligence in the Test Library;
 - project-specific leg/staff planning controls;
 - operational templates and example records suitable for immediate demonstration.
+
+
+### Why the Specifications and Requirements views exist
+
+These two views are now operational workflow controls rather than passive registers.
+
+**Specs & Test Basis** answers: *Which controlled document/revision defines the conditions, samples and objective pass/fail limits for this validation work?* It shows specification readiness, requirement mapping, method-release readiness, recurring specification-caused issues and the direct planning impact of an unreleased/weak specification. A structured six-point review gate must be satisfied before a specification can become the released planning basis.
+
+**Requirements & Coverage** answers: *What must be demonstrated, what objectively counts as pass, and which test demand will provide the evidence?* It ranks gaps by criticality/attention, distinguishes existing released methods from tests that still need development, forecasts coverage cost, and lets a user create or extend test coverage directly from a requirement.
+
+Together they make the flow explicit: **source need → objective acceptance criterion → controlled test specification → coverage decision → released/development-gated method → planned test leg → DUT/result/evidence → verified/failed requirement**.
+
+Included workflow examples:
+
+- `LabOS-Requirements-Import-Template.csv`;
+- `LabOS-Specification-Review-Checklist.csv`.
+
+### Reliability fixes in v0.4.0
+
+- repaired the Programme Builder method-selection layout and Create & Auto Plan navigation path;
+- implemented the missing project-plan renderer used after programme creation;
+- added project-level and test-leg planning controls that recalculate the shared laboratory schedule;
+- changed the service worker to **network-first for HTML/JavaScript/CSS** so a GitHub Pages update does not combine a new navigation shell with stale cached application logic;
+- retained cache fallback for offline use and bundled documents.
 
 ## Capabilities retained from v0.2.0
 
@@ -211,7 +237,7 @@ The baseline deterministic environment includes approximately:
 - Synthetic calibration certificates: 31 PDFs;
 - Synthetic test specifications: 10 PDFs;
 - Operational example/template PDFs: 4;
-- Operational example/template CSVs: 2.
+- Operational example/template CSVs: 4.
 
 The Programme Builder can add further programmes, test legs, DUTs, specifications, draft methods and development tasks during a demo session.
 

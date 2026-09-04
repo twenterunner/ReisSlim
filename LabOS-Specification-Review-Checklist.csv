@@ -1,0 +1,7 @@
+Check ID,Specification Release Check,Purpose,Required for Release,Example Evidence
+SRC,Source traceability,"Confirms the test specification is derived from an approved customer/product requirement",Yes,"Source requirement IDs and revision recorded"
+MAP,Requirements mapped,"Prevents test conditions from becoming detached from validation obligations",Yes,"Every in-scope validation requirement linked to the spec"
+ACC,Objective acceptance criteria,"Ensures pass/fail can be determined without subjective interpretation",Yes,"Numeric limits, categorical condition or explicit acceptance rule"
+SMP,Sample/DUT definition,"Defines population, genealogy, conditioning and availability assumptions",Yes,"DUT count, groups, serialisation and readiness gate"
+MTH,Method and revision,"Confirms each required test method exists or has an explicit development task",Yes,"Released method ID/revision or linked development plan"
+APP,Release approval,"Confirms the controlled test basis is approved before laboratory commitment",Yes,"Review completed and status set to Released"

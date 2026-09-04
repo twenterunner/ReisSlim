@@ -1,0 +1,4 @@
+Source Requirement ID,Validation Requirement,Category,Criticality,Verification Method,Objective Acceptance Criterion,Specification ID,Owner
+CUS-DEMO-001,"Sensor shall remain functional after 1,000 thermal cycles between -40C and +150C",Environmental,Critical,Test,"No loss of required function; all measured parameters within released product limits after exposure",SPEC-001,Validation Engineer
+CUS-DEMO-002,"Peak current consumption shall remain below the released maximum during nominal operation",Electrical,High,Test,"Measured peak current <= released specification upper limit",SPEC-001,Electrical Test Engineer
+CUS-DEMO-003,"Housing shall show no structural damage after random vibration exposure",Mechanical,High,Test,"No cracks, loose parts or functional degradation; post-test functional checks pass",SPEC-001,Mechanical Test Engineer
