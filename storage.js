@@ -1,9 +1,5 @@
-import { STORAGE_SCHEMA_VERSION, VERSION } from './config.js';
-import { validateCanonicalPlan } from './validator.js';
-const KEY='reisslim.v2.trips';
-export function serializeTrip(plan){return JSON.stringify({schemaVersion:STORAGE_SCHEMA_VERSION,appVersion:VERSION,savedAt:new Date().toISOString(),plan})}
-export function deserializeTrip(text){const x=JSON.parse(text);if(x.schemaVersion!==STORAGE_SCHEMA_VERSION)throw new Error('STORAGE_SCHEMA_MISMATCH');const v=validateCanonicalPlan(x.plan);if(!v.valid)throw Object.assign(new Error('STORED_PLAN_INVALID'),{validation:v});x.plan.validation=v;return x.plan}
-export function loadTrips(storage=localStorage){try{return JSON.parse(storage.getItem(KEY)||'[]').map(x=>{try{return deserializeTrip(x)}catch{return null}}).filter(Boolean)}catch{return[]}}
-export function saveTrip(plan,storage=localStorage){const current=loadTrips(storage).filter(p=>p.createdAt!==plan.createdAt);current.unshift(plan);storage.setItem(KEY,JSON.stringify(current.slice(0,25).map(serializeTrip)));return current}
-export function deleteTrip(createdAt,storage=localStorage){const current=loadTrips(storage).filter(p=>p.createdAt!==createdAt);storage.setItem(KEY,JSON.stringify(current.map(serializeTrip)));return current}
-export class MemoryStorage{constructor(){this.m=new Map()}getItem(k){return this.m.get(k)??null}setItem(k,v){this.m.set(k,String(v))}removeItem(k){this.m.delete(k)}}
+const DB_NAME='labos-prototype'; const DB_VERSION=1; const STORE='state'; const KEY='canonical';
+function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+export async function loadState(){ try{const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(KEY);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}catch(e){ try{return JSON.parse(localStorage.getItem('labos-state')||'null');}catch{return null;} } }
+export async function saveState(data){ try{const db=await openDB(); await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(data,KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}catch(e){localStorage.setItem('labos-state',JSON.stringify(data));} }
+export async function clearState(){ try{const db=await openDB();await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}catch{} localStorage.removeItem('labos-state'); }

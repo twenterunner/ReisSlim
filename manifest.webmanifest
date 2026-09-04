@@ -1,1 +1,10 @@
-{"name":"ReisSlim Offline-first Roadtripplanner","short_name":"ReisSlim","version":"2.2.6","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#edf4f2","theme_color":"#123f3a","description":"Offline-first roadtrip planning with canonical plans and optional live enrichment.","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "name": "LabOS Laboratory Operations Prototype",
+  "short_name": "LabOS",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f8",
+  "theme_color": "#0b3c49",
+  "icons": [{"src":"labos-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

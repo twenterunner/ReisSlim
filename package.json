@@ -1,19 +1,7 @@
 {
-  "name": "reisslim",
-  "version": "2.2.6",
+  "name": "labos-static-prototype",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Offline-first deterministic roadtrip planner.",
-  "scripts": {
-    "generate:data": "node tool-generate-dataset.mjs",
-    "validate:data": "node tool-validate-dataset.mjs",
-    "test": "node --test --test-reporter=spec test-*.test.mjs",
-    "bench": "node test-performance.mjs",
-    "check": "node tool-check-syntax.mjs && node tool-validate-dataset.mjs && node tool-check-static.mjs && node --test --test-reporter=spec test-*.test.mjs && node test-performance.mjs",
-    "check:static": "node tool-check-static.mjs",
-    "check:syntax": "node tool-check-syntax.mjs"
-  },
-  "engines": {
-    "node": ">=20"
-  }
+  "scripts": {"verify": "node verify-model.mjs"}
 }

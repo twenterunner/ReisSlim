@@ -1,0 +1,89 @@
+import { DEMO_NOW, priorityRank, addHours, cloneData } from './data.js';
+
+const HOUR=3600000;
+function overlaps(aStart,aEnd,bStart,bEnd){return new Date(aStart)<new Date(bEnd)&&new Date(aEnd)>new Date(bStart);}
+function isWeekend(d){const n=d.getUTCDay(); return n===0||n===6;}
+function nextWorkStart(date){const d=new Date(date); while(isWeekend(d)){d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(8,0,0,0);} if(d.getUTCHours()<8)d.setUTCHours(8,0,0,0); if(d.getUTCHours()>=17){d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(8,0,0,0); while(isWeekend(d)){d.setUTCDate(d.getUTCDate()+1);} } return d;}
+function roundTo4h(date){let d=nextWorkStart(date);const mins=d.getUTCHours()*60+d.getUTCMinutes();if(mins<=8*60){d.setUTCHours(8,0,0,0);return d;}if(mins<=12*60){d.setUTCHours(12,0,0,0);return d;}if(mins<=16*60){d.setUTCHours(16,0,0,0);return d;}d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(8,0,0,0);return nextWorkStart(d);}
+function addWorkHours(date,hours){let d=nextWorkStart(date),remain=Math.max(0,hours);while(remain>0.0001){d=nextWorkStart(d);const end=new Date(d);end.setUTCHours(17,0,0,0);const avail=Math.max(0,(end-d)/HOUR);if(remain<=avail){d=new Date(d.getTime()+remain*HOUR);remain=0;}else{remain-=avail;d=new Date(end);d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(8,0,0,0);d=nextWorkStart(d);}}return d;}
+function durationInfo(method,leg,eq){const capacity=Math.max(1,Math.min(method?.dutCapacity||999,eq?.capacity||999));const batches=Math.max(1,Math.ceil((leg?.dutIds?.length||1)/capacity));const hours=(method?.setupHours||0)+(method?.executionHours||0)*batches+(method?.teardownHours||0)+(method?.analysisHours||0);return {capacity,batches,hours};}
+function currentCalibration(data, eqId, at=DEMO_NOW, allowScheduled=false){const when=new Date(at);const cals=data.calibrations.filter(c=>c.equipmentId===eqId&&new Date(c.calibrationDate)<=when&&(allowScheduled||c.result!=='Scheduled')).sort((a,b)=>new Date(b.calibrationDate)-new Date(a.calibrationDate)); return cals[0]||null;}
+function qualifiedStaff(data, methodId, skill, equipmentType){return data.staff.filter(s=>s.skills.includes(skill)&&(s.equipmentQualifications||[]).includes(equipmentType)&&s.qualifications.some(q=>q.methodId===methodId && ['Independent','Reviewer','Trainer/Expert'].includes(q.level) && new Date(q.expires)>DEMO_NOW));}
+function staffUnavailable(s,start,end,scenario){const blocks=[...(s.availability||[])]; if(scenario?.type==='staff_unavailable'&&scenario.staffId===s.id) blocks.push({start:scenario.start,end:scenario.end,reason:'Scenario unavailability'}); return blocks.some(b=>overlaps(start,end,b.start,b.end));}
+function equipmentUnavailable(data,eq,start,end,scenario){if(['Out of Service','Retired'].includes(eq.status))return 'Equipment out of service'; const blocks=data.maintenance.filter(m=>m.equipmentId===eq.id); if(scenario?.type==='equipment_unavailable'&&scenario.equipmentId===eq.id)blocks.push({start:scenario.start,end:scenario.end,type:'Scenario',reason:'Scenario outage'}); const b=blocks.find(x=>overlaps(start,end,x.start,x.end)); return b?`${b.type}: ${b.reason}`:null;}
+function slotBusy(bookings,resourceField,id,start,end){return bookings.some(b=>b[resourceField]===id&&overlaps(start,end,b.start,b.end));}
+function predecessorEnd(data,leg){if(!leg.predecessorIds?.length)return DEMO_NOW; let max=DEMO_NOW; for(const id of leg.predecessorIds){const p=data.legs.find(x=>x.id===id); const e=p?.actualEnd||p?.plannedEnd; if(!e)return null; if(new Date(e)>new Date(max))max=new Date(e);} return max;}
+function devReady(data,leg){if(!leg.developmentTaskId)return {ready:DEMO_NOW,reason:null}; const d=data.devTasks.find(x=>x.id===leg.developmentTaskId); if(!d)return {ready:null,reason:'Missing test development task'}; if(d.completeDate)return {ready:new Date(d.completeDate),reason:null}; const projected=d.dueDate?new Date(d.dueDate):null; return {ready:projected,reason:`Test development ${d.id} not complete; earliest release ${projected?projected.toISOString().slice(0,10):'unknown'}`};}
+
+export function validateBooking(data,{legId,equipmentId,staffId,start,end,ignoreBookingId=null,scenario=data.settings?.scenario}){
+ const leg=data.legs.find(l=>l.id===legId), method=data.methods.find(m=>m.id===leg?.methodId), eq=data.equipment.find(e=>e.id===equipmentId), st=data.staff.find(s=>s.id===staffId);
+ const reasons=[];
+ if(!leg||!method) reasons.push('Test leg or method not found.');
+ if(!eq||eq.type!==method?.equipmentType) reasons.push(`Equipment is not compatible; ${method?.equipmentType||'required type'} is required.`);
+ if(!st||!st.skills.includes(method?.requiredSkills[0])||!(st.equipmentQualifications||[]).includes(method?.equipmentType)||!st.qualifications.some(q=>q.methodId===method.id&&['Independent','Reviewer','Trainer/Expert'].includes(q.level)&&new Date(q.expires)>new Date(start))) reasons.push('Selected staff member lacks the required method and/or equipment authorisation.');
+ if(new Date(end)<=new Date(start)) reasons.push('End must be after start.');const startD=new Date(start);if(isWeekend(startD)||startD.getUTCHours()<8||startD.getUTCHours()>=17) reasons.push('Attended work must start within staff working hours (08:00-17:00, Monday-Friday).');
+ const pred=leg?predecessorEnd(data,leg):null; if(leg?.predecessorIds?.length&&!pred)reasons.push('A predecessor leg is not yet planned or completed.'); else if(pred&&new Date(start)<new Date(pred)) reasons.push(`Cannot start before predecessor completion ${new Date(pred).toISOString().slice(0,16).replace('T',' ')}.`);
+ const dev=leg?devReady(data,leg):{ready:null}; if(dev.ready&&new Date(start)<new Date(dev.ready))reasons.push(dev.reason||`Method development not ready until ${new Date(dev.ready).toISOString().slice(0,10)}.`);
+ if(eq){const un=equipmentUnavailable(data,eq,start,end,scenario); if(un)reasons.push(un); const cal=currentCalibration(data,eq.id,start,true); if(eq.calibrationRequired&&(!cal||new Date(cal.dueDate)<new Date(end)))reasons.push(`Calibration is not valid through the planned end; current due date ${cal?.dueDate?.slice(0,10)||'missing'}.`);}
+ const attendedEnd=method?.continuousStaffing?end:addWorkHours(start,(method?.setupHours||0)+(method?.teardownHours||0)+(method?.analysisHours||0));if(st&&staffUnavailable(st,start,attendedEnd,scenario))reasons.push('Staff member is unavailable during the required attended period.');
+ const others=data.bookings.filter(b=>b.id!==ignoreBookingId);
+ if(eq&&slotBusy(others,'equipmentId',eq.id,start,end))reasons.push(`Equipment ${eq.id} is already booked in this period.`);
+ const staffEnd=method?.continuousStaffing?end:attendedEnd;
+ if(st&&slotBusy(others,'staffId',st.id,start,staffEnd))reasons.push(`Staff member ${st.name} is already booked in the required attended period.`);
+ return {ok:reasons.length===0,reasons};
+}
+
+export function scheduleAll(input,{scenario=input.settings?.scenario,recordAudit=true}={}){
+ const data=cloneData(input); const oldMap=Object.fromEntries(data.legs.map(l=>[l.id,{start:l.plannedStart,end:l.plannedEnd,equipmentId:l.equipmentId,staffId:l.staffId}]));
+ // Keep completed and locked bookings, rebuild unlocked future plan.
+ const lockedBookings=(data.bookings||[]).filter(b=>b.locked||b.status==='Completed');
+ data.bookings=lockedBookings;
+ for(const leg of data.legs){if(leg.status!=='Completed'&&!leg.locked){leg.plannedStart=null;leg.plannedEnd=null;leg.equipmentId=null;leg.staffId=null;leg.planExplanation=[];leg.blockingReason=null;if(!['Blocked','Failed','Cancelled'].includes(leg.status))leg.status='Draft';}}
+ // restore locked leg details from bookings
+ for(const b of lockedBookings){const l=data.legs.find(x=>x.id===b.legId); if(l){l.plannedStart=b.start;l.plannedEnd=b.end;l.equipmentId=b.equipmentId;l.staffId=b.staffId;l.locked=!!b.locked;}}
+ const schedulable=data.legs.filter(l=>l.status!=='Completed'&&!l.locked&&!['Cancelled','Failed'].includes(l.status)).sort((a,b)=>{
+   const pa=priorityRank[data.programmes.find(p=>p.id===a.programmeId)?.priority||'Normal']; const pb=priorityRank[data.programmes.find(p=>p.id===b.programmeId)?.priority||'Normal']; if(pb!==pa)return pb-pa; return new Date(a.dueDate)-new Date(b.dueDate)||a.sequence-b.sequence;
+ });
+ const diagnostics={unscheduled:[],moved:[],reasonCounts:{},iterations:0};
+ for(const leg of schedulable){
+   const prog=data.programmes.find(p=>p.id===leg.programmeId), method=data.methods.find(m=>m.id===leg.methodId); if(!prog||!method)continue;
+   const pred=predecessorEnd(data,leg); if(leg.predecessorIds?.length&&!pred){leg.blockingReason='Predecessor incomplete or unscheduled';leg.planExplanation=[leg.blockingReason];diagnostics.unscheduled.push(leg.id);diagnostics.reasonCounts['Predecessor dependency']=(diagnostics.reasonCounts['Predecessor dependency']||0)+1;continue;}
+   const dev=devReady(data,leg); if(leg.developmentTaskId&&!dev.ready){leg.blockingReason=dev.reason;leg.planExplanation=[dev.reason];diagnostics.unscheduled.push(leg.id);diagnostics.reasonCounts['Test development']=(diagnostics.reasonCounts['Test development']||0)+1;continue;}
+   let earliest=new Date(Math.max(DEMO_NOW.getTime(),pred?new Date(pred).getTime():0,dev.ready?new Date(dev.ready).getTime():0)); earliest=roundTo4h(earliest);
+   let eqCandidates=data.equipment.filter(e=>e.type===method.equipmentType);
+   if(scenario?.type==='add_equipment'&&scenario.equipmentType===method.equipmentType){eqCandidates=[...eqCandidates,{id:'SCN-EQ-01',name:`Scenario ${method.equipmentType}`,type:method.equipmentType,status:'Available',calibrationRequired:false,capacity:method.dutCapacity}];}
+   const staffCandidates=qualifiedStaff(data,method.id,method.requiredSkills[0],method.equipmentType);
+   let best=null; const reasons=new Map();
+   if(!eqCandidates.length) reasons.set('Equipment capacity',`No equipment of type ${method.equipmentType} exists.`);
+   if(!staffCandidates.length) reasons.set('Missing qualification',`No independently qualified staff are available for ${method.id}.`);
+   for(const eq of eqCandidates){
+     for(const st of staffCandidates){
+       let t=new Date(earliest); const horizon=new Date(DEMO_NOW); horizon.setUTCDate(horizon.getUTCDate()+90);
+       while(t<horizon){diagnostics.iterations++; t=roundTo4h(t); const di=durationInfo(method,leg,eq); const total=di.hours; const end=method.continuousStaffing?addWorkHours(t,total):new Date(t.getTime()+total*HOUR); const staffHours=method.continuousStaffing?total:(method.setupHours+method.teardownHours+method.analysisHours); const staffEnd=method.continuousStaffing?end:addWorkHours(t,staffHours);
+         const un=equipmentUnavailable(data,eq,t,end,scenario); if(un){reasons.set(eq.status==='Breakdown'?'Equipment breakdown':'Equipment unavailable',`${eq.id} unavailable: ${un}`);t=new Date(t.getTime()+4*HOUR);continue;}
+         const cal=currentCalibration(data,eq.id,t,true); if(eq.calibrationRequired&&(!cal||new Date(cal.dueDate)<end)){reasons.set('Calibration',`${eq.id} calibration expires ${cal?.dueDate?.slice(0,10)||'before use'} before test end ${end.toISOString().slice(0,10)}.`);t=new Date(t.getTime()+4*HOUR);continue;}
+         if(slotBusy(data.bookings,'equipmentId',eq.id,t,end)){reasons.set('Equipment capacity',`${eq.id} is occupied during the candidate window.`);t=new Date(t.getTime()+4*HOUR);continue;}
+         if(staffUnavailable(st,t,staffEnd,scenario)){reasons.set('Staff unavailable',`${st.name} is unavailable during the attended portion.`);t=new Date(t.getTime()+4*HOUR);continue;}
+         if(slotBusy(data.bookings,'staffId',st.id,t,staffEnd)){reasons.set('Staff availability',`${st.name} has another booking during the attended portion.`);t=new Date(t.getTime()+4*HOUR);continue;}
+         const lateness=Math.max(0,(end-new Date(leg.dueDate))/HOUR); const score=t.getTime()+lateness*HOUR*20; if(!best||score<best.score)best={start:new Date(t),end,eq,st,staffEnd,score,lateness,batches:di.batches,capacity:di.capacity,reasons:[...reasons.values()].slice(-3)}; break;
+       }
+     }
+   }
+   if(!best){const arr=[...reasons.entries()]; leg.blockingReason=arr[0]?.[1]||'No feasible resource combination found within 90 days.';leg.planExplanation=arr.map(x=>x[1]).slice(0,4);diagnostics.unscheduled.push(leg.id);const key=arr[0]?.[0]||'Unallocated demand';diagnostics.reasonCounts[key]=(diagnostics.reasonCounts[key]||0)+1;continue;}
+   const booking={id:`BKG-${leg.id}`,legId:leg.id,programmeId:leg.programmeId,methodId:leg.methodId,start:best.start.toISOString(),end:best.end.toISOString(),staffEnd:best.staffEnd.toISOString(),equipmentId:best.eq.id,staffId:best.st.id,locked:false,status:'Planned',priority:prog.priority,dueDate:leg.dueDate,lateHours:Math.round(best.lateness*10)/10,batches:best.batches,resourceCapacity:best.capacity};
+   data.bookings.push(booking); leg.plannedStart=booking.start;leg.plannedEnd=booking.end;leg.equipmentId=booking.equipmentId;leg.staffId=booking.staffId;leg.status=best.lateness>0?'At Risk':'Planned';
+   const exp=[]; if(dev.reason)exp.push(dev.reason); if(best.reasons.length)exp.push(...best.reasons); if(best.batches>1)exp.push(`${leg.dutIds.length} DUTs require ${best.batches} sequential batches at effective capacity ${best.capacity}.`); if(best.lateness>0)exp.push(`${prog.project} is forecast ${Math.round(best.lateness/24*10)/10} days late for this leg.`); exp.push(`Selected ${best.eq.id} and ${best.st.name} as the earliest feasible qualified resource combination.`); leg.planExplanation=exp;
+   const old=oldMap[leg.id]; if(old?.start&&(old.start!==leg.plannedStart||old.equipmentId!==leg.equipmentId||old.staffId!==leg.staffId))diagnostics.moved.push({legId:leg.id,oldStart:old.start,newStart:leg.plannedStart,oldEquipment:old.equipmentId,newEquipment:leg.equipmentId,oldStaff:old.staffId,newStaff:leg.staffId});
+ }
+ // Forecast completion and programme statuses.
+ for(const p of data.programmes){const ls=data.legs.filter(l=>l.programmeId===p.id); const ends=ls.map(l=>l.actualEnd||l.plannedEnd).filter(Boolean).map(x=>new Date(x)); p.forecastCompletion=ends.length?new Date(Math.max(...ends)).toISOString():null; const blocked=ls.some(l=>l.blockingReason); const late=p.forecastCompletion&&new Date(p.forecastCompletion)>new Date(p.dueDate); p.scheduleRisk=blocked?'Blocked':late?'Late':ls.some(l=>l.status==='At Risk')?'At Risk':'On Track'; if(blocked)p.status='Blocked'; else if(late)p.status='At Risk'; else if(p.status!=='Closed')p.status='Active';}
+ data.settings.lastPlannerRun=new Date().toISOString();
+ if(recordAudit)data.audit.push({timestamp:new Date().toISOString(),actor:data.settings.actor,action:'Laboratory plan recalculated',entity:'Planning',previousValue:`${diagnostics.moved.length} prior moves`,newValue:`${data.bookings.length} bookings; ${diagnostics.unscheduled.length} unscheduled`});
+ return {data,diagnostics};
+}
+
+export function manualMove(input,bookingId,changes){const data=cloneData(input); const b=data.bookings.find(x=>x.id===bookingId); if(!b)return {ok:false,reasons:['Booking not found.'],data:input}; const leg=data.legs.find(l=>l.id===b.legId); const method=data.methods.find(m=>m.id===leg.methodId); const start=changes.start||b.start; const targetEq=data.equipment.find(e=>e.id===(changes.equipmentId||b.equipmentId)); const di=durationInfo(method,leg,targetEq); const end=changes.end||(method.continuousStaffing?addWorkHours(start,di.hours).toISOString():addHours(start,di.hours)); const candidate={legId:b.legId,equipmentId:changes.equipmentId||b.equipmentId,staffId:changes.staffId||b.staffId,start,end}; const valid=validateBooking(data,{...candidate,ignoreBookingId:b.id}); if(!valid.ok)return {...valid,data:input}; const prev=JSON.stringify({start:b.start,equipmentId:b.equipmentId,staffId:b.staffId,locked:b.locked}); Object.assign(b,candidate,{locked:changes.locked??true}); Object.assign(leg,{plannedStart:start,plannedEnd:end,equipmentId:candidate.equipmentId,staffId:candidate.staffId,locked:b.locked}); data.audit.push({timestamp:new Date().toISOString(),actor:data.settings.actor,action:'Manual booking changed',entity:b.id,previousValue:prev,newValue:JSON.stringify({start,equipmentId:b.equipmentId,staffId:b.staffId,locked:b.locked})}); return {ok:true,reasons:[],data};}
+
+export function applyPriority(input,programmeId,priority){const data=cloneData(input); const p=data.programmes.find(x=>x.id===programmeId); if(!p)return data; const old=p.priority;p.priority=priority; for(const l of data.legs.filter(l=>l.programmeId===programmeId))l.priority=priority; data.audit.push({timestamp:new Date().toISOString(),actor:data.settings.actor,action:'Priority changed',entity:programmeId,previousValue:old,newValue:priority}); return data;}
+
+export function computePlanningMetrics(data){const planned=data.legs.filter(l=>['Planned','At Risk'].includes(l.status)).length, unscheduled=data.legs.filter(l=>l.status!=='Completed'&&!l.plannedStart&&!['Cancelled','Failed'].includes(l.status)).length, late=data.bookings.filter(b=>b.lateHours>0).length, atRisk=data.programmes.filter(p=>['Late','At Risk','Blocked'].includes(p.scheduleRisk)).length; return {planned,unscheduled,late,atRisk};}
