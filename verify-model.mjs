@@ -2,13 +2,14 @@ import { createDemoData, DEMO_NOW } from './data.js';
 import { scheduleAll, applyPriority, manualMove } from './planner.js';
 import { runDiagnostics, recomputeRequirementStatuses, calibrationStatus, calibrationAt, periodMetrics, issueAnalytics } from './diagnostics.js';
 import { estimateLegCost, programmeCost, portfolioCost } from './costs.js';
+import { ensureOperationsState, capacityForecast, inferOpportunityPlan, maintenanceSummary, optimizeMaintenancePlan, auditPortfolio, AUDIT_STANDARDS } from './operations.js';
 import { existsSync } from 'node:fs';
 
 function assert(ok, msg){ if(!ok) throw new Error(msg); console.log(`PASS  ${msg}`); }
 function seedCompletedBookings(d){ for(const l of d.legs.filter(x=>x.status==='Completed'&&x.actualStart&&x.actualEnd)) d.bookings.push({id:`BKG-${l.id}`,legId:l.id,programmeId:l.programmeId,methodId:l.methodId,start:l.actualStart,end:l.actualEnd,staffEnd:l.actualEnd,equipmentId:l.equipmentId,staffId:l.staffId,locked:true,status:'Completed',priority:d.programmes.find(p=>p.id===l.programmeId)?.priority||'Normal',dueDate:l.dueDate,lateHours:0}); }
 
 const started=performance.now();
-let data=createDemoData(); seedCompletedBookings(data);
+let data=createDemoData(); ensureOperationsState(data); seedCompletedBookings(data);
 let run=scheduleAll(data,{recordAudit:false}); data=run.data; recomputeRequirementStatuses(data);
 const elapsed=performance.now()-started;
 const diag=runDiagnostics(data);
@@ -46,7 +47,12 @@ const alphaCost=programmeCost(data,'VP-ALPHA'),portCost=portfolioCost(data);
 assert(alphaCost.forecast>0 && alphaCost.legs.length>0 && portCost.programmes.length===data.programmes.length && portCost.totalForecast>0, 'Programme and portfolio cost roll-ups reconcile to canonical test legs');
 assert(data.legs.filter(l=>l.status!=='Completed'&&l.plannedStart&&l.sampleReadyDate).every(l=>new Date(l.plannedStart)>=new Date(l.sampleReadyDate)), 'All future planned legs respect project sample-ready inputs');
 assert(data.legs.filter(l=>l.plannedStart).every(l=>{const p=data.programmes.find(p=>p.id===l.programmeId),sp=data.specifications.filter(s=>s.programmeId===l.programmeId);return (p?.gateStatus||'Released')==='Released'&&(!sp.length||sp.some(s=>s.status==='Released'))}), 'Draft/unreleased programme and specification gates do not consume planned capacity');
-const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv','LabOS-Requirements-Import-Template.csv','LabOS-Specification-Review-Checklist.csv'];
+const audits=auditPortfolio(data);assert(data.audits.length>=2&&Object.keys(AUDIT_STANDARDS).length===2&&audits.rows.every(a=>Number.isFinite(a.metrics.score)), 'ISO/IEC 17025 and IATF internal-audit workbenches produce deterministic readiness scores');
+const inferred=inferOpportunityPlan(data,data.opportunities.find(o=>o.id==='OPP-006')),explicit=inferOpportunityPlan(data,data.opportunities.find(o=>o.id==='OPP-001'));assert(inferred.source.startsWith('Inferred from')&&inferred.methodIds.length>0&&explicit.source==='Expected validation plan', 'Potential-project demand supports both similarity inference and explicit validation plans');
+const c0=capacityForecast(data,12,'committed'),cw=capacityForecast(data,12,'weighted'),cf=capacityForecast(data,12,'full'),pipe=c=>c.weeks.reduce((a,w)=>a+w.pipelineEq+w.pipelineStaff,0);assert(pipe(c0)<=pipe(cw)&&pipe(cw)<=pipe(cf)&&cw.equipment.some(x=>x.gapHours>0)&&cw.staff.some(x=>x.peakUtil>=100), 'Future capacity model separates committed, probability-weighted and full-pipeline demand and surfaces resource constraints');
+const maintCopy=JSON.parse(JSON.stringify(data)),before=maintenanceSummary(maintCopy,90),opt=optimizeMaintenancePlan(maintCopy,90),after=maintenanceSummary(maintCopy,90);assert(before.due.length>0&&after.planned.length>0&&opt.planned+opt.moved>0, 'Maintenance optimizer creates demand-aware preventive downtime windows for due equipment');
+const pmLockedOverlap=maintCopy.maintenance.filter(m=>m.policyId).some(m=>maintCopy.bookings.some(b=>b.locked&&b.equipmentId===m.equipmentId&&new Date(m.start)<new Date(b.end)&&new Date(m.end)>new Date(b.start)));assert(!pmLockedOverlap,'Optimized preventive-maintenance windows do not overlap locked equipment bookings');
+const exampleFiles=['LabOS-Test-Programme-Template.pdf','LabOS-Cost-Framework-Guide.pdf','LabOS-Sample-Test-Report.pdf','LabOS-Method-Development-Plan.pdf','LabOS-Cost-Rate-Card.csv','LabOS-Test-Programme-Template.csv','LabOS-Requirements-Import-Template.csv','LabOS-Specification-Review-Checklist.csv','LabOS-Audit-Checklist-ISO17025.csv','LabOS-Audit-Checklist-IATF16949.csv','LabOS-Opportunity-Pipeline-Template.csv','LabOS-Maintenance-Plan-Template.csv'];
 assert(exampleFiles.every(f=>existsSync(new URL(f,import.meta.url))), 'Operational example documents/templates are included');
 
 const roundtrip=JSON.parse(JSON.stringify(data));

@@ -1,4 +1,4 @@
-# LabOS Prototype v0.4.0
+# LabOS Prototype v0.5.0
 
 LabOS is a static, browser-only laboratory operations prototype combining LIMS, validation requirements management, specification control, test-programme design, deterministic resource-constrained planning, equipment/calibration management, people/competency management, test-development management, programme prioritisation, cost management, capacity analytics, lessons learned and management decision support.
 
@@ -8,11 +8,81 @@ The application is intentionally deployable directly on GitHub Pages with no bac
 
 The canonical workflow is:
 
-**requirements → specifications → test programme → test legs → DUT/sample demand → method availability/development → resource-constrained planning → execution → evidence/results → issues/lessons learned → cost/delivery/capacity management**
+**requirements → specifications → test programme → test legs → DUT/sample demand → method availability/development → resource-constrained planning → execution → evidence/results → issues/lessons learned → cost/delivery/capacity management → future demand / maintenance / audit assurance**
 
 All major views operate on the same browser-local canonical data model rather than duplicate demo-only representations.
 
-## New in v0.4.0
+## New in v0.5.0
+
+### Audit & compliance workbench
+
+A new **Audit & Compliance** module supports internal readiness audits using original workflow prompts based on the themes of **ISO/IEC 17025:2017** and **IATF 16949:2016**. The application does not reproduce licensed standard text and does not claim accreditation or certification.
+
+The workbench provides:
+
+- selectable ISO/IEC 17025 or IATF audit basis;
+- multiple audit records and planned dates;
+- clause/process-area readiness overview;
+- Conform / OFI / Minor / Major / N/A status;
+- system-derived evidence suggestions from calibration, competence, validation, maintenance, capacity and issue data;
+- manual auditor evidence, findings, action owner and due date;
+- readiness score, open nonconformities and process-area visuals;
+- CSV audit export;
+- seeded ISO/IEC 17025 and IATF readiness audits.
+
+Included audit templates:
+
+- `LabOS-Audit-Checklist-ISO17025.csv`;
+- `LabOS-Audit-Checklist-IATF16949.csv`.
+
+The ISO workbench uses ISO/IEC 17025:2017 as the current edition. The IATF workbench uses IATF 16949:2016 while explicitly noting that IATF has announced work on a second edition; the checklist should be updated when a future edition becomes effective.
+
+### Demand, staffing & equipment forecast
+
+A new **Demand & Capacity** module combines ongoing committed work with potential future projects. Potential projects can be entered with:
+
+- opportunity probability;
+- expected start and validation completion;
+- customer/product;
+- pipeline status;
+- explicit expected validation methods when known;
+- a selected similar existing programme;
+- or automatic similarity inference when the detailed validation plan is not yet known.
+
+The forecast supports **Committed only**, **Probability weighted**, and **Full pipeline / if all won** scenarios. It converts demand into weekly equipment occupancy, competency/staff hours, capacity gaps, incremental equipment units and FTE needs. The demo deliberately contains future constraints such as Reliability Rack, EMC and specialist competence pressure.
+
+Potential projects can be sent directly into the Test Programme Builder; inferred/expected test methods are preselected and can then be edited before programme release.
+
+Included example: `LabOS-Opportunity-Pipeline-Template.csv`.
+
+### Maintenance planning & optimisation
+
+A new **Maintenance Plan** module adds per-asset preventive-maintenance policy, criticality, condition score, failure risk, interval, next due date, duration and locked/flexible planning.
+
+**Optimize Maintenance & Replan** searches for low-demand windows before each due date, avoids locked test work, creates hard equipment-downtime blocks and reruns the shared laboratory scheduler. The view shows due/overdue maintenance, high-risk assets, planned downtime and optimisation benefit.
+
+Included example: `LabOS-Maintenance-Plan-Template.csv`.
+
+### Executive KPI command center
+
+The dashboard is upgraded from a basic KPI tile page into a management command center combining:
+
+- portfolio delivery and validation assurance;
+- financial control;
+- 12-week staffing/equipment outlook;
+- probability-weighted pipeline exposure;
+- audit readiness;
+- maintenance risk;
+- requirement assurance;
+- delivery/outcome/root-cause trends;
+- future equipment additions and FTE/skill needs;
+- automatic management actions;
+- programme priority scenario comparison;
+- cost/investment signal.
+
+Period-selectable weekly/monthly/custom KPI analytics remain available alongside these forward-looking views.
+
+## v0.4.0 workflow foundation retained
 
 ### Test cost & finance framework
 
@@ -283,6 +353,8 @@ Then open `http://localhost:8000/`.
 ## Persistence and transfer
 
 Canonical application state is stored in **IndexedDB**, with localStorage fallback. Changes survive browser refresh/restart for the same browser profile.
+
+When a compatible earlier LabOS prototype state is detected, v0.5.0 migrates that browser-local state through the current canonical shape rather than resetting it solely because the app version changed; the version upgrade is recorded in the prototype audit trail.
 
 Available controls include:
 

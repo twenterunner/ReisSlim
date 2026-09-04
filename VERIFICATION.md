@@ -1,163 +1,165 @@
-# LabOS Prototype v0.4.0 — Verification Record
+# LabOS Prototype v0.5.0 - Verification Record
 
 Verification date: 4 September 2026
 
 ## Final acceptance result
 
-**PASS** — v0.4.0 fixes the reported Cost & Finance / Programme Builder failures and converts Specifications and Requirements into operational workflow-control views.
+**PASS** - v0.5.0 extends the verified v0.4.0 workflow into audit/compliance readiness, probabilistic future-demand and resource forecasting, preventive-maintenance optimisation, and an executive laboratory operations command center.
 
-## Reported-defect closure
+## New v0.5.0 workflow verification
 
-### Cost & Finance — PASS
+### Audit & Compliance - PASS
 
-- Portfolio Cost & Finance route renders and remains interactive.
-- Programme selector opens leg-level financial control.
-- Budget, estimate, actual-to-date, estimate-to-complete, forecast-at-completion and variance are calculated from the canonical cost model.
-- Cost rate-card modal works.
-- Budget edit/save works and persists.
-- The budget editor now uses the same effective/derived programme budget shown in the financial dashboard when no explicit budget was previously stored.
-- Cost CSV export remains available.
+- Dedicated Audit & Compliance route is operational.
+- Selectable internal-readiness basis: ISO/IEC 17025:2017 or IATF 16949:2016.
+- Multiple audit records can be created, selected and retained.
+- System-derived evidence auto-assessment operates from canonical calibration, competence, requirement, test, issue, maintenance and capacity data.
+- Manual assessment supports Conform / OFI / Minor / Major / N/A, evidence, finding, owner and due date.
+- Readiness score, open findings and process-area visuals reconcile to audit items.
+- CSV export is available.
+- Seeded ISO readiness audit: 93% in deterministic verification state.
+- Seeded IATF readiness audit: 88% in deterministic verification state.
+- IATF laboratory coverage includes internal laboratory scope, calibration/verification records and external-laboratory control in addition to competence, maintenance, validation, change, audit and corrective-action themes.
+- The module is explicitly an internal readiness/workbench and does not claim accreditation, certification or reproduction of licensed standard text.
 
-### Build Programme — PASS
+### Demand & Capacity - PASS
 
-Two implementation defects were corrected:
+- Ongoing scheduled work is treated as committed demand.
+- Six seeded potential projects carry opportunity probability, dates and validation-demand assumptions.
+- Potential demand can use either an explicit expected validation plan or similarity inference from existing programmes.
+- Forecast modes are separate and reconcile in the required direction: Committed <= Probability weighted <= Full pipeline.
+- 4 / 8 / 12 / 26 week horizons are selectable.
+- Demand is translated to weekly equipment hours, staff/competency hours, capacity gaps, incremental equipment units and incremental FTE requirements.
+- Seeded 12-week weighted forecast surfaces real management constraints rather than static warnings. Deterministic verification identifies Reliability Rack and EMC Cell equipment pressure plus EMC Specialist competency pressure.
+- Potential-project conversion into Test Programme Builder preselects the inferred/expected methods and preserves the opportunity/source rationale.
+- CSV export is available.
 
-1. the Test Library selector is a semantic HTML table, but an older CSS rule forced `.builder-library` to `display:grid`; v0.4.0 explicitly restores table layout and interaction;
-2. **Create & Auto Plan** successfully created a programme but then navigated into Planning where the project-plan renderer was missing. `renderProjectPlanRows()` plus project/leg planning controls are now implemented.
+### Maintenance Plan - PASS
 
-Acceptance test: quick-start template with four existing methods + one custom method → programme created → five test legs → one development task → specification record → automatic planning → project planning page with five editable leg rows. **PASS**.
+- Per-asset policies include interval, duration, criticality, condition score, failure risk, strategy and next due date.
+- Three preventive-maintenance windows are seeded into the initial demo so planned downtime is visible immediately.
+- **Optimize Maintenance & Replan** searches lower-demand windows before due dates, creates hard equipment-downtime events and reruns the shared laboratory scheduler.
+- Optimised maintenance does not overlap locked equipment bookings in deterministic verification.
+- Due/overdue work, planned downtime, high-risk assets, breakdown history and policy details are visible.
+- Manual maintenance event and maintenance-policy editing are operational.
+- CSV export is available.
 
-### Requirements & Coverage — PASS
+### Executive KPI command center - PASS
 
-The view now operates as a coverage workbench rather than a passive requirement list:
+The Dashboard now combines current operational performance with forward-looking management signals, including:
 
-- source/customer need;
-- objective acceptance criterion;
-- controlled specification basis;
-- coverage decision;
-- existing released method versus method-development need;
-- linked test legs/DUT demand;
-- forecast coverage cost;
-- planned evidence and verification status.
+- portfolio delivery and validation assurance;
+- financial control;
+- 12-week equipment and staffing outlook;
+- probability-weighted pipeline exposure;
+- audit readiness;
+- maintenance risk;
+- requirement assurance;
+- delivery, outcome and root-cause trends;
+- future equipment additions and FTE/skill needs;
+- automatic management actions;
+- programme-priority scenario comparison;
+- cost/investment signal.
 
-Creating coverage directly from a Not Covered requirement was browser-tested and created canonical test demand successfully.
+The existing week/month/custom-period KPI controls and visual analytics remain available.
 
-### Specifications & Test Basis — PASS
+## Existing operational workflow regression - PASS
 
-The view now operates as the controlled executable test basis:
+Regression coverage retained from v0.4.0 includes:
 
-- specification/revision and local document;
-- requirement mapping;
-- objective acceptance readiness;
-- method/revision readiness;
-- historical specification-caused issues;
-- tests blocked by specification release;
-- change-impact view;
-- six-point structured Review / Release gate.
+- requirements and specification-controlled test basis;
+- test-programme builder, including new-method development gating;
+- project and portfolio resource-constrained planning;
+- sample/DUT-ready constraints and issue-driven replanning;
+- calibration-effective-date rules;
+- staff qualification and authorisation controls;
+- execution/results/traceability;
+- test-leg/programme/portfolio cost roll-ups;
+- lessons learned/root-cause analytics;
+- priority and equipment-outage scenarios;
+- JSON persistence/import/export/reset;
+- operational CSV exports and example documents.
 
-Specification review/release save was interaction-tested at 100% readiness and recalculated the laboratory plan successfully.
+## Data migration - PASS
 
-## Project planning controls — PASS
+v0.5.0 no longer resets otherwise-valid browser-local LabOS data merely because the application version changed. An existing compatible v0.4.x state is upgraded through the canonical shape initialiser, its version is updated to v0.5.0, and the schema upgrade is recorded in the prototype audit history.
 
-Planning now supports portfolio and single-project views. For a selected project the UI exposes:
+## In-app diagnostics - PASS 23/23
 
-- programme priority and business score;
-- release gate;
-- programme due date;
-- budget and programme manager;
-- per-leg sample/DUT ready date;
-- per-leg required completion;
-- automatic/preferred/required staff policy;
-- selected preferred/required staff member;
-- method release/development state;
-- forecast leg cost;
-- planned equipment/staff/date;
-- blocker/explanation;
-- manual booking / lock control.
+The expanded deterministic integrity suite covers the existing 18 checks plus:
 
-Project-control save was interaction-tested and recalculated the shared laboratory plan while preserving diagnostics PASS.
+1. audit workbench integrity;
+2. potential-project demand inputs;
+3. future-capacity forecast reconciliation;
+4. maintenance-policy integrity;
+5. maintenance versus locked test work.
 
-## In-app diagnostics — PASS 18/18
+Result: **23 passed / 0 failed**.
 
-Administration → **Run System Verification** reports **18/18 PASS**, covering canonical references, resource overlaps, calibration, competency, critical requirement coverage, durations, dependencies, result evaluation, seeded dataset integrity, specification traceability, disruption inputs, lessons-learned classification, KPI history, cost roll-up/components, sample readiness and programme/specification release gates.
+## Extended deterministic model verification - PASS
 
-## Extended deterministic model verification — PASS
+`npm test` / `node verify-model.mjs` completed successfully after the final data-migration change.
 
-`node verify-model.mjs` passes all extended checks, including:
+Notable verified behaviours include:
 
-- 10 seeded programmes, 60 requirements, 50 test legs and 100 DUTs;
-- every seeded requirement has an objective acceptance criterion and controlled specification basis;
-- 10 local dummy test specifications;
-- period KPI and lessons-learned history;
-- sample-delay constraints;
-- week/month/custom-period KPI reconciliation;
-- Test Execution versus Bad Specification root-cause analytics;
-- project-priority scenario changing **17 bookings**;
-- calibration effective-date logic;
-- capacity/batching;
-- development gating;
-- predecessor sequencing;
-- direct priority promotion changing **26 bookings**;
-- equipment-outage scenario changing **2 bookings**;
-- invalid manual assignment rejection;
-- deterministic non-negative test-leg costs;
-- programme/portfolio cost reconciliation;
-- sample-ready constraints;
-- programme/specification release gates;
-- example operational documents/templates;
-- JSON state round-trip;
-- deterministic planning performance comfortably below one second on the seeded dataset.
+- priority-strategy scenario changes 17 bookings;
+- direct programme priority promotion changes 26 bookings;
+- equipment-outage scenario changes 2 bookings;
+- active sample delays constrain planning;
+- future scheduled calibration is used only once effective;
+- development-gated tests do not start before method release;
+- predecessor logic is respected;
+- unreleased programme/specification work does not consume committed capacity;
+- cost components and programme/portfolio roll-ups reconcile;
+- ISO/IATF audit scoring is deterministic;
+- explicit and similarity-inferred pipeline demand both operate;
+- maintenance optimisation creates/moves demand-aware preventive-downtime windows;
+- full JSON state round-trip preserves canonical records.
 
-## Browser/UI smoke verification — PASS
+Initial deterministic planning completed in approximately 72 ms during the final model run.
 
-The final v0.4.0 static UI was tested using an in-memory browser-origin harness because the execution environment blocks normal localhost/file navigation.
+## Browser regression - PASS
 
-Verified:
+An in-memory-origin Chromium smoke harness was used because this execution environment blocks normal localhost/file URL navigation.
 
-- all **15** primary routes;
-- Requirements coverage workbench and Create Coverage action;
-- Specifications readiness board and six-point review modal;
-- Cost & Finance portfolio view, programme drill-down and budget modal;
-- Programme Builder table layout, quick-start template, existing-method selection and custom method development;
-- Create & Auto Plan end-to-end;
-- resulting project planning view and project controls;
-- dynamically created programme preserving **18/18 PASS** integrity;
-- 390 px mobile viewport on Requirements, Specifications, Builder, Cost & Finance and Planning with no page-level horizontal overflow;
-- uncaught browser JavaScript errors: **0**.
+- All **18 primary routes** rendered successfully.
+- Dashboard command center rendered with audit, maintenance and future-capacity content.
+- Demand & Capacity rendered six opportunities and real equipment/staff risk signals.
+- OPP-006 conversion opened Test Programme Builder with five methods preselected and similarity provenance retained.
+- Maintenance route started with three seeded PM windows; optimisation generated/repositioned downtime and retained diagnostics PASS.
+- IATF audit rendered, record selection persisted, and manual finding editing opened correctly.
+- System diagnostics remained **23/23 PASS** through interaction testing.
+- 390 px mobile checks passed for Dashboard, Demand & Capacity, Maintenance and Audit with no page-level horizontal overflow.
+- Uncaught browser errors: **0**.
 
-Additional interaction pass verified:
+## Static deployment / service worker - PASS
 
-- cost budget save/close;
-- specification release review save/close;
-- project planning control save/replan;
-- diagnostics remained **PASS** after those mutations.
+- All application paths are relative and remain compatible with GitHub Pages repository-path deployment.
+- Service-worker cache version is `labos-v0.5.0`.
+- HTML, JavaScript, CSS and manifest requests use a network-first update strategy with cached offline fallback, reducing stale-code mismatches after GitHub deployment updates.
+- Non-code example documents/assets remain cacheable for offline demonstration.
 
-## Cache/update reliability — PASS
+## Included new templates - PASS
 
-The service worker cache is versioned `labos-v0.4.0`. HTML, JavaScript, CSS and the web manifest use a **network-first** update strategy with cache fallback, reducing the risk that GitHub Pages serves a new navigation shell with stale cached application code. Bundled PDFs/CSVs remain available through cache fallback.
+- `LabOS-Audit-Checklist-ISO17025.csv`
+- `LabOS-Audit-Checklist-IATF16949.csv`
+- `LabOS-Opportunity-Pipeline-Template.csv`
+- `LabOS-Maintenance-Plan-Template.csv`
 
-## Included example files
+These are delivered in addition to the existing cost, programme, requirements and specification templates plus calibration certificates, dummy test specifications and operational example PDFs.
 
-- 31 synthetic calibration certificate PDFs;
-- 10 synthetic test-specification PDFs;
-- `LabOS-Test-Programme-Template.pdf`;
-- `LabOS-Test-Programme-Template.csv`;
-- `LabOS-Requirements-Import-Template.csv`;
-- `LabOS-Specification-Review-Checklist.csv`;
-- `LabOS-Cost-Framework-Guide.pdf`;
-- `LabOS-Cost-Rate-Card.csv`;
-- `LabOS-Sample-Test-Report.pdf`;
-- `LabOS-Method-Development-Plan.pdf`.
+## Static-prototype boundary
 
-## Final package integrity
+This verification confirms deterministic prototype behaviour, not production accreditation/certification or enterprise compliance. The browser-only prototype does not provide server-enforced identity/security, validated electronic signatures, authoritative multi-user audit storage, concurrent-user conflict control or a centrally governed database.
 
-- root files: **65**;
-- nested paths/directories in ZIP: **0**;
-- service-worker asset references: **60/60 resolve**;
-- bundled PDFs: **45/45 structurally valid**;
-- bundled operational CSV examples: **4**;
-- ZIP CRC/integrity test: **PASS**.
+## Final flat-package preflight - PASS
 
-## Flat repository requirement
-
-**PASS** — all 65 deployable/source/example files are placed directly at repository/ZIP root. No nested application directory is required.
+- Root-level deliverable files: **70**
+- Nested folders/directories: **0**
+- Service-worker asset references resolved: **65/65**
+- Bundled PDFs parsed successfully: **45/45**
+- Bundled CSV example/template files parsed successfully: **8/8**
+- JavaScript/module syntax preflight: **PASS**
+- ZIP path-safety check: **PASS**
+- ZIP nested paths: **0**
+- ZIP integrity (`unzip -t`): **PASS**

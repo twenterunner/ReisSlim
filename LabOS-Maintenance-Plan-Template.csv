@@ -1,0 +1,2 @@
+﻿Equipment ID,Maintenance Strategy,Interval Days,Typical Downtime Hours,Criticality,Condition Score /100,Failure Risk,Next Due Date,Locked Window?,Notes
+TC-01,Preventive / condition-informed,90,8,High,72,Medium,2026-09-20,No,Optimizer should place before due date in a low-demand window.

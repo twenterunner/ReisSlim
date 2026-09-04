@@ -1,0 +1,2 @@
+﻿Opportunity ID,Project Name,Customer,Product,Probability %,Expected Start,Expected Validation Due,Status,Similar Existing Programme,Expected Method IDs (pipe-separated),Notes
+OPP-NEW-001,Example Future Programme,Demo Customer,Sensor Platform,65,2026-10-15,2027-02-15,Qualified,VP-ALPHA,ELEC-001|ENV-TC-004|MECH-VIB-006|ELEC-002,Use explicit methods when validation content is known; otherwise use similarity basis.
