@@ -1,4 +1,4 @@
-# LabOS Prototype v1.2.0
+# LabOS Prototype v1.3.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -15,6 +15,19 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+## New in v1.3.0 — editable split/merge topology and scenario-driven planning
+
+This release fixes the remaining branch-editing limitation and connects Validation, Prototyping and Planning more tightly.
+
+- **Split can be inserted into an existing plan.** A common test can be split even when later tests or later main Test Legs already exist. Those downstream tests are preserved and wait behind the merge junction instead of making Split disappear.
+- **Visible merge junction.** Once 1a / 1b exist, **⇉ Merge 1a + 1b here** remains visible directly under the active branch tails until the user explicitly reunites them.
+- **Existing downstream path is retained.** Example: `1.1 → 1.2 → split → [1a.1 → 1a.2] + [1b.1 → 1b.2] → merge → 1.3 → Leg 2`.
+- **Programme-lane planning view.** Each validation programme has a persistent colour; linked prototype builds, method-development work and validation tests appear in the same programme lane so the dependency is visible.
+- **Combined resource planning view.** Toggle to a resource-centric plan where all programmes compete for shared equipment, staff and prototype-build capacity while retaining programme colours.
+- **Planning Scenario Studio.** Sandboxed scenarios cover equipment breakdown/outage, sample delay, method-development delay, linked prototype-build delay, key-staff unavailability and programme-priority changes. Running a scenario does not alter the operational plan.
+- **Automatic recovery comparison.** For a disruption, LabOS recalculates the constrained portfolio and also tests a programme-protection recovery where relevant, showing booking movement, unscheduled work and delivery impact before any operational change is committed.
+- **Linked prototype/validation coordination remains optional.** Standalone prototype work remains independent; linked prototype completion controls validation sample readiness and appears in the same planning context.
 
 ## New in v1.2.0 — intuitive logical Test Legs
 
