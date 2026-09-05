@@ -34,6 +34,19 @@ export function ensureAdvancedState(data){
    ['Review acceptance criteria','Review','Deterministic result evaluation and exception review.'],
    ['Close evidence package','Approval','Attach evidence, review exceptions and route report approval.']
   ];data.lesTemplates.push({id:`LES-TPL-${String(++n).padStart(3,'0')}`,methodId:m.id,revision:m.revision||'A',status:'Released',steps:steps.map((s,i)=>({id:`S${i+1}`,sequence:i+1,title:s[0],type:s[1],instruction:s[2],mandatory:true,requiresEvidence:[4,5,6].includes(i),requiresReview:i===5}))});}}
+ // Ensure every active standard test has a controlled work instruction, including datasets migrated from older versions.
+ {const active=(data.methods||[]).filter(m=>m.active),baseSteps=[
+   ['Verify controlled method / spec revision','Document','Confirm released method and governing validation basis are current.'],
+   ['Verify DUT identity and chain of custody','Check','Scan/confirm DUTs, condition, genealogy and release status.'],
+   ['Verify equipment / MSA / materials readiness','Check','Calibration, maintenance, MSA where applicable, fixtures and consumables must be acceptable.'],
+   ['Perform setup and pre-test checks','Execution','Record setup parameters, fixture configuration and baseline readings.'],
+   ['Execute test / monitor live data','Execution','Capture instrument data and anomalies; exceptions trigger the quality/escalation workflow.'],
+   ['Review acceptance criteria','Review','Perform deterministic result evaluation and review exceptions against the controlled method.'],
+   ['Close evidence package','Approval','Attach raw data, report evidence and review-by-exception approval before closure.']
+  ];let n=data.lesTemplates.length;for(const m of active){if(data.lesTemplates.some(t=>t.methodId===m.id&&t.status==='Released'))continue;data.lesTemplates.push({id:`LES-TPL-${String(++n).padStart(3,'0')}`,methodId:m.id,revision:m.revision||'A',status:'Released',steps:baseSteps.map((a,i)=>({id:`S${i+1}`,sequence:i+1,title:a[0],type:a[1],instruction:a[2],mandatory:true,requiresEvidence:[3,4,5,6].includes(i),requiresReview:[5,6].includes(i)}))});}}
+ // Migrate seeded/demo quality records to the evidence-backed model without pretending user-created evidence exists.
+ for(const q of data.qualityEvents){q.evidenceRefs=q.evidenceRefs||[];if(q.status==='Closed'&&!q.evidenceRefs.length)q.evidenceRefs.push({stage:'Closed',evidence:`Demo seeded closure evidence for ${q.sourceId||q.id}`,reviewedBy:q.owner||'Demo Quality',timestamp:q.closedAt||dayISO(-1)});}
+ for(const c of data.capaActions){c.effectivenessEvidence=c.effectivenessEvidence||[];if(c.effectivenessStatus==='Effective'&&!c.effectivenessEvidence.length)c.effectivenessEvidence.push({result:'Effective',evidence:`Demo seeded effectiveness review for ${c.id}`,verifiedBy:c.owner||'Demo Quality',timestamp:c.verifiedAt||dayISO(-1)});}
  if(!data.guidedExecutions.length){let n=0;for(const l of (data.legs||[]).filter(l=>l.status==='Completed').slice(0,12)){const t=data.lesTemplates.find(x=>x.methodId===l.methodId);if(!t)continue;n++;data.guidedExecutions.push({id:`LES-RUN-${String(n).padStart(3,'0')}`,legId:l.id,templateId:t.id,status:'Completed',startedAt:l.actualStart||dayISO(-20),completedAt:l.actualEnd||dayISO(-19),operatorId:l.staffId||data.staff[0]?.id,stepStates:t.steps.map((s,i)=>({stepId:s.id,status:'Completed',timestamp:l.actualEnd||dayISO(-19),value:i===4?'Live data captured':'OK',evidence:i>=4?`EVID-${l.id}-${i+1}`:'',exception:i===3&&n%4===0?'Setup repeated after connector check':''})),reviewBy:data.staff.find(s=>s.role?.includes('Engineer'))?.id||data.staff[0]?.id,reviewStatus:'Approved'});}}
  if(!data.referenceStandards.length){data.referenceStandards.push(
   {id:'STD-DCV-01',name:'10 V DC Reference',type:'Electrical Reference',serial:'REF-10017',traceability:'National metrology institute',dueDate:dayISO(180),status:'Valid',uncertainty:'1.2 µV/V'},

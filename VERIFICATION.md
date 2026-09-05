@@ -1,12 +1,35 @@
-# LabOS Prototype v0.8.0 - Verification Record
+# LabOS Prototype v0.9.0 - Verification Record
 
-Verification date: 4 September 2026
+Verification date: 5 September 2026
 
 ## Final acceptance result
 
-**PASS** - v0.8.0 extends the verified v0.7.0 operating model with the full P1/P2 layer: unified quality events/CAPA/MRB, DUT chain of custody, guided LES execution, probabilistic P50/P80/P95 planning, metrology/MSA, predictive equipment health, fixture/consumable/spares constraints, external-lab alternatives, and knowledge/similarity reuse.
+**PASS** - v0.9.0 refines the verified P1/P2 foundation into a test-programme-centric operating model with a standard Test Portfolio, column-based validation-network design, prototype-to-validation readiness, history-estimated method development, programme-local planning and evidence-gated closure.
 
 
+
+
+## New v0.9.0 programme-centric verification
+
+- In-app deterministic diagnostics: **48/48 PASS**.
+- Extended deterministic model verification: **PASS**.
+- Primary consolidated navigation routes: **12/12 render successfully**.
+- Released standard tests with controlled work instruction: **100%**.
+- Test Portfolio detail including FTR, learned duration, cost, MSA and issue/lesson history: **PASS**.
+- Existing programme → editable horizontal validation network: **PASS**.
+- Sequential leg = new main column; parallel branch = second card in same next stage: **PASS**.
+- Multi-predecessor join editor: **PASS**.
+- Prototype auto-planning → linked validation sample-ready constraint: **PASS**.
+- Prototype completion without evidence rejected; with build evidence accepted: **PASS**.
+- New-test development effort derived from similar historical development rather than user-entered development days: **PASS**.
+- Programme-only replanning preserves other programme bookings: **PASS**.
+- Planning-constraint closure presents mandatory recovery-action + objective-evidence gate: **PASS**.
+- Quality-event stage advancement presents mandatory evidence gate: **PASS**.
+- CAPA effectiveness uses explicit verification evidence: **PASS**.
+- Test Portfolio reports no released method without a work instruction: **PASS**.
+- 390 px browser smoke across consolidated routes: **no page-level horizontal overflow**.
+- Browser smoke uncaught JavaScript errors: **0**.
+- Service worker uses network-first application-shell updates and cache namespace `labos-v0.9.0`.
 
 ## New v0.8.0 P1/P2 verification
 
@@ -200,7 +223,7 @@ An in-memory-origin Chromium smoke harness was used because this execution envir
 ## Static deployment / service worker - PASS
 
 - All application paths are relative and remain compatible with GitHub Pages repository-path deployment.
-- Service-worker cache version is `labos-v0.7.0`.
+- Service-worker cache version is `labos-v0.9.0`.
 - HTML, JavaScript, CSS and manifest requests use a network-first update strategy with cached offline fallback, reducing stale-code mismatches after GitHub deployment updates.
 - Non-code example documents/assets remain cacheable for offline demonstration.
 

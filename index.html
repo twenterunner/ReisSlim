@@ -17,7 +17,7 @@
       <span class="brand-mark">L</span><span><strong>LabOS</strong><small>Laboratory Operations</small></span>
     </button>
     <div class="top-actions">
-      <label class="searchbox"><span>⌕</span><input id="globalSearch" aria-label="Global search" placeholder="Search requirement, programme, DUT, asset…" autocomplete="off" /></label>
+      <label class="searchbox"><span>⌕</span><input id="globalSearch" aria-label="Global search" placeholder="Search programme, test, DUT, prototype, asset…" autocomplete="off" /></label>
       <label class="role-select"><span>View as</span><select id="roleSelect" aria-label="Simulated role"><option>Technician</option><option>Test Engineer</option><option>Planner</option><option selected>Lab Manager</option><option>Quality</option></select></label>
       <button id="mobileNavBtn" class="icon-btn mobile-only" aria-label="Open navigation">☰</button>
     </div>
@@ -25,34 +25,18 @@
   <div class="shell">
     <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
       <nav id="nav">
-        <button data-route="dashboard" class="active"><span>▦</span>Dashboard</button>
-        <button data-route="requirements"><span>⇅</span>Requirements & Coverage</button>
-        <button data-route="specifications"><span>▣</span>Specs & Test Basis</button>
-        <button data-route="programmes"><span>◫</span>Programmes</button>
-        <button data-route="builder"><span>＋</span>Build Programme</button>
-        <button data-route="planning"><span>▤</span>Test Planning</button>
-        <button data-route="execution"><span>▶</span>Test Execution</button>
-        <button data-route="quality"><span>◆</span>Quality / CAPA</button>
-        <button data-route="custody"><span>⇄</span>Samples & Custody</button>
-        <button data-route="guided"><span>☑</span>Guided Execution</button>
-        <button data-route="live"><span>◉</span>Live Test Monitor</button>
-        <button data-route="control"><span>⚠</span>Exceptions & Escalation</button>
-        <button data-route="duts"><span>⬡</span>DUTs</button>
-        <button data-route="library"><span>▧</span>Test Library</button>
-        <button data-route="equipment"><span>⚙</span>Equipment</button>
-        <button data-route="calibration"><span>◎</span>Calibration</button>
-        <button data-route="metrology"><span>◌</span>Metrology & MSA</button>
-        <button data-route="materials"><span>▱</span>Fixtures & Materials</button>
-        <button data-route="external"><span>↗</span>External Labs</button>
-        <button data-route="people"><span>♙</span>People & Skills</button>
-        <button data-route="costs"><span>€</span>Cost & Finance</button>
-        <button data-route="capacity"><span>▥</span>Demand & Capacity</button>
-        <button data-route="twin"><span>◇</span>Planning Digital Twin</button>
-        <button data-route="knowledge"><span>⌘</span>Knowledge & Similarity</button>
-        <button data-route="maintenance"><span>◴</span>Maintenance Plan</button>
+        <button data-route="dashboard" class="active"><span>▦</span>Command Center</button>
+        <button data-route="programmes"><span>◫</span>Test Programmes</button>
+        <button data-route="testportfolio"><span>▧</span>Test Portfolio</button>
+        <button data-route="planning"><span>▤</span>Planning & Capacity</button>
+        <button data-route="execution"><span>▶</span>Execution & Live</button>
+        <button data-route="prototypes"><span>⬡</span>Prototype Builds</button>
+        <button data-route="quality"><span>◆</span>Quality & Lessons</button>
+        <button data-route="resources"><span>⚙</span>Resources</button>
+        <button data-route="metrologyservice"><span>◎</span>Metrology & Asset Care</button>
+        <button data-route="analytics"><span>⌁</span>Finance & Analytics</button>
         <button data-route="audit"><span>✓</span>Audit & Compliance</button>
-        <button data-route="analytics"><span>⌁</span>Reports / Analytics</button>
-        <button data-route="admin"><span>⚒</span>Administration / Demo</button>
+        <button data-route="admin"><span>⚒</span>Administration</button>
       </nav>
       <div class="sidebar-foot"><span class="dot live"></span><span>Browser-local demo</span><small id="versionText"></small></div>
     </aside>

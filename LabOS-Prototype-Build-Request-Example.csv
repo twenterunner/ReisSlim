@@ -1,0 +1,3 @@
+request_id,project,product,linked_validation_programme,build_type,quantity,priority,material_ready_date,required_by,required_skill,station_type,status,evidence_requirement
+PRT-EX-001,Project Aurora,Aurora Sensor,VP-001,EVT,24,High,2026-09-09,2026-09-14,Prototype Assembly,Assembly Bench,Requested,Build traveller + serial list + inspection signoff
+PRT-EX-002,Project Orion,Orion Controller,VP-004,DV,8,High,2026-09-15,2026-09-20,Prototype Assembly,Assembly Bench,Requested,Configuration record + acceptance inspection
