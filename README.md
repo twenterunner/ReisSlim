@@ -1,4 +1,4 @@
-# LabOS Prototype v1.1.0
+# LabOS Prototype v1.2.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -16,18 +16,23 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
-## New in v1.1.0 — Validation branches and first-class Prototyping
+## New in v1.2.0 — intuitive logical Test Legs
 
-- **Validation and Prototyping are now separate primary workspaces.** The main navigation is Home, Validation, Prototyping, Planning, Execution, Lab, Quality and Insights.
-- **Branch semantics were redesigned.** **Add branch** splits the current main test leg into sub-legs in the same column: Leg 1 becomes **1a / 1b**. It does not create an adjacent main leg.
-- **Branch sequences behave like normal legs.** **Next leg** on 1a creates **2a**; Next leg on 1b creates **2b**. Each branch carries only its own DUT population and can continue independently for multiple stages.
-- **Merge returns branches to the master path.** A Merge action waits for all active branch tails, unions their surviving DUT populations, and creates the next common leg (for example 2a + 2b → common Leg 3).
-- **Sibling branches share the same upstream predecessor.** A starting split makes both 1a and 1b START legs; a downstream split gives all siblings the same prior master-leg predecessor.
-- **Prototype linkage is optional.** Standalone prototype requests remain independent. A linked prototype automatically controls the linked validation programme's sample-ready date and coordinates scheduling according to that programme's Auto / Assisted / Manual planning mode.
-- **Prototyping has its own operational plan.** The workspace shows open builds, linked vs standalone demand, finite build stations, assigned staff, planned dates, late work, and the prototype-to-validation readiness flow.
-- **Test Engineer role now lands directly in Validation.**
+The Validation Plan Designer now separates a **logical Test Leg** from the individual tests that run inside it. This fixes the earlier ambiguity where every test box effectively behaved like a new leg.
 
-The intended topology is therefore explicit and visual: **common leg → branch sub-legs → independent branch sequences → merge → common downstream validation**.
+- **One Test Leg = one column.** Test Leg 1, Test Leg 2, Test Leg 3, etc. are the main validation columns.
+- **Multiple sequential tests per leg.** Use **＋ Test below** to add another test beneath the selected test while remaining inside the same Test Leg.
+- **Explicit arrows show sample flow.** Sequential tests are linked top-to-bottom with visible arrows, while main Test Legs flow left-to-right.
+- **Branches stay inside their parent leg.** **⑂ Split samples** creates stacked sub-legs such as **1a** and **1b** inside the Test Leg 1 column. They do not become adjacent main Test Legs.
+- **Each sub-leg is itself a sequence.** 1a can contain 1a.1 → 1a.2 → 1a.3 while 1b independently contains 1b.1 → 1b.2, all visibly grouped under Test Leg 1.
+- **Merge is a prominent inline action.** While branches are active, **⇉ Merge 1a + 1b** is always shown directly underneath them. The user chooses the first common test after the merge.
+- **Common testing can continue after merge inside the same leg.** The merged population can proceed through 1.3 → 1.4, etc. before Test Leg 2 is created.
+- **Starting a new leg is deliberately different.** **＋ Add Test Leg 2** appears only at the bottom of a completed common path. The former ambiguous per-test “Next leg” control is removed.
+- **Branch DUT allocation is deterministic and non-overlapping.** Split A/B populations are taken from the incoming DUT set, branch tests keep their own population, and merge uses the union of surviving branch populations.
+- **The builder is visual-first.** Programme settings and templates are collapsible support panels; the validation flow is the primary interaction surface. The Test Portfolio remains available underneath for adding standard tests.
+- **Prototype linkage remains optional.** Validation and Prototyping remain separate primary workspaces; linked prototype completion controls validation sample readiness, while standalone prototype builds remain independent.
+
+The included `LabOS-Validation-Network-Example.csv` now demonstrates multiple common tests inside a leg, multi-test 1a/1b branches, merge, post-merge common testing, and transition to the next main Test Leg.
 
 ## New in v1.0.0 — guided, automation-first UX
 

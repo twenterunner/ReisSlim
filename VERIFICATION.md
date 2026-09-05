@@ -1,34 +1,36 @@
-# LabOS Prototype v1.1.0 - Verification Record
+# LabOS Prototype v1.2.0 - Verification Record
 
 Verification date: 5 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.1.0 preserves the verified v1.0 operating model and corrects validation branch/merge semantics while making Validation and Prototyping separate first-class workspaces.
+**PASS** - v1.2.0 preserves the verified v1.0 operating model and corrects validation branch/merge semantics while making Validation and Prototyping separate first-class workspaces.
 
 
 
 
 
-## New v1.1.0 validation / prototyping verification
+## New v1.2.0 Validation Plan Designer verification
 
 - In-app deterministic diagnostics: **48/48 PASS**.
-- Extended deterministic model verification: **PASS**.
-- Clean browser interaction test from a blank builder: **PASS**.
-- Main navigation exposes **8 primary routes**: Home, Validation, Prototyping, Planning, Execution, Lab, Quality and Insights.
-- Fresh Test Leg 1 + **Add branch** renders **1a and 1b in the same Test Leg 1 column**: **PASS**.
-- Sibling starting branches both show **START** and do not incorrectly depend on one another: **PASS**.
-- **Next leg** on 1a produces **2a** and Next leg on 1b produces **2b** in the same Test Leg 2 column: **PASS**.
-- **Merge 2a / 2b** produces common **Leg 3**: **PASS**.
-- Merge semantics use all selected branch-tail predecessors so downstream DUT flow is the union of surviving branch populations: **PASS**.
-- Prototyping primary workspace renders its finite-resource build plan: **PASS**.
-- Seeded prototype workload clearly separates validation-linked and standalone builds: **PASS**.
-- Linked prototype completion continues to propagate sample readiness into validation; standalone prototype work does not constrain validation: **PASS**.
-- Linked prototype replanning coordinates with validation according to programme planning mode; standalone replanning remains independent: **PASS**.
-- Test Engineer role default route points to Validation: **PASS**.
-- 390 px mobile smoke on Prototyping: **PASS; no page-level horizontal overflow**.
-- Browser interaction uncaught JavaScript errors: **0**.
-- Final deterministic initial planning run: approximately **180 ms**.
+- Browser initialization / main workspace: **PASS; 0 uncaught JavaScript errors**.
+- Blank programme → first standard test creates **Test Leg 1 / test 1.1**: **PASS**.
+- **＋ Test below** creates **1.2** inside the same Test Leg 1 column rather than creating a new main leg: **PASS**.
+- **⑂ Split samples** from the common path creates visibly stacked **1a / 1b** sub-leg containers inside Test Leg 1: **PASS**.
+- 1a and 1b share the same incoming predecessor and use separate DUT allocations: **PASS**.
+- Add another sequential test in 1a creates **1a.2** and retains only 1a DUT flow: **PASS**.
+- Add another sequential test in 1b creates **1b.2** and retains only 1b DUT flow: **PASS**.
+- Branch DUT overlap in created programme: **0 DUTs**: **PASS**.
+- A visible **⇉ Merge 1a + 1b** action is rendered directly below active branches: **PASS**.
+- Merge waits on both branch tails and creates the first common downstream test in **Test Leg 1**: **PASS**.
+- Merged DUT population equals the union of the branch populations in the created programme: **PASS**.
+- Additional common test after merge remains inside Test Leg 1: **PASS**.
+- **＋ Add Test Leg 2** is a separate end-of-column action and creates the first test in the next main column: **PASS**.
+- Explicit vertical flow arrows between sequential test boxes: **PASS**.
+- Explicit left-to-right arrow between logical Test Leg columns: **PASS**.
+- Environmental template creates multiple tests inside Test Leg 1, a split/merge, and then Test Leg 2: **PASS**.
+- Programme creation preserves `validationLegNo`, `validationSubLeg` and `validationStepNo` metadata for future editing: **PASS**.
+- 390 px mobile designer smoke: **PASS; no page-level horizontal overflow**.
 
 ## New v1.0.0 UX / operating-model verification
 

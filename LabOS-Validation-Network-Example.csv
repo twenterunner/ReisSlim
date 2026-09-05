@@ -1,6 +1,10 @@
-Leg,Name,Method,DUT_Count,Population,Depends_On,Lane,Mode
-L1,Initial electrical characterisation,ELEC-CHAR-001,20,All incoming,,0,Start
-L2,Thermal cycling,ENV-TC-004,20,Continue from L1,L1,0,Sequential
-L3,Vibration,MECH-VIB-003,10,Split A from L2,L2,0,Branch
-L4,Humidity,ENV-HUM-002,10,Split B from L2,L2,1,Branch
-L5,Final electrical characterisation,ELEC-CHAR-001,20,Survivors from L3 + L4,L3;L4,0,Join
+Logical_Test_Leg,Sub_Leg,Test_Order,Test_Method,DUTs,Flow,Notes
+1,Common,1,ELEC-001,20,START,"Common initial characterisation"
+1,Common,2,ENV-TC-004,20,After Common 1,"Second sequential test within Test Leg 1"
+1,1a,1,ENV-HU-003,10,Split from Common 2,"Branch A starts inside Test Leg 1"
+1,1a,2,ELEC-003,10,After 1a.1,"Additional sequential test within sub-leg 1a"
+1,1b,1,MECH-VIB-006,10,Split from Common 2,"Branch B starts inside Test Leg 1"
+1,1b,2,MECH-SHK-007,10,After 1b.1,"Additional sequential test within sub-leg 1b"
+1,Common,3,ELEC-002,20,Merge 1a + 1b,"First common test after both branches merge"
+1,Common,4,DIM-002,20,After Common 3,"Remainder of Test Leg 1 continues together"
+2,Common,1,REL-005,20,After Test Leg 1,"Test Leg 2 begins as a new main column"
