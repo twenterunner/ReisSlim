@@ -1,4 +1,4 @@
-# LabOS Prototype v1.0.0
+# LabOS Prototype v1.1.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -15,11 +15,25 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+## New in v1.1.0 — Validation branches and first-class Prototyping
+
+- **Validation and Prototyping are now separate primary workspaces.** The main navigation is Home, Validation, Prototyping, Planning, Execution, Lab, Quality and Insights.
+- **Branch semantics were redesigned.** **Add branch** splits the current main test leg into sub-legs in the same column: Leg 1 becomes **1a / 1b**. It does not create an adjacent main leg.
+- **Branch sequences behave like normal legs.** **Next leg** on 1a creates **2a**; Next leg on 1b creates **2b**. Each branch carries only its own DUT population and can continue independently for multiple stages.
+- **Merge returns branches to the master path.** A Merge action waits for all active branch tails, unions their surviving DUT populations, and creates the next common leg (for example 2a + 2b → common Leg 3).
+- **Sibling branches share the same upstream predecessor.** A starting split makes both 1a and 1b START legs; a downstream split gives all siblings the same prior master-leg predecessor.
+- **Prototype linkage is optional.** Standalone prototype requests remain independent. A linked prototype automatically controls the linked validation programme's sample-ready date and coordinates scheduling according to that programme's Auto / Assisted / Manual planning mode.
+- **Prototyping has its own operational plan.** The workspace shows open builds, linked vs standalone demand, finite build stations, assigned staff, planned dates, late work, and the prototype-to-validation readiness flow.
+- **Test Engineer role now lands directly in Validation.**
+
+The intended topology is therefore explicit and visual: **common leg → branch sub-legs → independent branch sequences → merge → common downstream validation**.
+
 ## New in v1.0.0 — guided, automation-first UX
 
 LabOS v1.0.0 is primarily a usability and operating-model release. The underlying canonical laboratory model remains intact, but routine work is organised around five jobs: **create a programme, create a prototype build, get programme status, plan/replan, and manage the laboratory from decision-focused KPIs**.
 
-- **Seven-item primary navigation:** Home, Programmes, Planning, Execution, Lab, Quality and Insights. Specialist registers remain available as contextual drill-downs instead of competing for permanent menu space.
+- **v1.0 historical navigation:** Home, Programmes, Planning, Execution, Lab, Quality and Insights. v1.1 promotes Validation and Prototyping to separate primary workspaces. Specialist registers remain available as contextual drill-downs instead of competing for permanent menu space.
 - **Permanent ＋ Create action:** starts a validation programme, prototype build, new/non-existing test, issue/delay or maintenance event from one consistent launcher.
 - **Four-step programme wizard:** Programme → Starting Plan → Samples → Automation. LabOS recommends a comparable historical programme or reusable architecture, then opens the visual validation-plan designer with every leg still editable.
 - **Three planning modes:**

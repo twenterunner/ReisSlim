@@ -1,13 +1,34 @@
-# LabOS Prototype v1.0.0 - Verification Record
+# LabOS Prototype v1.1.0 - Verification Record
 
 Verification date: 5 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.0.0 preserves the verified laboratory model and restructures the user experience around guided programme creation, guided prototype creation, one-tap programme status, automation-first replanning with preview/override, and a decision-focused KPI workspace.
+**PASS** - v1.1.0 preserves the verified v1.0 operating model and corrects validation branch/merge semantics while making Validation and Prototyping separate first-class workspaces.
 
 
 
+
+
+## New v1.1.0 validation / prototyping verification
+
+- In-app deterministic diagnostics: **48/48 PASS**.
+- Extended deterministic model verification: **PASS**.
+- Clean browser interaction test from a blank builder: **PASS**.
+- Main navigation exposes **8 primary routes**: Home, Validation, Prototyping, Planning, Execution, Lab, Quality and Insights.
+- Fresh Test Leg 1 + **Add branch** renders **1a and 1b in the same Test Leg 1 column**: **PASS**.
+- Sibling starting branches both show **START** and do not incorrectly depend on one another: **PASS**.
+- **Next leg** on 1a produces **2a** and Next leg on 1b produces **2b** in the same Test Leg 2 column: **PASS**.
+- **Merge 2a / 2b** produces common **Leg 3**: **PASS**.
+- Merge semantics use all selected branch-tail predecessors so downstream DUT flow is the union of surviving branch populations: **PASS**.
+- Prototyping primary workspace renders its finite-resource build plan: **PASS**.
+- Seeded prototype workload clearly separates validation-linked and standalone builds: **PASS**.
+- Linked prototype completion continues to propagate sample readiness into validation; standalone prototype work does not constrain validation: **PASS**.
+- Linked prototype replanning coordinates with validation according to programme planning mode; standalone replanning remains independent: **PASS**.
+- Test Engineer role default route points to Validation: **PASS**.
+- 390 px mobile smoke on Prototyping: **PASS; no page-level horizontal overflow**.
+- Browser interaction uncaught JavaScript errors: **0**.
+- Final deterministic initial planning run: approximately **180 ms**.
 
 ## New v1.0.0 UX / operating-model verification
 
