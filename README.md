@@ -1,4 +1,4 @@
-# LabOS Prototype v0.9.0
+# LabOS Prototype v1.0.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -15,20 +15,28 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
-## New in v0.9.0 — test-programme-centric operating model
+## New in v1.0.0 — guided, automation-first UX
 
-- **Requirements & Coverage is removed from primary navigation.** Requirements remain canonical background traceability records used by programmes/results, but users no longer have to operate the laboratory from a separate requirements register.
-- **Specifications & Test Basis is replaced by Test Portfolio.** Every released standard test is presented with controlled work instruction, revision, learned planning time, FTR/productive-time history, cost, linked MSA/uncertainty where applicable, likely recurring issues and drillable lesson provenance.
-- **Validation Programme Designer uses horizontal test-leg columns.** Every new sequential test leg creates the next main column; branches appear as parallel cards in the same stage; joins select multiple predecessors. Each leg owns its DUT count/population, method, staff policy, sample-ready input and development gate.
-- **Programme-first workflow.** A programme can be opened directly into its editable validation network, locally auto-planned without moving other programmes, or portfolio-replanned when management wants global optimisation.
-- **History-derived method development.** New/non-existing tests are development-gated and their lead time, engineering effort and technician effort are estimated from similar completed development history rather than requiring an arbitrary manual development duration.
-- **Prototype Build Requests.** Prototype/EVT/DV/pilot requests have finite build-station and staffing capacity. When linked to validation, planned/completed build readiness automatically becomes the first validation leg’s sample-ready constraint. Completion requires objective build evidence.
-- **Evidence-gated closure.** Planning constraints cannot be resolved without a recorded recovery action and objective evidence. Quality stages require investigation evidence; root cause and disposition are no longer auto-generated. CAPA effectiveness requires verification evidence before closure.
-- **Consolidated primary navigation.** The main menu is reduced to Command Center, Test Programmes, Test Portfolio, Planning & Capacity, Execution & Live, Prototype Builds, Quality & Lessons, Resources, Metrology & Asset Care, Finance & Analytics, Audit & Compliance and Administration. Detailed specialist registers remain contextual drill-downs.
+LabOS v1.0.0 is primarily a usability and operating-model release. The underlying canonical laboratory model remains intact, but routine work is organised around five jobs: **create a programme, create a prototype build, get programme status, plan/replan, and manage the laboratory from decision-focused KPIs**.
 
-### New v0.9.0 example file
+- **Seven-item primary navigation:** Home, Programmes, Planning, Execution, Lab, Quality and Insights. Specialist registers remain available as contextual drill-downs instead of competing for permanent menu space.
+- **Permanent ＋ Create action:** starts a validation programme, prototype build, new/non-existing test, issue/delay or maintenance event from one consistent launcher.
+- **Four-step programme wizard:** Programme → Starting Plan → Samples → Automation. LabOS recommends a comparable historical programme or reusable architecture, then opens the visual validation-plan designer with every leg still editable.
+- **Three planning modes:**
+  - **Auto:** LabOS maintains the best feasible schedule automatically.
+  - **Assisted (recommended):** LabOS calculates the best feasible change set and shows the impact before anything is applied.
+  - **Manual:** LabOS recommends options but never changes bookings unless the planner applies them.
+- **Clear planning language:** ambiguous actions such as “Update Operational Plan” are removed. The UI uses outcome-based terms such as **Review recommended schedule**, **Recalculate this programme**, **Recalculate all lab schedules**, **Apply recommended schedule** and **Override booking**.
+- **Impact preview before commit:** Assisted replanning shows programmes affected, moved/new bookings, unscheduled work, old/new dates, equipment and staff. The existing plan remains unchanged until **Apply recommended schedule** is pressed.
+- **Manual intervention without losing automation:** bookings can be dragged to another equipment/day for a quick override or tapped to change date, equipment and staff. Overrides can be locked so future automation must plan around them. Hard constraints remain enforced.
+- **One-tap Programme Status:** gives management health, due date, deterministic forecast, P80 forecast, on-time probability, test-leg progress, sample/prototype status, open method development, cost/budget, current critical path/blocker and the decision requiring attention. Status text can be copied for meetings/email.
+- **Three-step prototype-build wizard:** Build → Validation Link → Schedule. Linking a build to validation automatically propagates sample readiness rather than asking the user to maintain duplicate dates.
+- **Decision-first Home:** “Needs your attention” surfaces only work requiring acknowledgement, recovery or a management decision. Six management questions replace a wall of unrelated KPIs.
+- **Deep KPI drill-down:** delivery, capacity, productive time, recurring issues, finance and future risk tiles lead to the programmes/tests/resources driving the result.
+- **Role-oriented starting experience:** Technician, Test Engineer, Planner, Lab Manager and Quality roles land on the most relevant operational view while retaining the same canonical data.
+- **Backward-compatible state migration:** compatible v0.9.x browser-local data is upgraded to v1.0.0 rather than reset solely because the app version changed.
 
-- `LabOS-Prototype-Build-Request-Example.csv`
+The design rule for v1.0.0 is: **automate the ordinary, explain the recommendation, preview consequences, allow override, and remember the override.**
 
 ## New in v0.8.0 — P1/P2 operational depth
 
@@ -281,7 +289,7 @@ These two views are now operational workflow controls rather than passive regist
 
 **Specs & Test Basis** answers: *Which controlled document/revision defines the conditions, samples and objective pass/fail limits for this validation work?* It shows specification readiness, requirement mapping, method-release readiness, recurring specification-caused issues and the direct planning impact of an unreleased/weak specification. A structured six-point review gate must be satisfied before a specification can become the released planning basis.
 
-Requirement records remain part of the canonical traceability chain and automated evidence roll-up, but v0.9.0 intentionally removes the separate Requirements & Coverage primary tab so laboratory work is driven from Test Programmes and Test Portfolio.
+Requirement records remain part of the canonical traceability chain and automated evidence roll-up, but v1.0.0 intentionally removes the separate Requirements & Coverage primary tab so laboratory work is driven from Test Programmes and Test Portfolio.
 
 Together they make the flow explicit: **source need → objective acceptance criterion → controlled test specification → coverage decision → released/development-gated method → planned test leg → DUT/result/evidence → verified/failed requirement**.
 

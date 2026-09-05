@@ -1,35 +1,41 @@
-# LabOS Prototype v0.9.0 - Verification Record
+# LabOS Prototype v1.0.0 - Verification Record
 
 Verification date: 5 September 2026
 
 ## Final acceptance result
 
-**PASS** - v0.9.0 refines the verified P1/P2 foundation into a test-programme-centric operating model with a standard Test Portfolio, column-based validation-network design, prototype-to-validation readiness, history-estimated method development, programme-local planning and evidence-gated closure.
+**PASS** - v1.0.0 preserves the verified laboratory model and restructures the user experience around guided programme creation, guided prototype creation, one-tap programme status, automation-first replanning with preview/override, and a decision-focused KPI workspace.
 
 
 
 
-## New v0.9.0 programme-centric verification
+## New v1.0.0 UX / operating-model verification
 
 - In-app deterministic diagnostics: **48/48 PASS**.
 - Extended deterministic model verification: **PASS**.
-- Primary consolidated navigation routes: **12/12 render successfully**.
-- Released standard tests with controlled work instruction: **100%**.
-- Test Portfolio detail including FTR, learned duration, cost, MSA and issue/lesson history: **PASS**.
-- Existing programme → editable horizontal validation network: **PASS**.
-- Sequential leg = new main column; parallel branch = second card in same next stage: **PASS**.
-- Multi-predecessor join editor: **PASS**.
-- Prototype auto-planning → linked validation sample-ready constraint: **PASS**.
-- Prototype completion without evidence rejected; with build evidence accepted: **PASS**.
-- New-test development effort derived from similar historical development rather than user-entered development days: **PASS**.
-- Programme-only replanning preserves other programme bookings: **PASS**.
-- Planning-constraint closure presents mandatory recovery-action + objective-evidence gate: **PASS**.
-- Quality-event stage advancement presents mandatory evidence gate: **PASS**.
-- CAPA effectiveness uses explicit verification evidence: **PASS**.
-- Test Portfolio reports no released method without a work instruction: **PASS**.
-- 390 px browser smoke across consolidated routes: **no page-level horizontal overflow**.
+- Deterministic initial planning remains comfortably within responsiveness target (about 140 ms in the final model run).
+- Simplified primary navigation: **7/7 routes render successfully** — Home, Programmes, Planning, Execution, Lab, Quality and Insights.
+- Global **＋ Create** launcher: **PASS**.
+- Four-step new-programme wizard: **PASS** — programme definition → historical/template starting plan → sample/prototype readiness → Auto/Assisted/Manual planning mode.
+- Full programme-wizard browser test creates a real validation programme with **5 test legs**: **PASS**.
+- Historical-plan recommendation opens as an editable validation-plan starting point: **PASS**.
+- Three-step prototype-build wizard: **PASS** — Build → Validation Link → Schedule.
+- Prototype wizard creates a real prototype request and resource booking: **PASS**.
+- Linked prototype-build logic continues to feed validation sample readiness: **PASS**.
+- One-tap Programme Status including P80/on-time confidence, progress, samples, development, cost, blocker and decision: **PASS**.
+- Assisted portfolio replanning shows a schedule-impact preview and explicitly confirms that **nothing has changed yet** before apply: **PASS**.
+- Assisted programme replanning uses the same preview-before-commit model: **PASS**.
+- Auto/Assisted/Manual programme planning modes persist in canonical programme data: **PASS**.
+- Ambiguous “Update Operational Plan” action removed from current UI labels: **PASS**.
+- Manual planning: tap booking to override date/equipment/staff/lock state: **PASS**.
+- Manual planning drag affordance: draggable bookings and equipment/day drop targets render in portfolio planning: **PASS**.
+- Manual overrides continue to use hard-constraint validation and can be locked against automatic movement: **PASS**.
+- Six decision-oriented Home KPI tiles drill to source drivers: **PASS**.
+- KPI / status / create / replanning browser interactions: **PASS**.
+- 390 px mobile smoke across all seven primary routes: **PASS; no page-level horizontal overflow**.
 - Browser smoke uncaught JavaScript errors: **0**.
-- Service worker uses network-first application-shell updates and cache namespace `labos-v0.9.0`.
+- End-to-end browser workflow uncaught JavaScript errors: **0**.
+- Service worker uses the v1.0.0 cache namespace and network-first application-shell update strategy.
 
 ## New v0.8.0 P1/P2 verification
 
@@ -223,7 +229,7 @@ An in-memory-origin Chromium smoke harness was used because this execution envir
 ## Static deployment / service worker - PASS
 
 - All application paths are relative and remain compatible with GitHub Pages repository-path deployment.
-- Service-worker cache version is `labos-v0.9.0`.
+- Service-worker cache version is `labos-v1.0.0`.
 - HTML, JavaScript, CSS and manifest requests use a network-first update strategy with cached offline fallback, reducing stale-code mismatches after GitHub deployment updates.
 - Non-code example documents/assets remain cacheable for offline demonstration.
 

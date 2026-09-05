@@ -19,24 +19,21 @@
     <div class="top-actions">
       <label class="searchbox"><span>⌕</span><input id="globalSearch" aria-label="Global search" placeholder="Search programme, test, DUT, prototype, asset…" autocomplete="off" /></label>
       <label class="role-select"><span>View as</span><select id="roleSelect" aria-label="Simulated role"><option>Technician</option><option>Test Engineer</option><option>Planner</option><option selected>Lab Manager</option><option>Quality</option></select></label>
+      <button id="createBtn" class="btn primary top-create" aria-label="Create new laboratory work">＋ Create</button>
+      <button id="settingsBtn" class="icon-btn" aria-label="Open administration and settings">⚙</button>
       <button id="mobileNavBtn" class="icon-btn mobile-only" aria-label="Open navigation">☰</button>
     </div>
   </header>
   <div class="shell">
     <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
       <nav id="nav">
-        <button data-route="dashboard" class="active"><span>▦</span>Command Center</button>
-        <button data-route="programmes"><span>◫</span>Test Programmes</button>
-        <button data-route="testportfolio"><span>▧</span>Test Portfolio</button>
-        <button data-route="planning"><span>▤</span>Planning & Capacity</button>
-        <button data-route="execution"><span>▶</span>Execution & Live</button>
-        <button data-route="prototypes"><span>⬡</span>Prototype Builds</button>
-        <button data-route="quality"><span>◆</span>Quality & Lessons</button>
-        <button data-route="resources"><span>⚙</span>Resources</button>
-        <button data-route="metrologyservice"><span>◎</span>Metrology & Asset Care</button>
-        <button data-route="analytics"><span>⌁</span>Finance & Analytics</button>
-        <button data-route="audit"><span>✓</span>Audit & Compliance</button>
-        <button data-route="admin"><span>⚒</span>Administration</button>
+        <button data-route="dashboard" class="active"><span>⌂</span>Home</button>
+        <button data-route="programmes"><span>◫</span>Programmes</button>
+        <button data-route="planning"><span>▤</span>Planning</button>
+        <button data-route="execution"><span>▶</span>Execution</button>
+        <button data-route="lab"><span>⚙</span>Lab</button>
+        <button data-route="quality"><span>◆</span>Quality</button>
+        <button data-route="insights"><span>⌁</span>Insights</button>
       </nav>
       <div class="sidebar-foot"><span class="dot live"></span><span>Browser-local demo</span><small id="versionText"></small></div>
     </aside>
