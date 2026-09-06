@@ -16,18 +16,17 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
-## New in v1.3.0 — editable split/merge topology and scenario-driven planning
 
-This release fixes the remaining branch-editing limitation and connects Validation, Prototyping and Planning more tightly.
+## New in v1.3.0 — editable splits, coordinated prototype/validation planning and Scenario Studio
 
-- **Split can be inserted into an existing plan.** A common test can be split even when later tests or later main Test Legs already exist. Those downstream tests are preserved and wait behind the merge junction instead of making Split disappear.
-- **Visible merge junction.** Once 1a / 1b exist, **⇉ Merge 1a + 1b here** remains visible directly under the active branch tails until the user explicitly reunites them.
-- **Existing downstream path is retained.** Example: `1.1 → 1.2 → split → [1a.1 → 1a.2] + [1b.1 → 1b.2] → merge → 1.3 → Leg 2`.
-- **Programme-lane planning view.** Each validation programme has a persistent colour; linked prototype builds, method-development work and validation tests appear in the same programme lane so the dependency is visible.
-- **Combined resource planning view.** Toggle to a resource-centric plan where all programmes compete for shared equipment, staff and prototype-build capacity while retaining programme colours.
-- **Planning Scenario Studio.** Sandboxed scenarios cover equipment breakdown/outage, sample delay, method-development delay, linked prototype-build delay, key-staff unavailability and programme-priority changes. Running a scenario does not alter the operational plan.
-- **Automatic recovery comparison.** For a disruption, LabOS recalculates the constrained portfolio and also tests a programme-protection recovery where relevant, showing booking movement, unscheduled work and delivery impact before any operational change is committed.
-- **Linked prototype/validation coordination remains optional.** Standalone prototype work remains independent; linked prototype completion controls validation sample readiness and appears in the same planning context.
+- **Split can be inserted into an existing validation path.** A common test can be split even when later tests or later Test Legs already exist. Existing downstream work is preserved behind the merge junction rather than making the Split action disappear.
+- **Branch/merge remains explicit.** Splitting creates stacked `1a` / `1b` sub-legs, each branch can contain multiple sequential tests, and a prominent **Merge … here** action reunites the DUT populations before the preserved common path continues.
+- **Programme-lane planning view.** Planning can show one colour-coded lane per validation programme; a linked prototype build appears in the same programme lane before the validation work it releases.
+- **Combined resource planning view.** A toggle switches to the resource/equipment perspective so all programme demand is combined while retaining programme ownership colours.
+- **Planning horizon control.** The planning workspace can be viewed over 14, 28 or 42 days.
+- **Scenario Studio.** The planner can sandbox equipment breakdowns, sample delays, method-development delays, linked prototype-build delays, key-staff absence and programme-priority changes without altering the live operational plan.
+- **Automatic recovery comparison.** For disruption scenarios LabOS recalculates the constrained portfolio and, where relevant, compares it with a programme-protection recovery scenario so the user can see forecast, lateness, moved bookings and unscheduled work before deciding what to do.
+- **Prototype linkage remains optional.** Standalone prototype builds remain independent. When a build is linked to validation, sample-ready timing and planning are coordinated automatically.
 
 ## New in v1.2.0 — intuitive logical Test Legs
 

@@ -4,34 +4,26 @@ Verification date: 5 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.3.0 preserves the verified v1.2 operating model, allows split/merge insertion into existing validation plans, and adds linked programme/prototype planning plus sandboxed disruption scenarios.
+**PASS** - v1.3.0 preserves the verified operating model, allows split/merge editing inside existing validation paths, and adds coordinated prototype/validation planning plus scenario-based portfolio analysis.
 
 
 
 
 
-## New v1.3.0 validation topology and planning verification
+
+## New v1.3.0 validation/planning verification
 
 - In-app deterministic diagnostics: **48/48 PASS**.
 - Extended deterministic model verification: **PASS**.
-- Existing multi-leg programme can be edited and **Split** inserted before already-defined downstream tests: **PASS**.
-- Downstream common path and later Test Legs remain preserved behind the inserted merge junction: **PASS**.
-- Active branch paths expose a visible **⇉ Merge 1a + 1b here** control: **PASS**.
-- Merge UI reports both branch tails, combined DUT population and downstream continuation: **PASS**.
-- Planning exposes **Programme lanes** and **Resource plan** toggle: **PASS**.
-- Programme-lane planning uses persistent distinct programme colours: **PASS**.
-- Linked prototype work is visible in the associated validation programme planning context: **PASS**.
-- Combined resource plan retains programme colour ownership while showing shared equipment contention: **PASS**.
-- Scenario Studio equipment-breakdown scenario: **PASS**.
-- Scenario Studio sample-delay scenario: **PASS**.
-- Scenario Studio method-development-delay scenario: **PASS**.
-- Scenario Studio linked-prototype-delay scenario: **PASS**.
-- Scenario Studio key-staff-unavailable scenario: **PASS**.
-- Scenario Studio programme-priority scenario: **PASS**.
-- Scenario calculations leave live bookings, programme priorities and prototype dates unchanged until a recovery is explicitly applied: **PASS**.
-- Scenario result includes current-plan/disruption comparison and automated recovery options: **PASS**.
-- Planning 390 px mobile smoke: **PASS; no page-level horizontal overflow**.
-- Browser regression uncaught JavaScript errors: **0**.
+- Existing validation path can expose **Split here** without requiring all downstream tests to be deleted first: **PASS in the v1.3 interaction harness**.
+- Split preserves downstream common tests behind the merge junction: **PASS in the v1.3 interaction harness**.
+- Stacked sub-legs can each continue with additional sequential tests before merge: **PASS**.
+- Merge reunites branch tails and reconnects to the preserved common path: **PASS**.
+- Planning workspace includes **Programme lanes** and **Resource plan** toggle: **PASS by rendered v1.3 harness inspection**.
+- Linked prototype-build work is included in the corresponding programme lane: **PASS by rendered v1.3 harness inspection**.
+- Scenario Studio includes equipment outage, sample delay, method-development delay, prototype delay, staff unavailability and programme-priority scenarios: **PASS by rendered v1.3 harness inspection**.
+- Scenario calculation is sandboxed and does not directly mutate the operational plan: **PASS by code-path/model verification**.
+- Automatic programme-protection recovery comparison is available for applicable disruption scenarios: **PASS by code-path/model verification**.
 
 ## New v1.2.0 Validation Plan Designer verification
 
