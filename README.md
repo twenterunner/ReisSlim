@@ -1,4 +1,4 @@
-# LabOS Prototype v1.7.0
+# LabOS Prototype v1.8.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -17,6 +17,20 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+## New in v1.8.0 — integrated closed-loop decision intelligence
+
+- Replaced the fragmented “raw alert → separate quality list → separate recurring lesson → separate escalation ledger” experience with one **closed-loop intelligence flow**: **Signals → Correlated cases → Proposals → Accepted actions → Verified learning**.
+- Home is now a **decision & improvement inbox**. Live anomalies, quality/recurrence patterns and planning digital-twin opportunities are ranked together rather than forcing the user to hunt across unrelated lists.
+- Multiple live alarms on the same programme/test leg are correlated into **one operational case**. Source alert/event/issue/quality records stay available as evidence, but are no longer treated as separate work items.
+- Each case explains the detected pattern, an explicitly labelled leading hypothesis, the proposed action, expected value, confidence, source evidence and a verification rule before the user decides.
+- **Accept / Reject is governed.** Accept creates the appropriate controlled action (integrated investigation, CAPA/prevention action, learned standard-time update, or planning change); Reject suppresses the same recommendation until material evidence changes.
+- Accepted prevention actions are **closed-loop monitored** against subsequent actual runs. Three relevant recurrence-free executions move the action to verification-ready; a new matching issue marks effectiveness failed and re-opens learning.
+- Learned execution history can now propose **updated planning standards** when recent method duration materially differs from the library standard. Accept recalculates future planning with a restore point; Undo returns both the standard and schedule.
+- Quality is now case/action-centric: actionable cases and accepted actions appear first; NCR/deviation records, recurring lessons and live/escalation ledgers are explicitly secondary **source registers**.
+- Exception Control uses the same correlated cases and exposes planning impact without duplicating raw signals. Planning contains the same intelligence model beside the continuous digital-twin optimizer.
+- The intelligence engine rescans on a bounded 60-second interval while the browser is active, and the UI provides **Scan now** for immediate recalculation.
+- The new UI is designed as a visual flow system for mobile and desktop: compact decision cards, evidence → pattern → proposal → decision mini-flows, confidence/value, and one primary review action rather than long repetitive tables.
 
 ## New in v1.7.0 — continuous planning optimizer with governed accept / reject
 

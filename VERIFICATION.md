@@ -1,16 +1,36 @@
-# LabOS Prototype v1.7.0 - Verification Record
+# LabOS Prototype v1.8.0 - Verification Record
 
 Verification date: 6 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.7.0 preserves the verified validation-plan, delay recovery and exception-based planning controls and adds a bounded continuous digital-twin optimizer that searches for material technician reallocations, calibration-timing changes and bottleneck-capacity opportunities. Every proposal is reviewed before mutation, supports Accept / Reject, preserves programme-level impact visibility, and accepted operational changes create an Undo restore point.
+**PASS** - v1.8.0 preserves the verified planning optimizer and validation/quality controls, and replaces fragmented alert/quality/lesson/escalation queues with one correlated, closed-loop decision-intelligence model. Raw records remain auditable evidence; users act on ranked cases and proposals with Accept / Reject, controlled execution, verification of effectiveness and reversible planning-standard changes.
 
 
 
 
 
 
+
+## v1.8.0 integrated decision-intelligence verification
+
+- Decision-intelligence module builds ranked cases from live telemetry, operational events, issues, quality records, recurring lessons and learned method-time history: **PASS**.
+- Multiple open live alerts for one programme/test leg are collapsed to exactly **one correlated decision case** while preserving every source alert reference: **PASS**.
+- Live cases produce an integrated investigation proposal with confidence, pattern, hypothesis, expected value and a verification rule rather than exposing raw alerts as independent work items: **PASS**.
+- Automatic recurring lessons become controlled prevention proposals spanning specification, method/work-instruction, asset, sample/DUT, resource/competency and method-development causes: **PASS**.
+- Learned method history can generate a standard-time update proposal when actual duration materially differs from the current planning standard: **PASS**.
+- Decision-intelligence proposal generation is read-only with respect to operational bookings; no schedule mutation occurs before explicit acceptance: **PASS**.
+- Evidence-state signature changes when materially relevant new evidence is added, allowing previously rejected proposals to be reconsidered only after the underlying situation changes: **PASS**.
+- Integrated actions **Review / Evidence / Reject / Action detail / Scan now** are wired through the central action router: **PASS**.
+- Quality Hub renders **Actionable cases & prevention proposals** and states that raw records are evidence, not the work queue; the old “Evidence-gated quality work / Recurring lessons / Escalation-delay chain” presentation is removed from the active view: **PASS**.
+- Exception Control renders correlated **Operational decision cases** first, with the raw source-event ledger retained as a secondary evidence register: **PASS**.
+- Accepted prevention actions monitor subsequent execution evidence and move to effectiveness-failed or verification-ready based on recurrence: **PASS by code-path verification**.
+- Accepted standard-time changes preserve the prior method standard, bookings and programme forecasts for Undo: **PASS by code-path verification**.
+- Service worker uses cache `labos-v1.8.0` and explicitly caches `decision-intelligence.js`: **PASS**.
+- JavaScript syntax (`app.js`, `decision-intelligence.js`, `service-worker.js`): **PASS**.
+- Dedicated decision-intelligence regression suite: **12/12 PASS**.
+- Existing deterministic LabOS model suite after integration: **48/48 PASS**.
+- No full browser-runtime claim is made for this release; verification covers JavaScript syntax, deterministic model behaviour, intelligence regressions, source-level UI/action wiring and package integrity.
 
 ## v1.7.0 continuous planning optimizer verification
 
