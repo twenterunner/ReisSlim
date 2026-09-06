@@ -1,6 +1,6 @@
 {
   "name": "labos-static-prototype",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,6 @@
     "test": "node verify-model.mjs",
     "verify:intelligence": "node verify-intelligence.mjs",
     "verify:governance": "node verify-governance.mjs",
-    "verify:v111": "node verify-v111.mjs"
+    "verify:v112": "node verify-v112.mjs"
   }
 }

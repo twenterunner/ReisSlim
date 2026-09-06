@@ -1,8 +1,22 @@
-# LabOS Prototype v1.11.0 - Verification Record
+# LabOS Prototype v1.12.0 - Verification Record
 
-**PASS** — hierarchical/configurable validation reporting has been added without regressing the deterministic scheduler, decision-intelligence or evidence-gated implementation workflows.
+**PASS** — executive/customer visual reporting has been added on top of the verified hierarchical reporting engine.
 
-## v1.11.0 focused verification
+## v1.12.0 focused verification
+
+- Existing deterministic model suite: **48/48 PASS**.
+- Decision intelligence suite: **12/12 PASS**.
+- Evidence-gated implementation governance: **13/13 PASS**.
+- JavaScript syntax (`app.js`, `data.js`, `service-worker.js`): **PASS**.
+- Audience presets: **PASS** — Internal Design Review / Management / Technical / Comprehensive / Controlled Core plus External Customer / Third-party.
+- Visual validation flow blocks for leg/programme reports: **PASS**.
+- Planning swimlane source contract: **PASS** — Completed / In Progress / Planned / Exception states plus required/forecast markers.
+- Logged-data graph source contract: **PASS** — SVG line plots with min/average/max and alert-limit context.
+- Anonymisation contract: **PASS** — customer/programme identity, customer-specific requirement text and specification naming are redacted in report output.
+- Draft watermark / approval lock retained: **PASS**.
+- Print-ready customer-facing report styling: **PASS**.
+
+## Historical v1.11.0 focused verification
 
 - Existing deterministic model suite: **48/48 PASS**.
 - Decision intelligence suite: **12/12 PASS**.

@@ -1,4 +1,14 @@
-# LabOS Prototype v1.11.0
+# LabOS Prototype v1.12.0
+
+## New in v1.12.0 — executive/customer visual reporting, swimlanes, data plots & anonymisation
+
+- **Reports are now designed as visual controlled deliverables, not table dumps.** Every report has a branded cover, document-control panel, executive status dashboard, print-ready A4 landscape styling, consistent hierarchy and controlled draft/approval messaging.
+- **Planning is visualised with execution swimlanes.** Included tests are plotted on a common time axis with distinct Completed, In Progress, Planned and Exception states plus required-date and forecast markers. Interim reports continue to show the detailed blocker/remainder table underneath the visual.
+- **Validation topology is visualised with flow blocks.** Test Leg and Programme reports show independent main Test Legs as separate blocks; sequence/branch/merge arrows are only shown inside a leg, preserving the agreed validation-plan semantics.
+- **Logged data is graphed automatically.** Populated live-data channels are rendered as report-quality line plots with point count, min/average/max and configured alert-limit context. The full timestamped numeric appendix remains selectable.
+- **Presets are now audience-based.** Internal presets: Design Review, Management/Programme Review, Technical/Evidence Review, Comprehensive Engineering Record and Controlled Core. External presets: Customer Validation Report and Third-party/Audit Evidence Pack. All presets remain fully customisable by section.
+- **Reports can be anonymised.** When enabled, LabOS redacts customer identity, programme/customer identifiers, customer-specific requirement text and controlled specification naming while retaining non-identifying technical results, acceptance limits and evidence selected by the user. An anonymised report is explicitly marked as such.
+- **Approval remains governed.** Anonymisation does not bypass completion/content gates; unapproved reports retain the `AUTO-GENERATED · NOT APPROVED` watermark and final release still requires an authorised reviewer.
 
 ## New in v1.11.0 — hierarchical, configurable validation reporting
 
