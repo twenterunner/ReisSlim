@@ -1,6 +1,11 @@
-# LabOS Prototype v1.12.0 - Verification Record
+# LabOS Prototype v1.14.0 - Verification Record
 
 **PASS** — executive/customer visual reporting has been added on top of the verified hierarchical reporting engine.
+
+
+## v1.14.0 focused verification
+
+The v1.14.0 release adds checks for durable validation-design persistence, navigation-time capture, saved-design reopening, linked planning access, recursive branch paths and nested split/merge parent metadata, terminal-branch planning, and the Week / Month / Quarter / Year planning scale contract. See `verify-v113.mjs`.
 
 ## v1.12.0 focused verification
 
@@ -455,3 +460,20 @@ This verification confirms deterministic prototype behaviour, not production acc
 - ZIP path-safety check: **PASS**
 - ZIP nested paths: **0**
 - ZIP integrity (`unzip -t`): **PASS**
+
+## v1.14.0 focused verification
+
+- JavaScript syntax (`node --check app.js`): **PASS**
+- v1.13 regression contract, retargeted only for the new version number: **28/28 PASS**
+- v1.14 guided-workflow / prototype / visual-flow contract: **43/43 PASS**
+- Prototype linkage levels verified in source contract: programme / main Test Leg / specific test
+- Material-availability and expected-completion inputs: present and persisted
+- Prototype update/progress/delay -> linked sample-ready update -> protected programme replan: present
+- Optional selected-programme priority trade-off: simulate, impact comparison, Accept / Reject, Undo: present
+- Evidence-gated prototype start and completion: present
+- Guided blocker categories: custody, prototype, development, calibration, equipment, competency, specification, predecessor/dependency, generic fallback
+- Custody blocker workflow: controlled disposition, evidence requirement, replacement-DUT option, replan after resolution
+- Validation flow: desktop drag/drop + mobile Move control update executable dependencies; circular moves rejected
+- ZIP integrity/path safety: checked during release packaging
+
+This is a deterministic browser prototype verification, not a production validation or regulatory qualification record.

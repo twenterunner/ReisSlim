@@ -1,4 +1,16 @@
-# LabOS Prototype v1.12.0
+# LabOS Prototype v1.14.0
+
+
+## New in v1.14.0 — durable validation designs, recursive branching & multi-scale planning
+
+- Validation Plan Designer changes are now **durable work objects**, not transient form state. Editing auto-saves the current constructed validation into `validationDesigns`, and leaving the designer captures any still-focused input before navigation.
+- **Save now** saves the validation design itself; it no longer creates a programme and resets the designer. Saved designs can be reopened from both Validation and the designer.
+- A saved validation design can **Request planning**. Once planned, it retains the programme link and can reopen that exact Planning view. If the design changes after planning, LabOS treats the next request as revised planning and preserves the previous programme as a superseded revision.
+- Planning no longer clears the constructed validation. The exact design remains available and operational legs retain `sourceValidationDesignId` / `sourceBuilderLegId` traceability.
+- Branching is now **recursive**. A common path can split into `1a / 1b`; `1a` can then split into `1aa / 1ab`; those branches can split again to any required depth. Inner split levels must be merged before an outer merge. Terminal branches are valid and do not require an artificial merge merely to request planning.
+- Nested split/merge metadata remembers the parent branch path, so merging `1aa + 1ab` correctly returns to `1a` rather than incorrectly returning to the main `1` path.
+- The Validation view now includes **Constructed validation designs** with Open design / Request planning / Open planning actions.
+- Planning now offers explicit **Week / Month / Quarter / Year** views. Quarter and year views use weekly/monthly buckets while preserving exact booking positions across the full 92 / 366-day horizon. Programme lanes, resource lanes and staff allocation use the selected time scale.
 
 ## New in v1.12.0 — executive/customer visual reporting, swimlanes, data plots & anonymisation
 
@@ -645,3 +657,13 @@ Administration → **Run System Verification** performs **18 deterministic integ
 ## Package structure
 
 This delivery uses the requested **completely flat repository structure**. Every HTML, CSS, JavaScript, manifest, icon, README, verification file, calibration certificate, specification and operational example/template is directly at ZIP root. There are no nested folders.
+
+## v1.14.0 — guided operations, prototype-to-validation coupling, visual flow editing
+
+This update removes a class of dead-end status screens. Blocking conditions now expose a guided recovery path that explains the physical/controlled action, the evidence required to clear the gate, and the planning action that follows. Custody/sample blockers include per-DUT disposition and replacement workflows; prototype, method-development, calibration, resource, specification and predecessor blockers route to their relevant operational action instead of merely displaying the reason.
+
+Prototype build requests can now be linked to the entire validation programme, a specific main Test Leg, or one specific executable test. The request records both expected material availability and expected build completion. Updates and delays propagate into the linked sample-ready gate and trigger protected replanning of the linked programme by default. Users can optionally simulate a portfolio trade-off in which selected other programmes are allowed to yield capacity, review programme-by-programme impact, then accept or reject. Accepted replans remain undoable.
+
+Prototype execution is evidence-aware: expected material availability is a planning input, while starting the build requires a physical material-release reference and completion requires completion evidence. The prototype detail screen is now a guided workflow rather than a passive status modal.
+
+The Validation Designer now supports drag-and-drop repositioning on desktop and an explicit Move control for touch/mobile. Both change the executable predecessor relationship rather than merely reordering pixels. The established recursive split/merge model remains intact, including nested branches and independent main Test Legs.
