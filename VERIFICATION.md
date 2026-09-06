@@ -1,16 +1,27 @@
-# LabOS Prototype v1.9.0 - Verification Record
+# LabOS Prototype v1.10.0 - Verification Record
 
 Verification date: 6 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.9.0 preserves the verified planning optimizer and validation/quality controls, and replaces fragmented alert/quality/lesson/escalation queues with one correlated, closed-loop decision-intelligence model. Raw records remain auditable evidence; users act on ranked cases and proposals with Accept / Reject, controlled execution, verification of effectiveness and reversible planning-standard changes.
+**PASS** - v1.10.0 preserves the verified planning optimizer and validation/quality controls, and replaces fragmented alert/quality/lesson/escalation queues with one correlated, closed-loop decision-intelligence model. Raw records remain auditable evidence; users act on ranked cases and proposals with Accept / Reject, controlled execution, verification of effectiveness and reversible planning-standard changes.
 
 
 
 
 
 
+
+
+## v1.10.0 focused verification
+
+- JavaScript syntax (`app.js`, `service-worker.js`): **PASS**.
+- Existing deterministic model/integrity suite: **48/48 PASS**.
+- Decision-intelligence integration suite: **12/12 PASS** after release-cache version update.
+- Evidence-gated implementation-governance suite: **PASS**.
+- Predecessor topology scenarios: **4/4 PASS** — single predecessor re-homes the test; downstream follows; removing predecessor creates independent main leg; cross-main join rejected; same-leg branch join resolves as post-merge flow.
+- Reporting contract source checks: **PASS** — customer/programme, acceptance criteria, complete logged-data appendix, draft watermark, authorised approval and final conclusion are present.
+- Lesson-to-action contract source checks: **PASS** — explicit planning use, proposal state, implementation/effectiveness state and no-silent-change rule are present.
 
 
 ## v1.9.0 implementation-governance verification
@@ -41,7 +52,7 @@ Verification date: 6 September 2026
 - Exception Control renders correlated **Operational decision cases** first, with the raw source-event ledger retained as a secondary evidence register: **PASS**.
 - Accepted prevention actions monitor subsequent execution evidence and move to effectiveness-failed or verification-ready based on recurrence: **PASS by code-path verification**.
 - Accepted standard-time changes preserve the prior method standard, bookings and programme forecasts for Undo: **PASS by code-path verification**.
-- Service worker uses cache `labos-v1.9.0` and explicitly caches `decision-intelligence.js`: **PASS**.
+- Service worker uses cache `labos-v1.10.0` and explicitly caches `decision-intelligence.js`: **PASS**.
 - JavaScript syntax (`app.js`, `decision-intelligence.js`, `service-worker.js`): **PASS**.
 - Dedicated decision-intelligence regression suite: **12/12 PASS**.
 - Existing deterministic LabOS model suite after integration: **48/48 PASS**.

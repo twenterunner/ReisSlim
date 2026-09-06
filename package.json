@@ -1,12 +1,13 @@
 {
   "name": "labos-static-prototype",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "scripts": {
     "verify": "node verify-model.mjs",
     "test": "node verify-model.mjs",
     "verify:intelligence": "node verify-intelligence.mjs",
-    "verify:governance": "node verify-governance.mjs"
+    "verify:governance": "node verify-governance.mjs",
+    "verify:v110": "node verify-v110.mjs"
   }
 }

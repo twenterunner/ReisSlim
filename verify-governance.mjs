@@ -60,7 +60,7 @@ test('App review flow explicitly separates Accept from closure',()=>{const app=f
 
 test('Equipment-capacity approval creates implementation workflow and no fictional asset',()=>{const app=fs.readFileSync('./app.js','utf8');assert.ok(app.includes('no fictional equipment created'));assert.ok(app.includes('Register actual additional setup'));assert.ok(app.includes('Record commissioning evidence'));assert.ok(app.includes('Record calibration result'));});
 
-test('New implementation module is cached for offline PWA use and release version is consistent',()=>{const sw=fs.readFileSync('./service-worker.js','utf8'),pkg=JSON.parse(fs.readFileSync('./package.json','utf8')),data=fs.readFileSync('./data.js','utf8');assert.ok(sw.includes("labos-v1.9.0"));assert.ok(sw.includes('./implementation-governance.js'));assert.equal(pkg.version,'1.9.0');assert.ok(data.includes("APP_VERSION = '1.9.0'"));});
+test('New implementation module is cached for offline PWA use and release version is consistent',()=>{const sw=fs.readFileSync('./service-worker.js','utf8'),pkg=JSON.parse(fs.readFileSync('./package.json','utf8')),data=fs.readFileSync('./data.js','utf8');assert.ok(sw.includes("labos-v1.10.0"));assert.ok(sw.includes('./implementation-governance.js'));assert.equal(pkg.version,'1.10.0');assert.ok(data.includes("APP_VERSION = '1.10.0'"));});
 const failed=results.filter(x=>!x.passed);
 for(const r of results)console.log(`${r.passed?'PASS':'FAIL'}  ${r.name}${r.passed?'':`\n  ${r.error}`}`);
 console.log(`\nImplementation governance: ${results.length-failed.length}/${results.length} passed`);

@@ -1,4 +1,4 @@
-# LabOS Prototype v1.9.0
+# LabOS Prototype v1.10.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -17,6 +17,15 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+
+## New in v1.10.0 — predecessor-driven visual topology, controlled auto-reporting & explicit lesson use
+
+- **Predecessor edits now change the visual validation topology.** Selecting one predecessor re-homes the edited test into the same main Test Leg/sub-leg, places it directly after that predecessor, moves its downstream chain with it and renumbers the flow immediately. Removing all predecessors creates a new independent main Test Leg. Cross-main-leg joins are rejected because main Test Legs are independent; multi-predecessor joins are reserved for branch merges inside one Test Leg.
+- The predecessor modal now says exactly what will happen and finishes with **Save & move into flow** rather than silently saving a hidden dependency.
+- **Automated test reports are now complete controlled drafts**, including customer, programme/project/product/revision, requirements, validation intent, acceptance criteria, method/specification revision, DUT serials/genealogy, staff qualification, equipment/asset/serial, calibration, actual execution time, complete linked live-data log, results and recorded limits, anomalies/deviations, and an automated conclusion.
+- Every unapproved report carries a prominent **AUTO-GENERATED · NOT APPROVED** watermark. Final approval is locked until the test leg is completed and must be performed by a relevant configured reviewer (Lab Manager / Validation Engineer / Quality / qualified Reviewer/Expert). Approval records reviewer, role, timestamp, conclusion and approval note; only then is the watermark removed.
+- **Lessons learned now show their operational disposition.** Each lesson explicitly shows whether it is already informing learned planning time, whether an improvement proposal is awaiting Accept/Reject, whether an accepted action is in implementation/effectiveness monitoring, or whether it remains advisory evidence. Nothing silently changes a method, specification, work instruction, calibration policy or schedule.
 
 
 ## New in v1.9.0 — evidence-gated implementation & closure
