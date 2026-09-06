@@ -1,4 +1,4 @@
-# LabOS Prototype v1.8.0
+# LabOS Prototype v1.9.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -17,6 +17,19 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+
+## New in v1.9.0 — evidence-gated implementation & closure
+
+LabOS now separates **decision**, **implementation**, **effectiveness**, and **closure**. Accepting an intelligent proposal starts a controlled action; it never marks the problem solved. Every action carries a proposal-specific closure contract with authoritative and evidence-backed gates.
+
+- Equipment-capacity proposals remain non-physical after approval. A real additional setup must be registered, commissioned/qualified, calibration-valid where required, actually used on a completed run, and its benefit reviewed before closure is enabled.
+- Technician-reallocation proposals remain open until the controlled assignment exists and subsequent execution confirms that the intended technician actually performed the work.
+- Calibration-timing proposals require an actual completed Pass calibration record and a conflict-free future schedule before effectiveness review.
+- Quality / recurring-pattern proposals require actual controlled-change evidence and subsequent no-recurrence evidence before closure.
+- Learned planning-standard changes remain reversible and require subsequent observed runs plus an effectiveness review.
+- The action UI visibly tracks `Decision accepted → Implement → Prove effectiveness → Close`; the Close button stays locked until every required gate is satisfied.
+- New equipment records enter **Commissioning** state and are excluded from deterministic scheduling until commissioning is complete; calibration rules still apply after commissioning.
 
 ## New in v1.8.0 — integrated closed-loop decision intelligence
 

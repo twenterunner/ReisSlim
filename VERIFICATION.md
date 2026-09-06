@@ -1,16 +1,31 @@
-# LabOS Prototype v1.8.0 - Verification Record
+# LabOS Prototype v1.9.0 - Verification Record
 
 Verification date: 6 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.8.0 preserves the verified planning optimizer and validation/quality controls, and replaces fragmented alert/quality/lesson/escalation queues with one correlated, closed-loop decision-intelligence model. Raw records remain auditable evidence; users act on ranked cases and proposals with Accept / Reject, controlled execution, verification of effectiveness and reversible planning-standard changes.
+**PASS** - v1.9.0 preserves the verified planning optimizer and validation/quality controls, and replaces fragmented alert/quality/lesson/escalation queues with one correlated, closed-loop decision-intelligence model. Raw records remain auditable evidence; users act on ranked cases and proposals with Accept / Reject, controlled execution, verification of effectiveness and reversible planning-standard changes.
 
 
 
 
 
 
+
+
+## v1.9.0 implementation-governance verification
+
+- Accepting a proposal alone can never satisfy an implementation or effectiveness closure contract.
+- Equipment duplication requires a real equipment-register record, commissioning evidence, valid calibration where required, completed-run utilisation, and an evidence-backed effectiveness review before closure.
+- Commissioning-state equipment is a hard planning constraint and cannot be scheduled.
+- Acknowledging a live alert does not count as clearing it for investigation effectiveness; the source signal must actually be Closed / Resolved.
+- Staff reassignment requires the controlled schedule assignment and subsequent executed-work evidence.
+- Standard-time learning requires the actual method standard change, portfolio replan evidence, subsequent observed runs and an effectiveness review.
+- Recurrence after a prevention action moves the action to `Effectiveness failed` instead of allowing closure.
+- Manual implementation/effectiveness gates require explicit objective evidence; closure remains a separate explicit management action.
+- Dedicated `verify-governance.mjs`: **13/13 PASS**, covering the state-machine, physical-capacity gates, evidence/reference requirements, app action wiring and release-version consistency.
+- Existing deterministic LabOS model suite after the governance change: **48/48 PASS**.
+- Existing decision-intelligence regression suite after the governance change: **12/12 PASS**.
 
 ## v1.8.0 integrated decision-intelligence verification
 
@@ -26,7 +41,7 @@ Verification date: 6 September 2026
 - Exception Control renders correlated **Operational decision cases** first, with the raw source-event ledger retained as a secondary evidence register: **PASS**.
 - Accepted prevention actions monitor subsequent execution evidence and move to effectiveness-failed or verification-ready based on recurrence: **PASS by code-path verification**.
 - Accepted standard-time changes preserve the prior method standard, bookings and programme forecasts for Undo: **PASS by code-path verification**.
-- Service worker uses cache `labos-v1.8.0` and explicitly caches `decision-intelligence.js`: **PASS**.
+- Service worker uses cache `labos-v1.9.0` and explicitly caches `decision-intelligence.js`: **PASS**.
 - JavaScript syntax (`app.js`, `decision-intelligence.js`, `service-worker.js`): **PASS**.
 - Dedicated decision-intelligence regression suite: **12/12 PASS**.
 - Existing deterministic LabOS model suite after integration: **48/48 PASS**.
