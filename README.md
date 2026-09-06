@@ -1,4 +1,14 @@
-# LabOS Prototype v1.10.0
+# LabOS Prototype v1.11.0
+
+## New in v1.11.0 — hierarchical, configurable validation reporting
+
+- **One report builder now supports three authoritative scopes:** a single test, an entire main Test Leg (including its sequential/parallel tests), or the complete validation programme.
+- **Incomplete / future tests remain visible in reports.** Interim reports explicitly show current status, blockers, predecessor state, sample readiness, planned/forecast dates, method-development gates and the expected remaining test effort instead of silently omitting work that is not complete yet.
+- **Comprehensive is the default.** The report engine can include 20 controlled information sections: executive summary; customer/programme; scope/status/remainder; validation topology; requirements/specifications/acceptance criteria; methods; DUT genealogy; planning/readiness; staff/competency; equipment/calibration/metrology; execution history; logged-data summary; complete logged-data appendix; results/acceptance evaluation; quality/CAPA; lessons/improvement actions; cost/effort; evidence register; conclusions/outstanding actions; and approval/release.
+- **Users can tailor every report.** Presets are provided for Comprehensive, Customer, Technical/Evidence, Management and Controlled Core reports, with per-section checkboxes for a fully custom report.
+- **Final approval is content- and completion-gated.** Draft/interim reports may omit optional content, but a final controlled approval requires all included tests to be complete and requires the mandatory identity/scope, requirements/acceptance, results, conclusion and approval sections.
+- **Draft governance is unchanged and strengthened:** every unapproved output carries the `AUTO-GENERATED · NOT APPROVED` watermark. Authorised approval records reviewer, role, time, conclusion and note, after which the released report no longer carries the watermark.
+- **Programme-level reporting is directly accessible from Validation**, while every test detail / execution queue can open the same report builder and switch scope without losing the programme context.
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 

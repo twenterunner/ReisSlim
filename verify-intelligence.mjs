@@ -93,7 +93,7 @@ test('Primary route render functions are all defined after integration',()=>{
  const src=fs.readFileSync('./app.js','utf8');for(const name of ['renderHomeV100','renderProgrammesV100','renderPlanningV100','renderExecutionHub','renderQualityHub','renderLabV100','renderInsightsV100','renderResourcesHub','renderMetrologyService','renderAnalyticsHub'])assert.ok(src.includes(`function ${name}(`),name);
 });
 test('Service worker caches the decision-intelligence module',()=>{
- const sw=fs.readFileSync('./service-worker.js','utf8');assert.ok(sw.includes('./decision-intelligence.js'));assert.ok(sw.includes('./implementation-governance.js'));assert.ok(sw.includes("labos-v1.10.0"));
+ const sw=fs.readFileSync('./service-worker.js','utf8');assert.ok(sw.includes('./decision-intelligence.js'));assert.ok(sw.includes('./implementation-governance.js'));assert.ok(sw.includes("labos-v1.11.0"));
 });
 
 const failed=results.filter(x=>!x.passed);

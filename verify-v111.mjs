@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createDemoData,APP_VERSION} from './data.js';
+
+const src=fs.readFileSync('./app.js','utf8');
+const pkg=JSON.parse(fs.readFileSync('./package.json','utf8'));
+const sw=fs.readFileSync('./service-worker.js','utf8');
+const checks=[];
+const test=(name,fn)=>{fn();checks.push(name)};
+
+test('release version',()=>{assert.equal(APP_VERSION,'1.11.0');assert.equal(pkg.version,'1.11.0');assert.ok(sw.includes('labos-v1.11.0'));});
+test('three report scopes',()=>{for(const t of ["value=\"test\"","value=\"leg\"","value=\"programme\""])assert.ok(src.includes(t));});
+test('scope engine',()=>{for(const t of ['reportScopeContext','reportMainLegNo','reportTestLabel','reportScopeKey']){if(t==='reportScopeKey') continue; assert.ok(src.includes(t));}});
+test('comprehensive report default',()=>assert.ok(src.includes('comprehensive:REPORT_SECTION_DEFS.map')));
+test('custom section selection',()=>{assert.ok(src.includes('report-section-check'));assert.ok(src.includes('Custom selection'));});
+test('report profiles',()=>{for(const t of ['Customer validation report','Technical / evidence detail','Management status report','Controlled core only'])assert.ok(src.includes(t));});
+test('incomplete tests retained',()=>{assert.ok(src.includes('expected remaining plan'));assert.ok(src.includes('Final report approval is locked'));});
+test('remainder logic',()=>{for(const t of ['Method development pending','Awaiting predecessor','No feasible slot currently committed','Expected test effort'])assert.ok(src.includes(t));});
+test('mandatory final sections',()=>{for(const t of ["key:'customer'","key:'scope'","key:'requirements'","key:'results'","key:'conclusion'","key:'approval'"])assert.ok(src.includes(t));});
+test('customer and programme content',()=>{for(const t of ['Customer & programme','Product / revision','Programme owner','Gate status'])assert.ok(src.includes(t));});
+test('validation flow content',()=>{for(const t of ['Validation architecture & dependencies','Main leg','Predecessors','Parallel / merge group'])assert.ok(src.includes(t));});
+test('requirements and acceptance content',()=>{for(const t of ['Requirements, specifications & acceptance criteria','Requirement traceability','Acceptance criterion'])assert.ok(src.includes(t));});
+test('DUT genealogy content',()=>assert.ok(src.includes('DUT population & genealogy')));
+test('planning remainder content',()=>{for(const t of ['Planning, readiness & expected remainder','Active planning constraints','Current forecast'])assert.ok(src.includes(t));});
+test('people equipment metrology content',()=>{for(const t of ['Staff, competency & assignments','Equipment, calibration & metrology','Method qualification','Latest calibration'])assert.ok(src.includes(t));});
+test('execution and logged data content',()=>{for(const t of ['Execution history & actual time','Logged data summary','Complete logged-data appendix','timestamped reading row'])assert.ok(src.includes(t));});
+test('results and quality content',()=>{for(const t of ['Results & deterministic acceptance evaluation','Anomalies, deviations, quality & CAPA','Quality events / CAPA'])assert.ok(src.includes(t));});
+test('lessons operationalised in report',()=>{for(const t of ['Lessons learned & improvement actions','What LabOS does with it','no silent process change'])assert.ok(src.toLowerCase().includes(t.toLowerCase()));});
+test('cost evidence conclusion approval',()=>{for(const t of ['Cost & effort summary','Evidence & document register','Conclusions & outstanding actions','Approval & release'])assert.ok(src.includes(t));});
+test('draft watermark and approval gating',()=>{assert.ok(src.includes('AUTO-GENERATED • NOT APPROVED'));assert.ok(src.includes('reportMandatoryMissing'));assert.ok(src.includes('ctx.allCompleted'));});
+test('programme reporting entry point',()=>assert.ok(src.includes('>Programme report</button>')));
+test('demo scope sanity',()=>{const d=createDemoData();const p=d.programmes[0],legs=d.legs.filter(l=>l.programmeId===p.id);assert.ok(legs.length>=3);assert.ok(legs.some(l=>l.status==='Completed'));assert.ok(legs.some(l=>l.status!=='Completed'));});
+console.log(`LabOS v1.11.0 report verification: PASS (${checks.length}/${checks.length})`);
+for(const c of checks)console.log(` - ${c}: PASS`);

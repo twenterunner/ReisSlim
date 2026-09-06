@@ -1,4 +1,21 @@
-# LabOS Prototype v1.10.0 - Verification Record
+# LabOS Prototype v1.11.0 - Verification Record
+
+**PASS** — hierarchical/configurable validation reporting has been added without regressing the deterministic scheduler, decision-intelligence or evidence-gated implementation workflows.
+
+## v1.11.0 focused verification
+
+- Existing deterministic model suite: **48/48 PASS**.
+- Decision intelligence suite: **12/12 PASS**.
+- Evidence-gated implementation governance: **13/13 PASS**.
+- Hierarchical/configurable report contract: **22/22 PASS**.
+- JavaScript syntax (`app.js`, `data.js`, `service-worker.js`): **PASS**.
+- Three reporting scopes present: **single test / main Test Leg / entire programme**.
+- Incomplete-scope behavior: **PASS** — current status, blockers, predecessor state, sample readiness, forecast/planned remainder and expected test effort remain in interim reports.
+- Custom report profiles and per-section inclusion controls: **PASS**.
+- Final approval gating: **PASS** — all included tests must be complete and mandatory controlled sections must be present.
+- Draft watermark and authorised reviewer release path: **PASS**.
+
+## Historical v1.10.0 verification
 
 Verification date: 6 September 2026
 
