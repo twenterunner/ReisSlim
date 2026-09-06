@@ -1,4 +1,4 @@
-# LabOS Prototype v1.5.0
+# LabOS Prototype v1.7.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -17,6 +17,30 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+## New in v1.7.0 — continuous planning optimizer with governed accept / reject
+
+- Added a **Continuous planning optimizer** to Planning. While the app is open, LabOS repeatedly runs digital-twin alternatives across the current constrained portfolio instead of waiting for a delay or manual scenario request. The default scan interval is 60 seconds, and the scan is also refreshed when Planning is rendered against changed planning inputs.
+- **Technician reallocation** is now actively searched. LabOS tests qualified alternative technicians against method competency, equipment qualification, availability and double-booking constraints, then simulates the downstream portfolio schedule. Suggestions name the concrete reassignment and, where the scheduler uses the released capacity elsewhere, identify the second programme that benefits.
+- **Bottleneck-equipment capacity** is now tested rather than inferred from utilisation alone. For each demanded equipment type, LabOS simulates one additional equivalent unit and only proposes duplication/temporary capacity when the scheduler actually uses that unit and the quantified portfolio outcome improves.
+- **Calibration timing** is actively optimised. When calibration validity threatens future work, LabOS searches for an idle four-hour calibration window, reserves a *Scheduled* calibration outage in the digital twin and replans around it. It never records calibration as passed before execution/evidence exists.
+- Every suggestion shows the recommendation class, confidence, reason, quantified benefit, programme-by-programme impact, schedule moves and assumptions **before** application.
+- Every recommendation has explicit **Accept** and **Reject** controls. Rejected proposals remain suppressed for the current planning-state signature and are eligible again only after material planning inputs change.
+- Accepted staff/calibration changes are applied only after review, are audit logged and create a full **Undo** restore point.
+- Accepting an equipment-duplication recommendation records an **approved capacity action** and its business-case impact, but does **not** create a fictional asset or move live bookings onto scenario equipment. A real new/temporary asset must still be commissioned, qualified and calibrated before operational use.
+- Recent optimizer decisions and approved capacity actions remain visible in Planning so the recommendation history is inspectable rather than ephemeral.
+- The optimizer is bounded for browser/mobile use: candidate searches are capped, scans are skipped while the page is hidden, and only material improvements are shown.
+
+## New in v1.6.0 — planning decisions instead of raw alert noise
+
+- Replaced the low-value **Live planning inputs** event table with an exception-based **Planning decision queue**. Planning now answers the operational question: *does this event actually justify changing the schedule?*
+- Raw sensor/anomaly records remain in **Execution & Live** and are correlated into **one planning decision per affected programme / test leg** rather than one row per signal.
+- A single **High statistical anomaly** no longer automatically creates a 12-hour planning hold. It still creates traceable escalation/issue evidence, but becomes a hard planning constraint only when it is Critical, breaches a hard high/low limit, or is corroborated by at least two High/Critical alerts on the same leg within 30 minutes.
+- Correlated alerts update one existing planning constraint: hold duration and impact use the maximum credible value rather than incorrectly summing duplicate sensor alerts. Source alerts/issues are retained for audit traceability.
+- Existing v1.5 browser data is normalized on load: expired auto-generated live holds stop blocking the plan and become **Awaiting Evidence**; duplicated live holds for the same programme/leg are consolidated and the redundant records are retained as **Superseded** evidence.
+- Each actionable planning card now shows the next booked work, constraint expiry, booking overlap, projected due-date margin and a plain-language recommendation. If schedule recovery is required, **Compare recovery options** opens the existing protected-vs-portfolio replanning workflow before any schedule is mutated.
+- Events whose constraint clears before the next booking are shown as **Monitor**, explicitly explaining why no schedule reshuffle is justified. Elapsed holds are separated as an **Evidence closure** queue so quality traceability is preserved without pretending that an old alert is still a scheduling constraint.
+- The decision queue includes compact portfolio counts for **Needs decision**, **Monitor only**, **Evidence closure**, **Raw signals correlated**, and **Programmes touched**, plus drill-down to all source alerts/issues.
 
 ## New in v1.5.0 — delay recovery approval, cross-programme impact and undo
 

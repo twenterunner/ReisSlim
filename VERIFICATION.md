@@ -1,16 +1,53 @@
-# LabOS Prototype v1.5.0 - Verification Record
+# LabOS Prototype v1.7.0 - Verification Record
 
 Verification date: 6 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.5.0 preserves the verified validation-plan and laboratory-planning model and adds controlled delay recovery: protected programme-only replanning, selectable cross-programme capacity trade-offs, explicit per-programme impact approval, rejection without schedule mutation, and persistent undo of accepted replans.
+**PASS** - v1.7.0 preserves the verified validation-plan, delay recovery and exception-based planning controls and adds a bounded continuous digital-twin optimizer that searches for material technician reallocations, calibration-timing changes and bottleneck-capacity opportunities. Every proposal is reviewed before mutation, supports Accept / Reject, preserves programme-level impact visibility, and accepted operational changes create an Undo restore point.
 
 
 
 
 
 
+
+## v1.7.0 continuous planning optimizer verification
+
+- Continuous optimizer is present in Planning and scans the current portfolio on a bounded 60-second interval while the app is open/visible: **PASS**.
+- Optimizer state signature covers bookings, leg readiness/preferences, programme priority/forecast, staff competency/availability, equipment status/capacity/calibration, calibration records, maintenance and active disruptions so stale proposals are invalidated when material planning inputs change: **PASS**.
+- Staff search evaluates qualified alternative technicians and accepts a candidate only when the constrained scheduler actually uses the proposed person and the quantified portfolio score improves: **PASS**.
+- Seeded deterministic example produces **“Reallocate Liam Jacobs to VP-GAMMA; free Sarah de Vries for VP-INDIA”** with downstream programme impact and no worsened programme forecast in the test fixture: **PASS**.
+- Equipment search runs a one-unit digital-twin capacity scenario and only recommends capacity when scenario equipment is actually used by scheduled work: **PASS**.
+- Seeded deterministic example produces **“Add duplicate capacity for Reliability Rack”** and quantifies the affected scenario bookings/programmes: **PASS**.
+- Accepting equipment capacity does not instantiate `SCN-EQ-01` in operational equipment and does not move real bookings onto fictional equipment; it records an approved capacity action pending real commissioning/qualification/calibration: **PASS**.
+- Synthetic calibration-conflict regression produces a calibration-timing proposal for the affected real asset: **PASS**.
+- Calibration recommendation creates a `Scheduled` calibration record and planned calibration-maintenance window; it does not record a false successful calibration result: **PASS**.
+- Recommendation UI exposes reason, confidence, quantified benefit, assumptions and programme-level forecast/risk/move impact before acceptance: **PASS by source-level UI verification**.
+- Every proposal supports **Review impact & accept** and **Reject**; rejected proposals are suppressed for the unchanged planning-state signature: **PASS**.
+- Accepted staff/calibration recommendations create a bounded restore point covering bookings, leg planning/resource preferences, programme forecasts, calibration, maintenance and optimizer decision state; persistent Undo restores those fields: **PASS**.
+- Advisor scan on the seeded portfolio completed in **571.8 ms** in the verification container; candidate loops are bounded and hidden-page scans are skipped: **PASS**.
+- JavaScript syntax (`app.js`, `planning-advisor.js`, `service-worker.js`): **PASS**.
+- Existing deterministic model suite after integration: **48/48 PASS**.
+- Service-worker cache revision is `labos-v1.7.0` and includes `planning-advisor.js`: **PASS**.
+- Full browser runtime is **not claimed**; verification consists of syntax, deterministic model tests, dedicated advisor behaviour tests, source-level UI/control checks and package integrity.
+
+## v1.6.0 actionable planning-signal verification
+
+- Planning UI no longer renders a raw disruption table; it renders one decision card per affected programme/leg: **PASS**.
+- A single High **statistical anomaly** remains traceable but does not create a hard planning disruption: **PASS**.
+- Two High/Critical alerts on the same leg within 30 minutes create exactly one correlated planning constraint: **PASS**.
+- Additional correlated alerts merge into that existing constraint rather than creating duplicate planning delays: **PASS**.
+- A single hard **High limit / Low limit** excursion remains planning-material and creates a constraint: **PASS**.
+- Correlated constraints retain source live-alert IDs and issue IDs for evidence drill-down: **PASS**.
+- Expired persisted auto-generated live holds migrate to **Awaiting Evidence**, releasing schedule capacity without silently closing the anomaly: **PASS**.
+- Multiple still-active persisted live holds on one programme/leg consolidate to one active record; redundant records remain auditable as **Superseded**: **PASS**.
+- Planning cards expose next booked work, constraint end, overlap hours, projected due margin and a recommendation before replanning: **PASS** (source-level UI verification).
+- Actionable cards reuse v1.5 **Compare recovery options**, preserving protected programme-only and selectable portfolio-aware replan/accept/reject/undo controls: **PASS**.
+- JavaScript syntax (`app.js`, `workflow.js`, `service-worker.js`): **PASS**.
+- Existing deterministic model suite: **48/48 PASS**.
+- Dedicated v1.6 live-materiality regression: **PASS**.
+- Dedicated persisted-state normalization regression: **PASS**.
 
 ## v1.5.0 delay-replanning control verification
 
