@@ -1,5 +1,18 @@
-# LabOS Prototype v1.14.0
+# LabOS Prototype v1.14.1
 
+
+## v1.14.1 — no-dead-end guided DUT blocker resolution
+
+This targeted update fixes the custody/sample blocker workflow shown in the mobile UI. The guided resolution now uses the authoritative chain-of-custody state rather than only the master DUT status, so quarantined/disposed samples are actually surfaced as actionable records. The previous dead-end replacement dialog has been replaced by a guided sample-population resolution flow with these paths:
+
+- release/disposition an affected allocated DUT with evidence;
+- replace it with an unused released DUT from the same programme;
+- register/receive new physical DUTs with serial identities and release evidence;
+- make a controlled reduced-population change using an approved deviation/concession reference;
+- reconcile a stale blocker when the current allocation is already released;
+- open the programme DUT pool directly from the blocker workflow.
+
+Every resolution path replans the affected programme and retains an undo restore point. Empty replacement pools no longer leave the user with a disabled button and no next action.
 
 ## New in v1.14.0 — durable validation designs, recursive branching & multi-scale planning
 

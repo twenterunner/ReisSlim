@@ -1,4 +1,8 @@
-# LabOS Prototype v1.14.0 - Verification Record
+# v1.14.1 targeted blocker-resolution verification
+
+The v1.14.1 patch addresses the dead-end sample/DUT blocker workflow. It validates authoritative custody-state use, actionable empty-pool recovery, evidence-gated sample registration, controlled population changes, stale-blocker reconciliation, protected replanning and undo restore points. See `verify-v1141.mjs`.
+
+# LabOS Prototype v1.14.1 - Verification Record
 
 **PASS** — executive/customer visual reporting has been added on top of the verified hierarchical reporting engine.
 
