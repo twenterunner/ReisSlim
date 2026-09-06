@@ -1,15 +1,49 @@
-# LabOS Prototype v1.3.0 - Verification Record
+# LabOS Prototype v1.5.0 - Verification Record
 
-Verification date: 5 September 2026
+Verification date: 6 September 2026
 
 ## Final acceptance result
 
-**PASS** - v1.3.0 preserves the verified operating model, allows split/merge editing inside existing validation paths, and adds coordinated prototype/validation planning plus scenario-based portfolio analysis.
+**PASS** - v1.5.0 preserves the verified validation-plan and laboratory-planning model and adds controlled delay recovery: protected programme-only replanning, selectable cross-programme capacity trade-offs, explicit per-programme impact approval, rejection without schedule mutation, and persistent undo of accepted replans.
 
 
 
 
 
+
+
+## v1.5.0 delay-replanning control verification
+
+- Delay logging and schedule application are separated: **PASS**.
+- Protected programme-only proposal uses `scheduleProgramme(...)`, preserving other programme bookings: **PASS**.
+- Portfolio-aware proposal first identifies potentially affected programmes and supports a user-selected flexible programme set while locking all others: **PASS**.
+- Programme impact comparison exposes old/new forecast, delta days, due date, delivery state and booking-move count before acceptance: **PASS**.
+- No proposal mutates `state` before explicit acceptance: **PASS**.
+- Reject leaves current bookings unchanged and marks planning dirty: **PASS**.
+- Accepted replans create a bounded planning restore point: **PASS**.
+- Undo restores bookings, leg planning fields and programme forecasts/status while retaining the logged delay/constraint and marking planning dirty: **PASS**.
+- Persistent Undo control is exposed from Validation and Planning when history exists: **PASS**.
+- Deterministic sample-delay scenario on `VP-ALPHA`: protected replan moved **0 other-programme bookings**; full portfolio recovery identified `VP-GAMMA`, `VP-GOLF`, `VP-INDIA`, `VP-BETA` and `VP-JULIET` as potentially movable: **PASS**.
+- Selected-scope recovery test allowing only `VP-ALPHA`, `VP-GAMMA` and `VP-GOLF`: every moved booking belonged to those three programmes and no protected programme moved: **PASS**.
+- JavaScript syntax (`node --check app.js`): **PASS**.
+- Extended deterministic model verification (`npm test`): **48/48 PASS**.
+- Chromium localhost smoke was attempted but did not complete within the execution environment timeout; no browser-runtime claim is made for this release.
+
+## New v1.4.0 Validation Plan Designer correction verification
+
+- JavaScript syntax (`node --check app.js`): **PASS**.
+- Extended deterministic model verification (`npm test`): **48/48 PASS**.
+- Main Test Leg connector pseudo-element is explicitly disabled in the v1.4.0 CSS override: **PASS**.
+- Validation-plan copy explicitly states that main Test Legs have no arrows between them: **PASS**.
+- Active split branches use a two-column grid and **1a / 1b remain side by side** at desktop and narrow-screen breakpoints: **PASS**.
+- The validation canvas preserves horizontal scrolling on narrow screens rather than collapsing 1a / 1b into a vertical stack: **PASS by CSS/layout inspection**.
+- First-test, add-after, new-main-leg and after-merge insertion flows all route through the shared **Select standard test / Define required specs** workflow: **PASS by code-path inspection**.
+- Specification definition captures requirement/name, category, equipment type, skill, conditions/range, measurement/accuracy, acceptance criteria, expected execution hours and DUT quantity: **PASS**.
+- Test Library assessment deterministically produces one of three outcomes — standard suitable, adaptation required, or new test development required — and exposes closest method, match score and identified gaps: **PASS**.
+- Adaptation/new-test outcomes expose estimated development days, engineering hours, technician hours, confidence and historical basis: **PASS**.
+- Specification-derived acceptance criteria and assessment metadata propagate into generated requirements/development tasks/plan explanation: **PASS by code-path inspection**.
+- Split creation allows 1a and 1b to independently use either a standard test or a specification-defined/assessed test: **PASS by code-path inspection**.
+- Existing deterministic sample-flow, development-gate, resource-planning and programme-cost checks remain intact: **48/48 PASS**.
 
 ## New v1.3.0 validation/planning verification
 
@@ -17,7 +51,7 @@ Verification date: 5 September 2026
 - Extended deterministic model verification: **PASS**.
 - Existing validation path can expose **Split here** without requiring all downstream tests to be deleted first: **PASS in the v1.3 interaction harness**.
 - Split preserves downstream common tests behind the merge junction: **PASS in the v1.3 interaction harness**.
-- Stacked sub-legs can each continue with additional sequential tests before merge: **PASS**.
+- v1.3.0 historical layout used stacked sub-legs; this remains a historical verification result and is **superseded by the v1.4.0 side-by-side layout**.
 - Merge reunites branch tails and reconnects to the preserved common path: **PASS**.
 - Planning workspace includes **Programme lanes** and **Resource plan** toggle: **PASS by rendered v1.3 harness inspection**.
 - Linked prototype-build work is included in the corresponding programme lane: **PASS by rendered v1.3 harness inspection**.
@@ -31,7 +65,7 @@ Verification date: 5 September 2026
 - Browser initialization / main workspace: **PASS; 0 uncaught JavaScript errors**.
 - Blank programme → first standard test creates **Test Leg 1 / test 1.1**: **PASS**.
 - **＋ Test below** creates **1.2** inside the same Test Leg 1 column rather than creating a new main leg: **PASS**.
-- **⑂ Split samples** from the common path creates visibly stacked **1a / 1b** sub-leg containers inside Test Leg 1: **PASS**.
+- v1.2.0 historical layout rendered **1a / 1b** stacked; this is **superseded by the v1.4.0 side-by-side layout**.
 - 1a and 1b share the same incoming predecessor and use separate DUT allocations: **PASS**.
 - Add another sequential test in 1a creates **1a.2** and retains only 1a DUT flow: **PASS**.
 - Add another sequential test in 1b creates **1b.2** and retains only 1b DUT flow: **PASS**.
@@ -42,7 +76,7 @@ Verification date: 5 September 2026
 - Additional common test after merge remains inside Test Leg 1: **PASS**.
 - **＋ Add Test Leg 2** is a separate end-of-column action and creates the first test in the next main column: **PASS**.
 - Explicit vertical flow arrows between sequential test boxes: **PASS**.
-- Explicit left-to-right arrow between logical Test Leg columns: **PASS**.
+- v1.2.0 historically rendered a left-to-right arrow between logical Test Leg columns; **v1.4.0 intentionally removes this connector**.
 - Environmental template creates multiple tests inside Test Leg 1, a split/merge, and then Test Leg 2: **PASS**.
 - Programme creation preserves `validationLegNo`, `validationSubLeg` and `validationStepNo` metadata for future editing: **PASS**.
 - 390 px mobile designer smoke: **PASS; no page-level horizontal overflow**.

@@ -1,4 +1,4 @@
-# LabOS Prototype v1.3.0
+# LabOS Prototype v1.5.0
 
 LabOS is a static, browser-only laboratory operations prototype centred on test programmes: validation-plan design, a reusable standard-test portfolio, method development, prototype/sample readiness, deterministic resource-constrained planning, guided/live execution, quality/CAPA, metrology, equipment/people/materials, cost, capacity analytics, lessons learned and management decision support.
 
@@ -17,10 +17,32 @@ All major views operate on the same browser-local canonical data model rather th
 
 
 
+
+## New in v1.5.0 — delay recovery approval, cross-programme impact and undo
+
+- Logging a delay no longer immediately reshuffles the schedule. The delay/constraint is saved first and the current schedule stays unchanged until the user approves a recovery option.
+- **Option A — Protected replan:** automatically replans only the affected programme. Existing bookings from every other programme are frozen.
+- **Option B — Portfolio-aware replan:** LabOS identifies the other programmes whose bookings/forecasts could move, names them explicitly, and lets the user choose which of those programmes may be flexed. All unselected programmes remain protected.
+- Before either proposal can be applied, LabOS shows a programme-by-programme impact table: current forecast, proposed forecast, delay/advance in days, due date, delivery-state change and booking moves.
+- Every proposal has explicit **Accept** and **Reject** controls. Reject leaves the schedule untouched and keeps planning marked for review.
+- Every accepted replan stores a bounded schedule restore point. **Undo accepted replan** restores the exact prior bookings/leg forecasts while keeping the logged operational delay active, so the schedule is visibly marked as needing review rather than silently deleting the real-world constraint.
+- Undo is available immediately after acceptance and persistently from Validation / Planning while an undo point exists.
+
+## New in v1.4.0 — corrected Validation Plan Designer and specification-driven test selection
+
+- **No arrows between main Test Legs.** Test Leg 1, Test Leg 2, Test Leg 3, etc. remain independent plan columns. Visual arrows are used only for sequence *inside* a leg; dependencies between main legs remain in the canonical dependency model without a decorative left-to-right connector.
+- **Split branches are side by side.** A split inside Test Leg 1 renders **1a** and **1b** in parallel horizontal lanes within the same Test Leg. Each branch can still contain its own sequential tests before an explicit merge. Narrow screens preserve the side-by-side relationship by allowing the validation canvas to scroll horizontally rather than stacking the branches vertically.
+- **Every test insertion supports two deliberate paths.** The user can either **Select standard test** from the released Test Library or **Define required specs** when the required validation outcome is known but the method is not.
+- **Specification capture is explicit.** The specification route captures test requirement/name, category, required equipment type, required skill, conditions/range, measurement/accuracy requirements, acceptance criteria, expected execution time and DUT quantity.
+- **Automatic Test Library assessment.** LabOS compares the entered specification against released standard methods and classifies the result as **Existing standard suitable**, **Existing standard needs adaptation**, or **New test development required**. The assessment shows the closest method, match score, capability gaps, estimated development days, engineering hours, technician hours, estimate confidence and the historical basis used.
+- **Development estimates flow into planning.** Adaptation/new-method estimates and their basis/confidence are carried into the method-development task and validation-plan explanation instead of presenting a misleading zero-day development result before the requirement has been assessed.
+- **Branch creation uses the same logic.** The first test in 1a and 1b can independently be selected from the Test Library or defined from specifications and assessed before the split is created.
+- **Existing split/merge and downstream-flow logic is retained.** Branch DUT populations remain deterministic and non-overlapping, merge remains explicit, and preserved downstream common work is reconnected after the merge.
+
 ## New in v1.3.0 — editable splits, coordinated prototype/validation planning and Scenario Studio
 
 - **Split can be inserted into an existing validation path.** A common test can be split even when later tests or later Test Legs already exist. Existing downstream work is preserved behind the merge junction rather than making the Split action disappear.
-- **Branch/merge remains explicit.** Splitting creates stacked `1a` / `1b` sub-legs, each branch can contain multiple sequential tests, and a prominent **Merge … here** action reunites the DUT populations before the preserved common path continues.
+- **Branch/merge remains explicit.** In v1.3.0 this was rendered as stacked `1a` / `1b` sub-legs; **v1.4.0 supersedes that presentation with side-by-side branches**. Each branch can contain multiple sequential tests, and a prominent **Merge … here** action reunites the DUT populations before the preserved common path continues.
 - **Programme-lane planning view.** Planning can show one colour-coded lane per validation programme; a linked prototype build appears in the same programme lane before the validation work it releases.
 - **Combined resource planning view.** A toggle switches to the resource/equipment perspective so all programme demand is combined while retaining programme ownership colours.
 - **Planning horizon control.** The planning workspace can be viewed over 14, 28 or 42 days.
@@ -34,8 +56,8 @@ The Validation Plan Designer now separates a **logical Test Leg** from the indiv
 
 - **One Test Leg = one column.** Test Leg 1, Test Leg 2, Test Leg 3, etc. are the main validation columns.
 - **Multiple sequential tests per leg.** Use **＋ Test below** to add another test beneath the selected test while remaining inside the same Test Leg.
-- **Explicit arrows show sample flow.** Sequential tests are linked top-to-bottom with visible arrows, while main Test Legs flow left-to-right.
-- **Branches stay inside their parent leg.** **⑂ Split samples** creates stacked sub-legs such as **1a** and **1b** inside the Test Leg 1 column. They do not become adjacent main Test Legs.
+- **Explicit arrows show sample flow.** In v1.2.0 sequential tests were linked top-to-bottom and main Test Legs also had left-to-right arrows; **v1.4.0 removes the arrows between main Test Legs** while retaining internal-leg sequence indicators.
+- **Branches stay inside their parent leg.** In v1.2.0 the sub-legs were stacked; **v1.4.0 keeps them inside the same parent leg but renders 1a and 1b side by side**. They do not become adjacent main Test Legs.
 - **Each sub-leg is itself a sequence.** 1a can contain 1a.1 → 1a.2 → 1a.3 while 1b independently contains 1b.1 → 1b.2, all visibly grouped under Test Leg 1.
 - **Merge is a prominent inline action.** While branches are active, **⇉ Merge 1a + 1b** is always shown directly underneath them. The user chooses the first common test after the merge.
 - **Common testing can continue after merge inside the same leg.** The merged population can proceed through 1.3 → 1.4, etc. before Test Leg 2 is created.
