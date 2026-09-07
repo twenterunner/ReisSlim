@@ -1,16 +1,13 @@
-# LabOS Prototype v1.16.0
+# LabOS Prototype v1.17.0
 
 
-## v1.16.0 — guided validation setup, sample readiness & serialized traceability
+## v1.17.0 — automated contention recovery, Programme Workspace & per-test sample allocation
 
-This release turns the four Validation Plan Designer stages into a real guided workflow rather than a decorative step indicator. A new validation now proceeds through **1 Programme & samples → 2 Design test flow → 3 Review readiness → 4 Schedule**. Each stage is durable and auto-saved.
+This release moves routine scheduling contention back where it belongs: into the automated planner. Equipment/staff occupancy and downstream predecessor sequencing are no longer presented as user-owned blockers. The planner now orders work dependency-first within priority/due-date classes and searches a full **12-month scheduling horizon**. A programme-specific replan still protects every other programme by default. If the target programme can only be recovered by flexing other programmes, LabOS automatically computes that portfolio alternative and shows programme-by-programme forecast/risk/booking impact for explicit **Accept / Reject**; accepted changes retain Undo.
 
-Sample readiness is now an explicit planning input instead of defaulting every newly constructed validation to an unavailable-sample block. The user can choose **a direct sample availability date**, **an existing prototype build**, or **create and link a new prototype build**. Prototype material-ready and expected-completion dates feed the validation readiness gate; subsequent prototype delays continue to trigger protected replanning of the linked validation by default.
+Every validation programme now has a dedicated **Programme Workspace**. From Validation, Planning or any programme link, the user can open one page containing programme/customer/product identity, delivery status, visual Test Leg/sub-leg flow, Week/Month/Quarter/Year planning swimlanes, serialized DUT traceability, requirements/specifications, prototype and method-development dependencies, budget/actual/forecast cost, execution, quality issues and reports. This removes the need to hunt through unrelated module pages to understand one programme.
 
-Every planned DUT receives a traceable serial identity. LabOS pre-populates editable `AUTO-SN-001…` serials to the configured population size, validates uniqueness, and creates the programme DUT records from exactly those user-visible identities. Future samples are represented as **Expected** until the planned availability date. The scheduler may reserve work after that future readiness date, but actual execution remains evidence-gated and still requires physical chain-of-custody release.
-
-Readiness Review explicitly checks programme identity, executable flow/topology, sample source, serial completeness/uniqueness, timing consistency and method-development needs before **Request planning** is enabled. Scheduling then creates the programme, DUT traceability, prototype dependency (when selected) and coordinated validation plan, and moves the workflow to Step 4 rather than resetting the designer.
-
+Sample allocation is now controllable at every test level. In the Validation Plan Designer, each test and recursively nested sub-leg exposes **◇ Samples**. The user may keep automatic predecessor inheritance/split logic or select exact serialized DUTs. After programme creation, each operational test leg also supports **Assign serialized samples**; only predecessor-compatible DUTs are offered. Any changed population invalidates the unlocked booking and triggers a programme replan so capacity/batching/duration remain correct.
 
 ## v1.14.1 — no-dead-end guided DUT blocker resolution
 
@@ -693,7 +690,7 @@ Prototype execution is evidence-aware: expected material availability is a plann
 The Validation Designer now supports drag-and-drop repositioning on desktop and an explicit Move control for touch/mobile. Both change the executable predecessor relationship rather than merely reordering pixels. The established recursive split/merge model remains intact, including nested branches and independent main Test Legs.
 
 
-## v1.16.0 — Guided workflow & UI simplification
+## v1.17.0 — Guided workflow & UI simplification
 
 - Schedule review no longer presents a contradictory "best feasible" message when tests remain unscheduled. The user is taken directly to grouped blockers with Resolve actions and a retry loop.
 - Auto planning also stops and opens guided blocker recovery if the requested scope cannot be fully scheduled.

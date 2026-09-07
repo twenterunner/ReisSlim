@@ -1,6 +1,6 @@
-# v1.16.0 guided validation/sample-readiness verification
+# v1.17.0 guided validation/sample-readiness verification
 
-The v1.16.0 verification adds focused checks for the real four-step Validation Plan Designer workflow, direct/prototype-driven sample availability, editable auto-generated serial identities, readiness locking, exact DUT serial transfer, prototype dependency creation, and the separation between **future planning readiness** and **physical execution custody release**. See `verify-v115.mjs`.
+The v1.17.0 verification adds focused checks for the real four-step Validation Plan Designer workflow, direct/prototype-driven sample availability, editable auto-generated serial identities, readiness locking, exact DUT serial transfer, prototype dependency creation, and the separation between **future planning readiness** and **physical execution custody release**. See `verify-v115.mjs`.
 
 - v1.15 focused verification: **21/21 PASS**.
 - Deterministic model/integrity suite: **48/48 PASS**.
@@ -501,7 +501,7 @@ This is a deterministic browser prototype verification, not a production validat
 - Help & Manual route, full user manual, quick-start guide and screenshot assets must be included in the offline service-worker cache.
 - Mobile section titles and planning intelligence dividers must wrap/read correctly.
 
-### v1.16.0 release results
+### v1.17.0 release results
 
 - Extended deterministic model verification: **PASS · 48/48 in-app integrity checks plus extended model verification**
 - Decision-intelligence verification: **PASS · 12/12**
@@ -510,3 +510,17 @@ This is a deterministic browser prototype verification, not a production validat
 - JavaScript syntax (`node --check app.js`): **PASS**
 - Legacy `verify-v115.mjs`: **18 functional v1.15 checks pass**; its three release-number assertions intentionally target v1.15.0 and are not used as v1.16 release criteria.
 - Browser screenshot smoke attempt: Chromium could not complete localhost navigation in the execution environment; no browser-render claim is made from that attempt.
+
+
+## v1.17 automated planning / programme workspace verification
+
+- Automated planner now resolves routine equipment/staff contention and predecessor sequencing before asking for a user action.
+- Dependency-depth ordering and a 366-day planning horizon are active.
+- Protected programme replan remains the default; a cross-programme recovery is previewed with programme-by-programme impact and explicit Accept / Reject.
+- Dedicated Programme Workspace consolidates validation flow, Week/Month/Quarter/Year planning, samples, requirements/specifications, prototype/method readiness, cost, execution, quality and reports.
+- Builder and operational test/sub-test legs both support explicit serialized sample assignment with predecessor compatibility.
+- Changing operational sample assignment invalidates the unlocked booking and replans the programme.
+- v1.17 focused contract: **24/24 PASS**.
+- Deterministic model suite: **48/48 PASS**.
+- Decision intelligence: **12/12 PASS**.
+- Evidence-gated implementation governance: **13/13 PASS**.
