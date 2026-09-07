@@ -1,6 +1,6 @@
-# v1.15.0 guided validation/sample-readiness verification
+# v1.16.0 guided validation/sample-readiness verification
 
-The v1.15.0 verification adds focused checks for the real four-step Validation Plan Designer workflow, direct/prototype-driven sample availability, editable auto-generated serial identities, readiness locking, exact DUT serial transfer, prototype dependency creation, and the separation between **future planning readiness** and **physical execution custody release**. See `verify-v115.mjs`.
+The v1.16.0 verification adds focused checks for the real four-step Validation Plan Designer workflow, direct/prototype-driven sample availability, editable auto-generated serial identities, readiness locking, exact DUT serial transfer, prototype dependency creation, and the separation between **future planning readiness** and **physical execution custody release**. See `verify-v115.mjs`.
 
 - v1.15 focused verification: **21/21 PASS**.
 - Deterministic model/integrity suite: **48/48 PASS**.
@@ -490,3 +490,23 @@ This verification confirms deterministic prototype behaviour, not production acc
 - ZIP integrity/path safety: checked during release packaging
 
 This is a deterministic browser prototype verification, not a production validation or regulatory qualification record.
+
+
+## v1.16 guided workflow verification
+
+- Schedule modal must distinguish feasible/no-change from incomplete/blocked schedules.
+- Incomplete schedules must expose each unscheduled leg, blocker reason and direct Resolve action; Apply is not offered until blockers are cleared.
+- Auto mode must route blocked plans into the same guided recovery workflow.
+- Planning and guided execution queues must not leave blocked work behind disabled-only actions.
+- Help & Manual route, full user manual, quick-start guide and screenshot assets must be included in the offline service-worker cache.
+- Mobile section titles and planning intelligence dividers must wrap/read correctly.
+
+### v1.16.0 release results
+
+- Extended deterministic model verification: **PASS · 48/48 in-app integrity checks plus extended model verification**
+- Decision-intelligence verification: **PASS · 12/12**
+- Evidence-gated implementation-governance verification: **PASS · 13/13**
+- v1.16 guided workflow / UI / manual contract: **PASS · 29/29**
+- JavaScript syntax (`node --check app.js`): **PASS**
+- Legacy `verify-v115.mjs`: **18 functional v1.15 checks pass**; its three release-number assertions intentionally target v1.15.0 and are not used as v1.16 release criteria.
+- Browser screenshot smoke attempt: Chromium could not complete localhost navigation in the execution environment; no browser-render claim is made from that attempt.

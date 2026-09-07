@@ -1,0 +1,35 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=path.dirname(new URL(import.meta.url).pathname);
+const read=n=>fs.readFileSync(path.join(root,n),'utf8');
+const app=read('app.js'), css=read('styles.css'), data=read('data.js'), sw=read('service-worker.js'), index=read('index.html'), pkg=JSON.parse(read('package.json')), manual=read('LabOS-User-Manual.html'), quick=read('LabOS-Quick-Start.html');
+let pass=0,fail=0;
+function t(name,cond){if(cond){console.log(`PASS  ${name}`);pass++;}else{console.error(`FAIL  ${name}`);fail++;}}
+
+t('version is 1.16.0',pkg.version==='1.16.0'&&/APP_VERSION\s*=\s*['"]1\.16\.0/.test(data)&&/labos-v1\.16\.0/.test(sw));
+t('guided schedule recovery exists',app.includes('Scheduling cannot complete until the blockers below are resolved.')&&app.includes('Resolve blockers')&&app.includes('Retry scheduling'));
+t('unscheduled schedule cannot be applied as coherent plan',app.includes('LabOS has <b>not</b> applied a partial schedule')&&app.includes("if(uns){")&&app.indexOf('Apply recommended schedule')>app.indexOf('if(!diff.length)'));
+t('old misleading feasible sentence removed',!app.includes('Current schedule is already the best feasible schedule; nothing needs to move.'));
+t('programme auto replan checks unscheduled first',/function smartProgrammeReplan[\s\S]{0,500}probe\.diagnostics\.unscheduled\.length/.test(app));
+t('portfolio auto replan checks unscheduled first',/function smartPortfolioReplan[\s\S]{0,500}probe\.diagnostics\.unscheduled\.length/.test(app));
+t('planning unscheduled rows expose Resolve',app.includes('data-act="guided-blocker" data-id="${l.id}">Resolve blocker →'));
+t('guided LES blocked work exposes resolver',app.includes('Resolve blocker →</button>`}</div></div>`'));
+t('compact execution queue exposes resolver',app.includes('data-act="guided-blocker" data-id="${l.id}">Resolve →'));
+t('blocker modal has schedule retry',app.includes('↻ Re-run programme schedule'));
+t('global guided workflow launcher exists',app.includes('function injectGuidedWorkflowLauncher()')&&app.includes('Guided actions · every blocked path should lead to a resolvable next step'));
+t('guided workflow coverage spans all operational workspaces',['builder','requirements','specifications','custody','guided','live','control','duts','library','equipment','calibration','metrology','materials','external','people','costs','capacity','twin','knowledge','maintenance','audit','admin','resources','metrologyservice','analytics','testportfolio'].every(r=>app.includes(`${r}:{title:`)));
+t('progressive disclosure exists',app.includes('function applyProgressiveDisclosure()')&&css.includes('.foldable-section'));
+t('planning intelligence formatting override exists',css.includes('.planning-intelligence-divider{height:auto!important')&&css.includes('.section-title .hint{grid-column:1/3'));
+t('help route registered',index.includes('data-route="help"')&&app.includes('help:renderHelp'));
+t('manual is linked from app',app.includes('LabOS-User-Manual.html')&&app.includes('LabOS-Quick-Start.html'));
+t('manual has requested workflow topics',['prototype','validation','planning','execution','reporting','quality','troubleshooting'].every(x=>manual.includes(`id="${x}"`)));
+t('manual uses prototype screenshot',manual.includes('manual-prototype-build.jpg'));
+t('manual uses validation screenshot',manual.includes('manual-validation-designer.jpg'));
+t('manual documents report scope/presets/anonymisation',manual.includes('single test')&&manual.includes('entire Test Leg')&&manual.includes('entire programme')&&manual.includes('anonymisation'));
+t('manual documents guided blocker principle',manual.includes('Understand → Act → Evidence → Recheck / Replan → Continue'));
+t('quick start covers six common tasks',quick.includes('1 · Create a validation programme')&&quick.includes('6 · Act on a lesson / intelligence proposal'));
+t('service worker caches manuals',['LabOS-User-Manual.html','LabOS-Quick-Start.html','manual-validation-designer.jpg','manual-prototype-build.jpg','manual-schedule-blocker.jpg','manual-decision-intelligence.jpg'].every(x=>sw.includes(x)));
+t('package includes v116 verifier',pkg.scripts?.['verify:v116']==='node verify-v116.mjs');
+for(const f of ['manual-validation-designer.jpg','manual-prototype-build.jpg','manual-schedule-blocker.jpg','manual-decision-intelligence.jpg','manual-traceability.jpg'])t(`manual asset exists: ${f}`,fs.existsSync(path.join(root,f))&&fs.statSync(path.join(root,f)).size>1000);
+console.log(`\n${pass}/${pass+fail} checks passed`);
+process.exitCode=fail?1:0;

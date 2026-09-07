@@ -1,7 +1,7 @@
-# LabOS Prototype v1.15.0
+# LabOS Prototype v1.16.0
 
 
-## v1.15.0 — guided validation setup, sample readiness & serialized traceability
+## v1.16.0 — guided validation setup, sample readiness & serialized traceability
 
 This release turns the four Validation Plan Designer stages into a real guided workflow rather than a decorative step indicator. A new validation now proceeds through **1 Programme & samples → 2 Design test flow → 3 Review readiness → 4 Schedule**. Each stage is durable and auto-saved.
 
@@ -691,3 +691,14 @@ Prototype build requests can now be linked to the entire validation programme, a
 Prototype execution is evidence-aware: expected material availability is a planning input, while starting the build requires a physical material-release reference and completion requires completion evidence. The prototype detail screen is now a guided workflow rather than a passive status modal.
 
 The Validation Designer now supports drag-and-drop repositioning on desktop and an explicit Move control for touch/mobile. Both change the executable predecessor relationship rather than merely reordering pixels. The established recursive split/merge model remains intact, including nested branches and independent main Test Legs.
+
+
+## v1.16.0 — Guided workflow & UI simplification
+
+- Schedule review no longer presents a contradictory "best feasible" message when tests remain unscheduled. The user is taken directly to grouped blockers with Resolve actions and a retry loop.
+- Auto planning also stops and opens guided blocker recovery if the requested scope cannot be fully scheduled.
+- Blocked execution and planning rows expose a direct Resolve blocker action instead of dead/disabled actions.
+- Every operational workspace now includes a compact Guided workflow foldout with task-based entry points; nested workspaces route to the relevant action rather than leaving the user to hunt through modules.
+- Secondary information sections use progressive disclosure to reduce page clutter, especially on mobile.
+- Mobile section headings and planning-intelligence dividers were corrected to prevent headings/hints from running into each other.
+- A Help & Manual workspace was added plus a full HTML user manual and quick-start guide using real prototype screenshots and worked examples.
