@@ -1,4 +1,15 @@
-# LabOS Prototype v1.14.1
+# LabOS Prototype v1.15.0
+
+
+## v1.15.0 — guided validation setup, sample readiness & serialized traceability
+
+This release turns the four Validation Plan Designer stages into a real guided workflow rather than a decorative step indicator. A new validation now proceeds through **1 Programme & samples → 2 Design test flow → 3 Review readiness → 4 Schedule**. Each stage is durable and auto-saved.
+
+Sample readiness is now an explicit planning input instead of defaulting every newly constructed validation to an unavailable-sample block. The user can choose **a direct sample availability date**, **an existing prototype build**, or **create and link a new prototype build**. Prototype material-ready and expected-completion dates feed the validation readiness gate; subsequent prototype delays continue to trigger protected replanning of the linked validation by default.
+
+Every planned DUT receives a traceable serial identity. LabOS pre-populates editable `AUTO-SN-001…` serials to the configured population size, validates uniqueness, and creates the programme DUT records from exactly those user-visible identities. Future samples are represented as **Expected** until the planned availability date. The scheduler may reserve work after that future readiness date, but actual execution remains evidence-gated and still requires physical chain-of-custody release.
+
+Readiness Review explicitly checks programme identity, executable flow/topology, sample source, serial completeness/uniqueness, timing consistency and method-development needs before **Request planning** is enabled. Scheduling then creates the programme, DUT traceability, prototype dependency (when selected) and coordinated validation plan, and moves the workflow to Step 4 rather than resetting the designer.
 
 
 ## v1.14.1 — no-dead-end guided DUT blocker resolution

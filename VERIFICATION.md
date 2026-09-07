@@ -1,3 +1,12 @@
+# v1.15.0 guided validation/sample-readiness verification
+
+The v1.15.0 verification adds focused checks for the real four-step Validation Plan Designer workflow, direct/prototype-driven sample availability, editable auto-generated serial identities, readiness locking, exact DUT serial transfer, prototype dependency creation, and the separation between **future planning readiness** and **physical execution custody release**. See `verify-v115.mjs`.
+
+- v1.15 focused verification: **21/21 PASS**.
+- Deterministic model/integrity suite: **48/48 PASS**.
+- JavaScript syntax (`app.js`, `advanced.js`, `planner.js`, `prototypes.js`, `data.js`): **PASS**.
+- Historical intelligence/governance functional assertions remain green except their legacy service-worker assertions intentionally hard-code the older `labos-v1.12.0` cache name; those version-only checks are superseded by the v1.15 release check.
+
 # v1.14.1 targeted blocker-resolution verification
 
 The v1.14.1 patch addresses the dead-end sample/DUT blocker workflow. It validates authoritative custody-state use, actionable empty-pool recovery, evidence-gated sample registration, controlled population changes, stale-blocker reconciliation, protected replanning and undo restore points. See `verify-v1141.mjs`.
